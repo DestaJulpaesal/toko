@@ -1,0 +1,23 @@
+import 'dotenv/config';
+import app from './app.js';
+import prisma from './config/db.js';
+
+const PORT = process.env.PORT || 5000;
+
+async function startServer() {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET wajib di-set di environment variable');
+  }
+  try {
+    await prisma.$connect();
+    console.log('Database connection ready');
+  } catch (error) {
+    console.warn(`Database warm-up failed: ${error.message}`);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer();

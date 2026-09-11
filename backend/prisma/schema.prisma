@@ -1,0 +1,414 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  CASHIER
+  PARCEL_MANAGER
+}
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+  HIDDEN
+  OUT_OF_STOCK
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  DEBT
+}
+
+enum OrderType {
+  STORE
+  ONLINE
+  WHATSAPP
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum ParcelType {
+  STANDARD
+  CUSTOM
+}
+
+enum SiteContentType {
+  TERMS
+  PRIVACY
+  CONTACT
+  FAQ
+  HELP
+  TESTIMONIAL
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  phone         String?
+  role          Role     @default(CASHIER)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders        Order[]
+  transactions  FinanceTransaction[]
+  regionId      String?
+  region        ParcelRegion? @relation("RegionMembers", fields: [regionId], references: [id], onDelete: SetNull)
+  managedRegions ParcelRegion[] @relation("RegionManager")
+  collectionSessions CollectionSession[] @relation("CollectionManager")
+  verifiedCollections CollectionSession[] @relation("CollectionVerifier")
+}
+
+model ParcelRegion {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  managerId   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  manager     User?    @relation("RegionManager", fields: [managerId], references: [id], onDelete: SetNull)
+  users       User[] @relation("RegionMembers")
+  participants ParcelParticipant[] @relation("RegionParticipants")
+  collectionSessions CollectionSession[]
+
+  @@index([managerId])
+}
+
+model Customer {
+  id            String   @id @default(cuid())
+  name          String
+  phone         String?
+  email         String?
+  address       String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders        Order[]
+  debts         DebtRecord[]
+  parcelParticipants ParcelParticipant[]
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products    Product[]
+}
+
+model Product {
+  id            String         @id @default(cuid())
+  sku           String         @unique
+  name          String
+  slug          String         @unique
+  description   String?
+  categoryId    String
+  imageUrl      String?
+  status        ProductStatus  @default(ACTIVE)
+  isFeatured    Boolean        @default(false)
+  isParcel      Boolean        @default(false)
+  stockWarning  Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  category      Category       @relation(fields: [categoryId], references: [id])
+  variants      ProductVariant[]
+  orderItems    OrderItem[]
+  parcelItems   ParcelItem[]
+  stockMovements StockMovement[]
+}
+
+model ProductVariant {
+  id            String        @id @default(cuid())
+  productId     String
+  name          String        // e.g. "Bungkus", "Sachet", "Kg"
+  sku           String        @unique
+  barcode       String?       @unique
+  basePrice     Decimal       @db.Decimal(12,2)
+  sellPrice     Decimal       @db.Decimal(12,2)
+  wholesalePrice Decimal?     @db.Decimal(12,2)
+  stockQty      Int           @default(0)
+  unit          String
+  isDefault     Boolean       @default(false)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  product       Product       @relation(fields: [productId], references: [id])
+  orderItems    OrderItem[]
+  stockMovements StockMovement[]
+}
+
+model StockMovement {
+  id              String           @id @default(cuid())
+  productId       String
+  variantId       String?
+  type            String           // IN, OUT, ADJUSTMENT, RETURN
+  quantity        Int
+  note            String?
+  reference       String?
+  createdAt       DateTime         @default(now())
+
+  product         Product          @relation(fields: [productId], references: [id])
+  variant         ProductVariant?  @relation(fields: [variantId], references: [id])
+}
+
+model Parcel {
+  id            String       @id @default(cuid())
+  name          String
+  slug          String       @unique
+  description   String?
+  type          ParcelType   @default(STANDARD)
+  price         Decimal      @db.Decimal(12,2)
+  imageUrl      String?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  items         ParcelItem[]
+  orderItems    OrderItem[]
+  participants  ParcelParticipant[]
+  basePrice     Decimal?     @db.Decimal(12,2)
+  managerCommission Decimal   @default(0) @db.Decimal(12,2)
+}
+
+model ParcelProgram {
+  id           String   @id @default(cuid())
+  name         String
+  year         Int
+  targetAmount Decimal  @db.Decimal(12,2)
+  isActive     Boolean  @default(true)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  participants ParcelParticipant[]
+  @@unique([name, year])
+}
+
+model ParcelParticipant {
+  id              String   @id @default(cuid())
+  customerId      String?
+  parcelId        String?
+  programId       String?
+  name            String
+  participantPhone String?
+  targetAmount    Decimal  @db.Decimal(12,2)
+  regionId        String?
+  salePrice       Decimal  @default(0) @db.Decimal(12,2)
+  grossMargin     Decimal  @default(0) @db.Decimal(12,2)
+  managerCommission Decimal @default(0) @db.Decimal(12,2)
+  commissionStatus String   @default("PENDING")
+  contributionAmount Decimal @db.Decimal(12,2)
+  frequency       String   @default("DAILY")
+  startDate       DateTime @default(now())
+  endDate         DateTime?
+  status          String   @default("ACTIVE")
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  parcel          Parcel? @relation(fields: [parcelId], references: [id], onDelete: SetNull)
+  program         ParcelProgram? @relation(fields: [programId], references: [id], onDelete: SetNull)
+  contributions   ParcelContribution[]
+  collectionEntries CollectionEntry[]
+  region          ParcelRegion? @relation("RegionParticipants", fields: [regionId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([parcelId])
+  @@index([programId])
+  @@index([regionId])
+}
+
+model ParcelContribution {
+  id            String   @id @default(cuid())
+  participantId String
+  amount        Decimal  @db.Decimal(12,2)
+  paidAt        DateTime @default(now())
+  note          String?
+  createdAt     DateTime @default(now())
+
+  participant   ParcelParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([participantId])
+  @@index([paidAt])
+}
+
+model CollectionSession {
+  id             String   @id @default(cuid())
+  regionId       String
+  managerId      String
+  collectionDate DateTime @default(now())
+  status         String   @default("SUBMITTED")
+  expectedAmount Decimal  @default(0) @db.Decimal(12,2)
+  actualCash     Decimal?
+  difference     Decimal?
+  note           String?
+  verifiedAt     DateTime?
+  verifiedById   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  region         ParcelRegion @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  manager        User @relation("CollectionManager", fields: [managerId], references: [id], onDelete: Restrict)
+  verifiedBy     User? @relation("CollectionVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  entries        CollectionEntry[]
+
+  @@index([regionId, collectionDate])
+  @@index([managerId, collectionDate])
+}
+
+model CollectionEntry {
+  id            String   @id @default(cuid())
+  sessionId     String
+  participantId String
+  amount        Decimal  @db.Decimal(12,2)
+  note          String?
+  createdAt     DateTime @default(now())
+
+  session       CollectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participant   ParcelParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, participantId])
+  @@index([participantId])
+}
+
+model ParcelItem {
+  id            String   @id @default(cuid())
+  parcelId      String
+  productId     String
+  quantity      Int
+  notes         String?
+
+  parcel        Parcel   @relation(fields: [parcelId], references: [id])
+  product       Product  @relation(fields: [productId], references: [id])
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  orderNumber    String      @unique
+  type           OrderType
+  status         OrderStatus @default(PENDING)
+  customerId     String?
+  userId         String?
+  subtotal       Decimal     @db.Decimal(12,2)
+  discount       Decimal     @db.Decimal(12,2) @default(0)
+  shippingCost   Decimal     @db.Decimal(12,2) @default(0)
+  total          Decimal     @db.Decimal(12,2)
+  notes          String?
+  whatsappLink   String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  customer       Customer?   @relation(fields: [customerId], references: [id])
+  user           User?       @relation(fields: [userId], references: [id])
+  items          OrderItem[]
+  financeEntries FinanceTransaction[]
+}
+
+model OrderItem {
+  id            String   @id @default(cuid())
+  orderId       String
+  productId     String?
+  variantId     String?
+  parcelId      String?
+  name          String
+  quantity      Int
+  unitPrice     Decimal  @db.Decimal(12,2)
+  total         Decimal  @db.Decimal(12,2)
+  createdAt     DateTime @default(now())
+
+  order         Order    @relation(fields: [orderId], references: [id])
+  product       Product? @relation(fields: [productId], references: [id])
+  variant       ProductVariant? @relation(fields: [variantId], references: [id])
+  parcel        Parcel?  @relation(fields: [parcelId], references: [id])
+}
+
+model FinanceTransaction {
+  id            String           @id @default(cuid())
+  orderId       String?
+  userId        String?
+  type          TransactionType
+  amount        Decimal          @db.Decimal(12,2)
+  description   String
+  category      String?
+  paymentMethod String?
+  createdAt     DateTime         @default(now())
+
+  order         Order?           @relation(fields: [orderId], references: [id])
+  user          User?            @relation(fields: [userId], references: [id])
+}
+
+model DebtRecord {
+  id            String   @id @default(cuid())
+  customerId    String
+  amount        Decimal  @db.Decimal(12,2)
+  status        String   @default("OPEN")
+  dueDate       DateTime?
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  customer      Customer @relation(fields: [customerId], references: [id])
+}
+
+model PromoCampaign {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  description   String?
+  discountType  String    @default("PERCENT")
+  discountValue Decimal   @db.Decimal(12,2)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model SiteProfile {
+  id        String   @id @default("main")
+  headline  String
+  story     String
+  photoUrl  String?
+  updatedAt DateTime @updatedAt
+}
+
+model SiteContent {
+  id          String          @id @default(cuid())
+  type        SiteContentType
+  title       String
+  slug        String          @unique
+  content     String
+  sortOrder   Int             @default(0)
+  isPublished Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}

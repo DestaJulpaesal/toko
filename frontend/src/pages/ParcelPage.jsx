@@ -1,0 +1,165 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import PublicHeader from '../components/PublicHeader';
+import PublicFooter from '../components/PublicFooter';
+import { apiFetch } from '../services/api';
+import { useCart } from '../context/CartContext';
+
+export default function ParcelPage() {
+  const { addItem, totalItems } = useCart();
+  const [packages, setPackages] = useState([]);
+  const [toastMessage, setToastMessage] = useState('');
+
+  useEffect(() => {
+    const loadParcels = async () => {
+      try {
+        const response = await apiFetch('/parcels');
+        const data = await response.json();
+
+        if (response.ok && data.success && Array.isArray(data.parcels)) {
+          setPackages(
+            data.parcels.map((parcel) => ({
+              id: parcel.id,
+              name: parcel.name,
+              category: parcel.type === 'CUSTOM' ? 'Acara' : 'Parsel',
+              price: Number(parcel.price || 0),
+              originalPrice: Number(parcel.price || 0),
+              discountPercent: 0,
+              badge: parcel.type === 'CUSTOM' ? 'Custom' : 'Parsel',
+              text: parcel.description || 'Paket yang dibuat sesuai kebutuhan pelanggan.',
+              tag: parcel.type === 'CUSTOM' ? 'Custom Acara' : 'Best Seller',
+              artClass: parcel.type === 'CUSTOM' ? 'purple' : 'warm',
+            }))
+          );
+        }
+      } catch {
+        setPackages([]);
+      }
+    };
+
+    loadParcels();
+  }, []);
+
+  const handleAddToCart = (item) => {
+    addItem(item);
+    setToastMessage(`✓ "${item.name}" berhasil ditambahkan ke keranjang!`);
+    setTimeout(() => setToastMessage(''), 3500);
+  };
+
+  return (
+    <div className="public-page">
+      <PublicHeader />
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="cart-toast" role="status">
+          <span className="toast-check">✓</span>
+          <span><strong>{toastMessage}</strong></span>
+          <Link to="/cart">Lihat keranjang ({totalItems})</Link>
+          <button onClick={() => setToastMessage('')} aria-label="Tutup notifikasi">×</button>
+        </div>
+      )}
+
+      <main className="parcel-page-shell">
+        <section className="inner-hero parcel-hero">
+          <div>
+            <span className="eyebrow dark">Parsel & Paket Acara</span>
+            <h1>Paket Siap Berbagi dengan Diskon Spesial.</h1>
+          </div>
+          <div>
+            <p>
+              Mulai dari parcel keluarga, hampers hari raya, hingga paket hajatan syukuran.
+              Semua dikemas rapi, berkualitas, dan hemat dengan potongan harga langsung!
+            </p>
+            <div className="parcel-hero-actions">
+              <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer" className="btn btn-secondary">
+                Chat Admin via WhatsApp
+              </a>
+              <Link to="/cart" className="btn btn-primary">
+                Keranjang Belanja ({totalItems})
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="parcel-grid">
+          {packages.map((item) => {
+            const savings = item.originalPrice - item.price;
+            const waUrl = `https://wa.me/6281234567890?text=${encodeURIComponent(
+              `Halo Toko Glosir, saya ingin pesan *${item.name}* dengan harga promo Rp ${item.price.toLocaleString('id-ID')} (Diskon ${item.discountPercent}%). Mohon info stok dan pengirimannya ya.`
+            )}`;
+
+            return (
+              <article key={item.id} className="parcel-feature-card">
+                <div className={`parcel-art parcel-art-${item.artClass}`}>
+                  <div className="parcel-art-content">
+                    <span>GLOSIR</span>
+                    <small>{item.tag}</small>
+                  </div>
+                  {item.originalPrice && (
+                    <div className="parcel-art-discount-badge">
+                      -{item.discountPercent}%
+                    </div>
+                  )}
+                </div>
+
+                <div className="catalog-badges-wrap">
+                  <span className="catalog-badge">{item.badge}</span>
+                  <span className="discount-tag">-{item.discountPercent}%</span>
+                </div>
+
+                <h2>{item.name}</h2>
+                <p>{item.text}</p>
+
+                <div className="parcel-pricing-box">
+                  <div className="price-stack">
+                    <strong className="current-price">Rp {item.price.toLocaleString('id-ID')}</strong>
+                    <div className="original-price-row">
+                      <del className="original-price">Rp {item.originalPrice.toLocaleString('id-ID')}</del>
+                      <span className="save-pill">Hemat Rp {savings.toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="parcel-card-footer">
+                  <button
+                    className="btn btn-primary full"
+                    onClick={() => handleAddToCart(item)}
+                  >
+                    Tambah ke Keranjang
+                  </button>
+                  <a
+                    href={waUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-secondary full parcel-wa-btn"
+                  >
+                    Pesan via WhatsApp
+                  </a>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        <section className="parcel-cta">
+          <div>
+            <span className="eyebrow light">Butuh Kustomisasi?</span>
+            <h2>Ceritakan Kebutuhan Acara & Anggaran Anda.</h2>
+            <p>Kami siap menyusun komposisi paket parcel atau bingkisan hajatan yang tepat sesuai anggaran dan selera Anda.</p>
+          </div>
+          <a
+            href="https://wa.me/6281234567890?text=Halo%20Glosir,%20saya%20butuh%20konsultasi%20custom%20paket%20parcel%20dan%20hajatan"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-secondary"
+          >
+            Konsultasi via WhatsApp
+          </a>
+        </section>
+      </main>
+
+      <PublicFooter />
+    </div>
+  );
+}

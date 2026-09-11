@@ -1,0 +1,21 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Sync Glosir DB",
+			"type": "shell",
+			"command": "cd /d C:\\Glosir\\backend && npx prisma db push",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Sync Glosir DB",
+			"type": "shell",
+			"command": "cd C:\\Glosir\\backend; npx prisma db push",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
