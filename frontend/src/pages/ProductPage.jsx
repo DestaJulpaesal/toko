@@ -6,8 +6,6 @@ import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 
-const filters = ['Semua', 'Glosir', 'Parsel', 'Promo', 'Hajatan'];
-
 export default function ProductPage() {
   const { addItem, totalItems } = useCart();
   const [activeFilter, setActiveFilter] = useState('Semua');
@@ -17,6 +15,7 @@ export default function ProductPage() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('default');
   const { toggleFavorite, isFavorite } = useFavorites();
+  const filters = ['Semua', 'Promo', ...new Set(products.map((product) => product.category).filter(Boolean))];
 
   useEffect(() => {
     try {
@@ -26,15 +25,41 @@ export default function ProductPage() {
       // Ignore an invalid local cache and use the API response.
     }
 
-    apiFetch('/products')
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error('Product API unavailable'))))
-      .then((data) => {
-        if (data.success && Array.isArray(data.products)) {
-          setProducts(data.products);
-          localStorage.setItem('glosir_products_cache', JSON.stringify(data.products));
-        } else {
-          setProducts([]);
-        }
+    Promise.all([apiFetch('/products'), apiFetch('/parcels'), apiFetch('/event-packages')])
+      .then(async ([productResponse, parcelResponse, eventResponse]) => {
+        const [productData, parcelData, eventData] = await Promise.all([productResponse.json(), parcelResponse.json(), eventResponse.json()]);
+        const catalogProducts = productData.success && Array.isArray(productData.products) ? productData.products : [];
+        const catalogParcels = parcelData.success && Array.isArray(parcelData.parcels) ? parcelData.parcels.map((parcel) => ({
+          id: `parcel-${parcel.id}`,
+          parcelId: parcel.id,
+          name: parcel.name,
+          category: parcel.type === 'CUSTOM' ? 'Acara' : 'Parsel',
+          price: Number(parcel.price || 0),
+          originalPrice: null,
+          discountPercent: 0,
+          badge: parcel.type === 'CUSTOM' ? 'Paket Acara' : 'Parsel',
+          stock: null,
+          description: parcel.description || 'Paket siap berbagi dari Glosir.',
+          items: parcel.items || [],
+          detailPath: '/parsel',
+        })) : [];
+        const catalogEvents = eventData.success && Array.isArray(eventData.packages) ? eventData.packages.map((item) => ({
+          id: `event-${item.id}`,
+          eventPackageId: item.id,
+          name: item.name,
+          category: 'Paket Acara',
+          price: Number(item.price || 0),
+          originalPrice: null,
+          discountPercent: 0,
+          badge: item.isCustom ? 'Custom Acara' : 'Paket Acara',
+          stock: null,
+          description: item.description || 'Paket kebutuhan acara pilihan Glosir.',
+          items: (item.items || []).map((entry) => ({ id: entry.id, quantity: entry.quantity, productName: entry.variant?.product?.name, variantName: entry.variant?.name })),
+          detailPath: '/paket-acara',
+        })) : [];
+        const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
+        setProducts(merged);
+        localStorage.setItem('glosir_products_cache', JSON.stringify(merged));
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
@@ -49,10 +74,9 @@ export default function ProductPage() {
         const hasDiscount = (product.originalPrice && product.originalPrice > product.price) || (product.discountPercent && product.discountPercent > 0);
         return hasDiscount || product.badge?.toLowerCase().includes('promo') || product.badge?.toLowerCase().includes('diskon');
       }
-      if (activeFilter === 'Hajatan') return product.category === 'Acara';
       return product.category === activeFilter;
     })
-    .sort((first, second) => sort === 'low' ? first.price - second.price : sort === 'high' ? second.price - first.price : first.id - second.id);
+    .sort((first, second) => sort === 'low' ? first.price - second.price : sort === 'high' ? second.price - first.price : 0);
 
   return (
     <div className="public-page">
@@ -64,7 +88,7 @@ export default function ProductPage() {
             <h1>Produk Glosir & Parcel</h1>
           </div>
           <div className="catalog-actions">
-            <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer" className="btn btn-secondary">Pesan via WhatsApp</a>
+            <a href={`https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}`} target="_blank" rel="noreferrer" className="btn btn-secondary">Pesan via WhatsApp</a>
             <Link to="/cart" className="btn btn-primary">Keranjang ({totalItems})</Link>
           </div>
         </header>
@@ -90,7 +114,7 @@ export default function ProductPage() {
           {visibleProducts.map((product) => (
             <article key={product.id} className="catalog-card">
               <button className={`favorite-button ${isFavorite(product.id) ? 'active' : ''}`} onClick={() => toggleFavorite(product)} aria-label="Simpan produk">{isFavorite(product.id) ? '★' : '☆'}</button>
-              <Link to={`/products/${product.id}`} className="catalog-image product-art-link">
+              <Link to={product.detailPath || `/products/${product.id}`} className="catalog-image product-art-link">
                 <span className="product-art-label">{product.name.split(' ').slice(0, 2).join(' ')}</span>
                 <small>{product.category}</small>
               </Link>
@@ -104,6 +128,14 @@ export default function ProductPage() {
               </div>
               <Link to={`/products/${product.id}`} className="catalog-title-link"><h3>{product.name}</h3></Link>
               <p>{product.category}</p>
+              {product.items?.length > 0 && (
+                <ul className="catalog-package-items">
+                  {product.items.slice(0, 4).map((entry) => (
+                    <li key={entry.id}>{entry.quantity}× {entry.productName || entry.variant?.product?.name || 'Produk'}{entry.variantName || entry.variant?.name ? ` (${entry.variantName || entry.variant.name})` : ''}</li>
+                  ))}
+                  {product.items.length > 4 && <li>+{product.items.length - 4} item lainnya</li>}
+                </ul>
+              )}
               <div className="catalog-meta">
                 <div className="price-stack">
                   <strong className="current-price">Rp {product.price.toLocaleString('id-ID')}</strong>
@@ -114,7 +146,7 @@ export default function ProductPage() {
                     </div>
                   )}
                 </div>
-                <small>{product.stock} stok</small>
+                {product.stock !== null && <small>{product.stock} stok</small>}
               </div>
               <button className="btn btn-primary full" onClick={() => { addItem(product); setAddedProduct(product.name); }}>
                 Tambah ke keranjang

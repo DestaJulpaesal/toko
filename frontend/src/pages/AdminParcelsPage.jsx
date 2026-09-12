@@ -6,16 +6,18 @@ import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableAction
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
 
-const emptyForm = { name: '', code: '', type: 'Standard', price: '', originalPrice: '', status: 'Aktif' };
+const emptyForm = { name: '', code: '', type: 'Standard', price: '', originalPrice: '', status: 'Aktif', isManualPrice: false, items: [] };
 
 export default function AdminParcelsPage() {
   const [parcels, setParcels] = useState([]);
+  const [products, setProducts] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
 
   const loadParcels = async () => {
     try {
@@ -39,7 +41,13 @@ export default function AdminParcelsPage() {
 
   useEffect(() => {
     loadParcels();
+    apiFetch('/products?all=true').then((response) => response.json()).then((data) => setProducts(data.products || [])).catch(() => setProducts([]));
   }, []);
+
+  const toggleItem = (variantId) => setForm((current) => ({ ...current, items: current.items.some((item) => item.variantId === variantId) ? current.items.filter((item) => item.variantId !== variantId) : [...current.items, { variantId, quantity: 1 }] }));
+  const updateItemQuantity = (variantId, quantity) => setForm((current) => ({ ...current, items: current.items.map((item) => item.variantId === variantId ? { ...item, quantity: quantity === '' ? '' : Number(quantity) } : item) }));
+  const autoPrice = form.items.reduce((sum, item) => sum + Number(products.find((product) => product.variantId === item.variantId)?.price || 0) * Number(item.quantity || 0), 0);
+  const filteredProducts = products.filter((product) => `${product.name} ${product.sku} ${product.barcode || ''}`.toLowerCase().includes(productSearch.toLowerCase().trim()));
 
   const visibleParcels = parcels.filter((parcel) => `${parcel.name} ${parcel.code} ${parcel.type}`.toLowerCase().includes(search.toLowerCase()));
   const allSelected = visibleParcels.length > 0 && visibleParcels.every((parcel) => selectedIds.includes(parcel.id));
@@ -56,16 +64,17 @@ export default function AdminParcelsPage() {
 
   const submitForm = async (event) => {
     event.preventDefault();
-    if (!form.name.trim() || !form.code.trim() || !form.price) { setNotice('Lengkapi nama, kode, dan harga parsel.'); return; }
+    if (!form.name.trim() || !form.code.trim() || !form.items.length || form.items.some((item) => !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) || (form.isManualPrice && !form.price)) { setNotice('Lengkapi nama, kode, isi parsel, dan jumlah barang minimal 1.'); return; }
     if (!await confirmAction(`Yakin ingin ${editingId ? 'memperbarui parsel ini' : 'menambahkan parsel baru'}?`)) return;
 
     const payload = {
       name: form.name,
       description: form.code,
       type: form.type === 'Custom' ? 'CUSTOM' : 'STANDARD',
-      price: Number(form.price),
       isActive: form.status === 'Aktif',
-      items: [],
+      isManualPrice: form.isManualPrice,
+      price: form.isManualPrice ? Number(form.price) : autoPrice,
+      items: form.items,
     };
 
     try {
@@ -129,6 +138,9 @@ export default function AdminParcelsPage() {
                 </select>
               </label>
             </div>
+            <fieldset className="parcel-item-picker"><legend>Isi parsel <small>{form.items.length} barang dipilih</small></legend><div className="picker-toolbar"><span>Pilih barang yang masuk ke dalam paket</span><input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Cari nama, SKU, barcode..." /></div><div className="parcel-item-grid">{filteredProducts.map((product) => { const selectedItem = form.items.find((item) => item.variantId === product.variantId); return <div key={product.variantId} className={`parcel-item-option${selectedItem ? ' selected' : ''}`}><input type="checkbox" checked={Boolean(selectedItem)} onChange={() => toggleItem(product.variantId)} /><span><strong>{product.name}</strong><small>Rp {Number(product.price).toLocaleString('id-ID')} · stok {product.stock}</small></span>{selectedItem && <input type="number" min="1" value={selectedItem.quantity} onClick={(event) => event.stopPropagation()} onChange={(event) => updateItemQuantity(product.variantId, event.target.value)} />}</div>; })}{!filteredProducts.length && <div className="picker-empty">Barang tidak ditemukan.</div>}</div></fieldset>
+            <label className="parcel-manual-price"><input type="checkbox" checked={form.isManualPrice} onChange={(event) => setForm((current) => ({ ...current, isManualPrice: event.target.checked }))} /> Harga manual / nego</label>
+            {!form.isManualPrice && <div className="parcel-auto-price">Harga otomatis dari isi: <strong>Rp {autoPrice.toLocaleString('id-ID')}</strong></div>}
             <div className="form-two-columns">
               <label>Harga Jual (Promo)
                 <CurrencyInput name="price" value={form.price} onValueChange={(value) => setForm((current) => ({ ...current, price: value }))} placeholder="Rp 120.000" />
@@ -179,7 +191,7 @@ export default function AdminParcelsPage() {
                       <td><span className="status-chip good">{parcel.status}</span></td>
                       <td>
                         <div className="row-actions">
-                          <button onClick={() => { setEditingId(parcel.id); setForm(parcel); }}>Edit</button>
+                          <button onClick={() => { setEditingId(parcel.id); setForm({ ...parcel, items: parcel.items || [], isManualPrice: true }); }}>Edit</button>
                           <button onClick={async () => {
                             if (!await confirmAction(`Hapus parsel "${parcel.name}"?`)) return;
                             try {

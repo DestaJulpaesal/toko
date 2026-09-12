@@ -1,26 +1,10 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, customerCreateSchema, customerUpdateSchema } from '../middleware/security.js';
 
 const router = express.Router();
 router.use(authenticateToken, requireRole('OWNER', 'ADMIN'));
-
-// Helper to parse points from customer record
-export function parseCustomerPoints(notes, fallbackPoints = 0) {
-  if (!notes) return fallbackPoints;
-  const match = notes.match(/\[POIN:\s*(\d+)\]/i);
-  if (match) {
-    return parseInt(match[1], 10);
-  }
-  return fallbackPoints;
-}
-
-// Helper to embed points into customer notes string
-export function embedCustomerPoints(notes, points) {
-  const cleanNotes = (notes || '').replace(/\[POIN:\s*\d+\]\s*/gi, '').trim();
-  return `[POIN: ${points}] ${cleanNotes}`.trim();
-}
-
 
 // Helper to add or deduct points from customer
 export async function updateCustomerPoints(customerId, pointsDelta) {
@@ -29,12 +13,11 @@ export async function updateCustomerPoints(customerId, pointsDelta) {
   try {
     const customer = await prisma.customer.findUnique({ where: { id: customerId } });
     if (customer) {
-      const current = parseCustomerPoints(customer.notes, 0);
+      const current = Number(customer.points || 0);
       const newPoints = Math.max(current + pointsDelta, 0);
-      const updatedNotes = embedCustomerPoints(customer.notes, newPoints);
       await prisma.customer.update({
         where: { id: customerId },
-        data: { notes: updatedNotes },
+        data: { points: newPoints },
       });
       return { previousPoints: current, newPoints };
     }
@@ -79,8 +62,8 @@ router.get('/', async (req, res) => {
         phone: c.phone,
         email: c.email,
         address: c.address,
-        notes: (c.notes || '').replace(/\[POIN:\s*\d+\]\s*/gi, '').trim(),
-        points: parseCustomerPoints(c.notes, 0),
+        notes: c.notes || '',
+        points: Number(c.points || 0),
         createdAt: c.createdAt,
         totalOrders: c._count?.orders || 0,
       })),
@@ -95,22 +78,22 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/customers - Create a new customer
-router.post('/', async (req, res) => {
+router.post('/', validateBody(customerCreateSchema), async (req, res) => {
   const { name, phone, email, address, notes, points = 0 } = req.body || {};
 
   if (!name || !name.trim()) {
     return res.status(400).json({ success: false, message: 'Nama pelanggan wajib diisi' });
   }
 
-  const initialPoints = Number(points) || 0;
-  const embeddedNotes = initialPoints > 0 ? embedCustomerPoints(notes, initialPoints) : notes ? notes.trim() : null;
+  const initialPoints = Math.max(Number(points) || 0, 0);
 
   const customerData = {
     name: name.trim(),
     phone: phone ? phone.trim() : null,
     email: email ? email.trim() : null,
     address: address ? address.trim() : null,
-    notes: embeddedNotes,
+    notes: notes ? notes.trim() : null,
+    points: initialPoints,
   };
 
   try {
@@ -123,7 +106,7 @@ router.post('/', async (req, res) => {
       customer: {
         ...created,
         points: initialPoints,
-        notes: (created.notes || '').replace(/\[POIN:\s*\d+\]\s*/gi, '').trim(),
+        notes: created.notes || '',
         totalOrders: 0,
       },
     });
@@ -137,7 +120,7 @@ router.post('/', async (req, res) => {
 });
 
 // PATCH /api/customers/:id - Update customer
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', validateBody(customerUpdateSchema), async (req, res) => {
   const { id } = req.params;
   const { name, phone, email, address, notes, points } = req.body || {};
 
@@ -146,11 +129,6 @@ router.patch('/:id', async (req, res) => {
   }
 
   try {
-    let finalNotes = notes ? notes.trim() : '';
-    if (points !== undefined) {
-      finalNotes = embedCustomerPoints(finalNotes, Number(points) || 0);
-    }
-
     const updated = await prisma.customer.update({
       where: { id },
       data: {
@@ -158,7 +136,8 @@ router.patch('/:id', async (req, res) => {
         phone: phone ? phone.trim() : null,
         email: email ? email.trim() : null,
         address: address ? address.trim() : null,
-        notes: finalNotes || null,
+        notes: notes !== undefined ? (notes ? notes.trim() : null) : undefined,
+        ...(points !== undefined ? { points: Math.max(Number(points) || 0, 0) } : {}),
       },
     });
     return res.json({
@@ -166,8 +145,8 @@ router.patch('/:id', async (req, res) => {
       message: 'Data pelanggan berhasil diperbarui',
       customer: {
         ...updated,
-        points: parseCustomerPoints(updated.notes, points || 0),
-        notes: (updated.notes || '').replace(/\[POIN:\s*\d+\]\s*/gi, '').trim(),
+        points: Number(updated.points || 0),
+        notes: updated.notes || '',
       },
     });
   } catch (error) {

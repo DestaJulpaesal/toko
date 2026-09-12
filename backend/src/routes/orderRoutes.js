@@ -1,8 +1,9 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { updateCustomerPoints } from './customerRoutes.js';
-import { authenticateToken } from '../middleware/auth.js';
-import { checkoutLimiter, checkoutSchema, validateBody } from '../middleware/security.js';
+import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { checkoutLimiter, checkoutSchema, onlineOrderSchema, validateBody } from '../middleware/security.js';
+import { sendWhatsappMessage } from '../services/whatsappService.js';
 
 const router = express.Router();
 
@@ -92,6 +93,96 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+router.get('/unread-count', authenticateToken, async (req, res) => {
+  const since = req.query.since ? new Date(String(req.query.since)) : new Date(0);
+  const count = await prisma.order.count({ where: { status: 'PENDING', createdAt: { gt: Number.isNaN(since.getTime()) ? new Date(0) : since } } });
+  return res.json({ success: true, count });
+});
+
+router.get('/average-transaction', authenticateToken, async (req, res) => {
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const result = await prisma.order.aggregate({ where: { type: 'STORE', status: 'COMPLETED', createdAt: { gte: since } }, _avg: { total: true }, _count: { _all: true } });
+  return res.json({ success: true, average: Number(result._avg.total || 0), count: result._count._all });
+});
+
+router.post('/online', checkoutLimiter, validateBody(onlineOrderSchema), async (req, res) => {
+  try {
+    const { customerName, customerPhone, address, note, promoCode, shippingCost, items } = req.body;
+    const variantIds = items.filter((item) => item.variantId).map((item) => item.variantId);
+    const parcelIds = items.filter((item) => item.parcelId).map((item) => item.parcelId);
+    const eventPackageIds = items.filter((item) => item.eventPackageId).map((item) => item.eventPackageId);
+    const [variants, parcels, eventPackages] = await Promise.all([
+      prisma.productVariant.findMany({ where: { id: { in: variantIds }, isActive: true }, include: { product: true } }),
+      prisma.parcel.findMany({ where: { id: { in: parcelIds }, isActive: true } }),
+      prisma.eventPackage.findMany({ where: { id: { in: eventPackageIds }, isActive: true } }),
+    ]);
+    const lines = items.map((item) => {
+      const quantity = Number(item.quantity);
+      if (item.variantId) {
+        const variant = variants.find((candidate) => candidate.id === item.variantId);
+        if (!variant) throw new Error('Produk pada keranjang sudah tidak tersedia');
+        return { variantId: variant.id, productId: variant.productId, name: variant.product.name, quantity, unitPrice: Number(variant.sellPrice), total: Number(variant.sellPrice) * quantity };
+      }
+      if (item.parcelId) {
+        const parcel = parcels.find((candidate) => candidate.id === item.parcelId);
+        if (!parcel) throw new Error('Parsel pada keranjang sudah tidak tersedia');
+        return { parcelId: parcel.id, name: parcel.name, quantity, unitPrice: Number(parcel.price), total: Number(parcel.price) * quantity };
+      }
+      const eventPackage = eventPackages.find((candidate) => candidate.id === item.eventPackageId);
+      if (!eventPackage) throw new Error('Paket acara pada keranjang sudah tidak tersedia');
+      return { eventPackageId: eventPackage.id, name: eventPackage.name, quantity, unitPrice: Number(eventPackage.price), total: Number(eventPackage.price) * quantity };
+    });
+    const subtotal = lines.reduce((sum, line) => sum + line.total, 0);
+    const promoDiscount = promoCode === 'LEBARAN15' ? Math.round(subtotal * 0.15) : promoCode === 'GLOSIR10' ? Math.round(subtotal * 0.1) : promoCode === 'HEMAT25' ? Math.min(25000, subtotal) : promoCode === 'PARSEL20' ? Math.round(subtotal * 0.2) : 0;
+    const total = Math.max(subtotal - promoDiscount + Number(shippingCost || 0), 0);
+    const orderNumber = `WEB-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const normalizedPhone = customerPhone.replace(/\D/g, '').replace(/^0/, '62');
+    const storeNumber = String(process.env.STORE_WHATSAPP_NUMBER || process.env.OWNER_WHATSAPP_NUMBER || '').replace(/\D/g, '');
+    if (!storeNumber) return res.status(503).json({ success: false, message: 'Nomor WhatsApp toko belum dikonfigurasi' });
+    const whatsappText = `Halo Glosir, saya ingin konfirmasi pesanan ${orderNumber}.\nNama: ${customerName}\nWhatsApp: ${normalizedPhone}\nAlamat: ${address}\n\n${lines.map((line) => `${line.name} x${line.quantity} - Rp ${line.total.toLocaleString('id-ID')}`).join('\n')}\n\nSubtotal: Rp ${subtotal.toLocaleString('id-ID')}\nDiskon: Rp ${promoDiscount.toLocaleString('id-ID')}\nOngkir: Rp ${Number(shippingCost || 0).toLocaleString('id-ID')}\nTotal: Rp ${total.toLocaleString('id-ID')}\nPromo: ${promoCode || '-'}`;
+    const whatsappLink = `https://wa.me/${storeNumber}?text=${encodeURIComponent(whatsappText)}`;
+    const existingCustomer = await prisma.customer.findFirst({ where: { phone: normalizedPhone } });
+    const customer = existingCustomer
+      ? await prisma.customer.update({ where: { id: existingCustomer.id }, data: { name: customerName, address } })
+      : await prisma.customer.create({ data: { name: customerName, phone: normalizedPhone, address } });
+    const order = await prisma.order.create({ data: { orderNumber, type: 'ONLINE', status: 'PENDING', customerId: customer.id, subtotal, discount: promoDiscount, shippingCost: Number(shippingCost || 0), total, notes: note || null, whatsappLink, items: { create: lines.map((line) => ({ productId: line.productId, variantId: line.variantId, parcelId: line.parcelId, eventPackageId: line.eventPackageId, name: line.name, quantity: line.quantity, unitPrice: line.unitPrice, total: line.total })) } } });
+    return res.status(201).json({ success: true, order: { id: order.id, orderNumber, whatsappLink } });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || 'Pesanan online gagal dibuat' });
+  }
+});
+
+router.patch('/:id/status', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+  const nextStatus = String(req.body?.status || '').toUpperCase();
+  const allowedStatuses = ['PENDING', 'CONFIRMED', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED'];
+  if (!allowedStatuses.includes(nextStatus)) return res.status(400).json({ success: false, message: 'Status pesanan tidak valid' });
+  try {
+    const result = await prisma.$transaction(async (transaction) => {
+      const order = await transaction.order.findUnique({ where: { id: req.params.id }, include: { customer: true, items: true } });
+      if (!order) throw Object.assign(new Error('Pesanan tidak ditemukan'), { statusCode: 404 });
+      if (order.status === nextStatus) return order;
+      if (['CONFIRMED', 'COMPLETED'].includes(nextStatus) && !['CONFIRMED', 'COMPLETED'].includes(order.status)) {
+        for (const item of order.items.filter((line) => line.variantId)) {
+          const variant = await transaction.productVariant.findUnique({ where: { id: item.variantId } });
+          if (!variant || variant.stockQty < item.quantity) throw new Error(`Stok ${item.name} tidak mencukupi`);
+          await transaction.productVariant.update({ where: { id: variant.id }, data: { stockQty: { decrement: item.quantity } } });
+          await transaction.stockMovement.create({ data: { productId: variant.productId, variantId: variant.id, type: 'OUT', quantity: item.quantity, note: `Pesanan online ${order.orderNumber}`, reference: order.orderNumber } });
+        }
+      }
+      const updated = await transaction.order.update({ where: { id: order.id }, data: { status: nextStatus } });
+      if (order.customer?.phone && ['CONFIRMED', 'READY', 'CANCELLED'].includes(nextStatus)) {
+        const reason = req.body?.reason ? ` Alasan: ${req.body.reason}` : '';
+        const messages = { CONFIRMED: `Pesanan ${order.orderNumber} sudah dikonfirmasi, sedang diproses.`, READY: `Pesanan ${order.orderNumber} siap diambil/dikirim.`, CANCELLED: `Pesanan ${order.orderNumber} dibatalkan.${reason}` };
+        await sendWhatsappMessage(order.customer.phone, messages[nextStatus]);
+      }
+      return updated;
+    });
+    return res.json({ success: true, order: { id: result.id, orderNumber: result.orderNumber, status: result.status } });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Status pesanan gagal diperbarui' });
+  }
+});
+
 // GET /api/orders/:id - Get order detail by id or orderNumber
 router.get('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
@@ -148,6 +239,28 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+router.patch('/:id/void', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+  const reason = String(req.body?.reason || '').trim();
+  if (!reason) return res.status(400).json({ success: false, message: 'Alasan pembatalan wajib diisi' });
+  try {
+    const result = await prisma.$transaction(async (transaction) => {
+      const order = await transaction.order.findUnique({ where: { id: req.params.id }, include: { financeEntries: true } });
+      if (!order) throw Object.assign(new Error('Transaksi tidak ditemukan'), { statusCode: 404 });
+      if (order.status === 'VOIDED') throw Object.assign(new Error('Transaksi sudah dibatalkan'), { statusCode: 409 });
+      const movements = await transaction.stockMovement.findMany({ where: { reference: order.orderNumber, type: 'OUT', variantId: { not: null } } });
+      for (const movement of movements) {
+        await transaction.productVariant.update({ where: { id: movement.variantId }, data: { stockQty: { increment: movement.quantity } } });
+        await transaction.stockMovement.create({ data: { productId: movement.productId, variantId: movement.variantId, type: 'RETURN', quantity: movement.quantity, note: `Void transaksi: ${reason}`, reference: order.orderNumber } });
+      }
+      await transaction.financeTransaction.updateMany({ where: { orderId: order.id, deletedAt: null }, data: { deletedAt: new Date() } });
+      return transaction.order.update({ where: { id: order.id }, data: { status: 'VOIDED', voidReason: reason, voidedById: req.user.id } });
+    });
+    return res.json({ success: true, order: { id: result.id, status: result.status, voidReason: result.voidReason } });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Transaksi gagal dibatalkan' });
+  }
+});
+
 // POST /api/orders/checkout - Process POS checkout with Points, Cash, QRIS, or Bank Transfer
 router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (req, res) => {
   try {
@@ -172,16 +285,48 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
 
     try {
       const result = await prisma.$transaction(async (transaction) => {
+        const packageIds = items.filter((item) => item.eventPackageId).map((item) => item.eventPackageId);
+        const parcelIds = items.filter((item) => item.parcelId).map((item) => item.parcelId);
+        const eventPackages = await transaction.eventPackage.findMany({
+          where: { id: { in: packageIds }, isActive: true },
+          include: { items: { include: { variant: { include: { product: { include: { category: true } } } } } } },
+        });
+        const parcels = await transaction.parcel.findMany({
+          where: { id: { in: parcelIds }, isActive: true },
+          include: { items: { include: { variant: { include: { product: { include: { category: true } } } } } } },
+        });
         const variants = await Promise.all(
           items.map((item) =>
-            transaction.productVariant.findUnique({
+            item.variantId ? transaction.productVariant.findUnique({
               where: { id: item.variantId },
               include: { product: { include: { category: true } } },
-            })
+            }) : null
           )
         );
 
         const lines = items.map((item, index) => {
+          if (item.eventPackageId) {
+            const eventPackage = eventPackages.find((candidate) => candidate.id === item.eventPackageId);
+            const quantity = Number(item.quantity);
+            if (!eventPackage || !Number.isInteger(quantity) || quantity < 1) throw new Error('Paket acara tidak valid');
+            for (const packageItem of eventPackage.items) {
+              if (!packageItem.variant.isActive || packageItem.variant.stockQty < packageItem.quantity * quantity) {
+                throw new Error(`Stok produk ${packageItem.variant.product.name} tidak mencukupi untuk paket ${eventPackage.name}`);
+              }
+            }
+            return { eventPackage, quantity, unitPrice: Number(eventPackage.price), total: Number(eventPackage.price) * quantity };
+          }
+          if (item.parcelId) {
+            const parcel = parcels.find((candidate) => candidate.id === item.parcelId);
+            const quantity = Number(item.quantity);
+            if (!parcel || !Number.isInteger(quantity) || quantity < 1) throw new Error('Parsel tidak valid');
+            for (const parcelItem of parcel.items) {
+              if (!parcelItem.variant.isActive || parcelItem.variant.stockQty < parcelItem.quantity * quantity) {
+                throw new Error(`Stok produk ${parcelItem.variant.product.name} tidak mencukupi untuk parsel ${parcel.name}`);
+              }
+            }
+            return { parcel, quantity, unitPrice: Number(parcel.price), total: Number(parcel.price) * quantity };
+          }
           const variant = variants[index];
           const quantity = Number(item.quantity);
           if (!variant || !Number.isInteger(quantity) || quantity < 1) {
@@ -197,7 +342,11 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
         const subtotal = lines.reduce((sum, line) => sum + line.total, 0);
         const discountAmount = Math.min(Number(discount) || 0, subtotal);
         const total = Math.max(subtotal - discountAmount, 0);
-        const saleCategories = [...new Set(lines.map(({ variant }) => variant.product.category?.name).filter(Boolean))];
+        const saleCategories = [...new Set(lines.flatMap((line) => {
+          if (line.variant) return [line.variant.product.category?.name];
+          if (line.eventPackage) return line.eventPackage.items.map((item) => item.variant.product.category?.name);
+          return line.parcel.items.map((item) => item.variant.product.category?.name);
+        }).filter(Boolean))];
 
         let paid = Number(paidAmount);
         if (paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') {
@@ -232,28 +381,46 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
             total,
             notes: `Points: +${earnedPoints} / -${redeemedPoints}`,
             items: {
-              create: lines.map(({ variant, quantity, unitPrice, total }) => ({
-                productId: variant.productId,
-                variantId: variant.id,
-                name: variant.product.name,
-                quantity,
-                unitPrice,
-                total,
+              create: lines.map((line) => ({
+                productId: line.variant?.productId,
+                variantId: line.variant?.id,
+                eventPackageId: line.eventPackage?.id,
+                parcelId: line.parcel?.id,
+                name: line.variant?.product.name || line.eventPackage?.name || line.parcel.name,
+                quantity: line.quantity,
+                unitPrice: line.unitPrice,
+                total: line.total,
               })),
             },
           },
           include: { customer: true },
         });
 
-        for (const { variant, quantity } of lines) {
+        const stockDeductions = new Map();
+        for (const line of lines) {
+          if (line.variant) {
+            stockDeductions.set(line.variant.id, (stockDeductions.get(line.variant.id) || 0) + line.quantity);
+          } else if (line.eventPackage) {
+            for (const packageItem of line.eventPackage.items) {
+              stockDeductions.set(packageItem.variant.id, (stockDeductions.get(packageItem.variant.id) || 0) + packageItem.quantity * line.quantity);
+            }
+          } else {
+            for (const parcelItem of line.parcel.items) {
+              stockDeductions.set(parcelItem.variant.id, (stockDeductions.get(parcelItem.variant.id) || 0) + parcelItem.quantity * line.quantity);
+            }
+          }
+        }
+        for (const [variantId, quantity] of stockDeductions) {
+          const variant = await transaction.productVariant.findUnique({ where: { id: variantId } });
+          if (!variant || variant.stockQty < quantity) throw new Error('Stok berubah. Silakan ulangi checkout.');
           await transaction.productVariant.update({
-            where: { id: variant.id },
+            where: { id: variantId },
             data: { stockQty: { decrement: quantity } },
           });
           await transaction.stockMovement.create({
             data: {
               productId: variant.productId,
-              variantId: variant.id,
+              variantId,
               type: 'OUT',
               quantity,
               note: 'Penjualan kasir POS',
@@ -305,11 +472,11 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
           redeemedPoints: Number(redeemedPoints) || 0,
           previousPoints: pointDetails.previousPoints,
           currentPoints: pointDetails.currentPoints,
-          items: lines.map(({ variant, quantity, total }) => ({
-            name: variant.product.name,
-            quantity,
-            unitPrice: Number(variant.sellPrice),
-            total,
+          items: lines.map((line) => ({
+            name: line.variant?.product.name || line.eventPackage?.name || line.parcel.name,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            total: line.total,
           })),
           createdAt: order.createdAt,
         };

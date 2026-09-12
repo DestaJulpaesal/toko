@@ -5,68 +5,6 @@ import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import { useCart } from '../context/CartContext';
 
-const activeVouchers = [
-  {
-    id: 'promo-lebaran',
-    name: 'Promo Lebaran & Hari Raya',
-    code: 'LEBARAN15',
-    badge: '15% OFF',
-    type: 'Persentase',
-    highlight: 'Diskon 15% untuk seluruh paket parsel & kebutuhan hari raya',
-    minSpend: 100000,
-    scope: 'Seluruh Parsel & Kebutuhan Dapur',
-    channel: 'Kasir Toko, Web & WhatsApp',
-    validUntil: 'Akhir Bulan Ini',
-    colorScheme: 'warm',
-  },
-  {
-    id: 'promo-glosir10',
-    name: 'Glosir Hemat 10',
-    code: 'GLOSIR10',
-    badge: '10% OFF',
-    type: 'Persentase',
-    highlight: 'Diskon 10% untuk belanja sembako dan kebutuhan dapur',
-    minSpend: 50000,
-    scope: 'Bahan Pokok & Kebutuhan Dapur',
-    channel: 'Kasir Toko, Web & WhatsApp',
-    validUntil: 'Promo Berjalan',
-    colorScheme: 'green',
-  },
-  {
-    id: 'promo-hemat25',
-    name: 'Potongan Langsung 25 Ribu',
-    code: 'HEMAT25',
-    badge: 'POTONGAN Rp 25.000',
-    type: 'Potongan Tunai',
-    highlight: 'Potongan langsung Rp 25.000 untuk belanja grosir',
-    minSpend: 150000,
-    scope: 'Belanja Grosir & Bundling Bulanan',
-    channel: 'Kasir Toko, Web & WhatsApp',
-    validUntil: 'Berlaku Hari Ini',
-    colorScheme: 'gold',
-  },
-  {
-    id: 'promo-parsel20',
-    name: 'Spesial Parsel & Hajatan',
-    code: 'PARSEL20',
-    badge: '20% OFF',
-    type: 'Spesial Parsel',
-    highlight: 'Diskon 20% khusus pemesanan parsel & paket hajatan',
-    minSpend: 300000,
-    scope: 'Parsel Lebaran & Paket Acara',
-    channel: 'Kasir Toko, Web & WhatsApp',
-    validUntil: 'Musim Acara & Hari Raya',
-    colorScheme: 'purple',
-  },
-];
-
-const defaultFlashSaleProducts = [
-  { id: 1, name: 'Kopi Bubuk Premium', category: 'Glosir', price: 48000, originalPrice: 60000, discountPercent: 20, stock: 25, badge: 'Diskon 20%' },
-  { id: 3, name: 'Minyak Goreng 2L', category: 'Kebutuhan Dapur', price: 35000, originalPrice: 40000, discountPercent: 12, stock: 9, badge: 'Diskon 12%' },
-  { id: 4, name: 'Parcel Lebaran', category: 'Parsel', price: 120000, originalPrice: 150000, discountPercent: 20, stock: 12, badge: 'Promo Spesial' },
-  { id: 6, name: 'Teh Celup 40 pcs', category: 'Minuman', price: 59000, originalPrice: 69000, discountPercent: 14, stock: 20, badge: 'Diskon 14%' },
-];
-
 const promoFaqs = [
   {
     q: 'Bagaimana cara menggunakan kode promo ini saat belanja di kasir toko fisik?',
@@ -91,8 +29,8 @@ export default function PromoPage() {
   const [activeCategory, setActiveCategory] = useState('Semua');
   const [toastMessage, setToastMessage] = useState('');
   const [copiedCode, setCopiedCode] = useState('');
-  const [vouchers, setVouchers] = useState(activeVouchers);
-  const [flashSaleProducts, setFlashSaleProducts] = useState(defaultFlashSaleProducts);
+  const [vouchers, setVouchers] = useState([]);
+  const [flashSaleProducts, setFlashSaleProducts] = useState([]);
 
   useEffect(() => {
     const loadPromos = async () => {
@@ -105,44 +43,40 @@ export default function PromoPage() {
         const promos = promoRes?.success && Array.isArray(promoRes.promos) ? promoRes.promos : [];
         const products = productRes?.success && Array.isArray(productRes.products) ? productRes.products : [];
 
-        if (promos.length > 0) {
-          setVouchers(
-            promos.map((promo) => ({
-              id: promo.id,
-              name: promo.name,
-              code: promo.name.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 10) || 'PROMO',
-              badge: promo.discountType === 'PERCENT' ? `${promo.discountValue}% OFF` : `POTONGAN Rp ${Number(promo.discountValue || 0).toLocaleString('id-ID')}`,
-              type: promo.discountType === 'PERCENT' ? 'Persentase' : 'Potongan Tunai',
-              highlight: promo.description || 'Promo aktif dari Glosir untuk kebutuhan belanja Anda.',
-              minSpend: 50000,
-              scope: 'Semua Produk',
-              channel: 'Kasir Toko, Web & WhatsApp',
-              validUntil: 'Promo Berjalan',
-              colorScheme: promo.discountType === 'FIXED' ? 'gold' : 'green',
-            }))
-          );
-        }
+        setVouchers(
+          promos.map((promo) => ({
+            id: promo.id,
+            name: promo.name,
+            code: promo.slug.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 18) || 'PROMO',
+            badge: promo.discountType === 'PERCENT' ? `${promo.discountValue}% OFF` : `POTONGAN Rp ${Number(promo.discountValue || 0).toLocaleString('id-ID')}`,
+            type: promo.discountType === 'PERCENT' ? 'Persentase' : 'Potongan Tunai',
+            highlight: promo.description || 'Promo aktif dari Glosir untuk kebutuhan belanja Anda.',
+            minSpend: 0,
+            scope: 'Semua Produk',
+            channel: 'Kasir Toko, Web & WhatsApp',
+            validUntil: promo.endsAt ? new Date(promo.endsAt).toLocaleDateString('id-ID') : 'Promo Berjalan',
+            colorScheme: promo.discountType === 'FIXED' ? 'gold' : 'green',
+          }))
+        );
 
-        if (products.length > 0) {
-          setFlashSaleProducts(
-            products
-              .filter((product) => Number(product.originalPrice || 0) > Number(product.price || 0))
-              .slice(0, 4)
-              .map((product) => ({
-                id: product.id,
-                name: product.name,
-                category: product.category,
-                price: Number(product.price || 0),
-                originalPrice: Number(product.originalPrice || product.price || 0),
-                discountPercent: product.discountPercent || Math.round(((Number(product.originalPrice || product.price || 0) - Number(product.price || 0)) / Number(product.originalPrice || product.price || 1)) * 100),
-                stock: Number(product.stock || 0),
-                badge: 'Diskon Langsung',
-              }))
-          );
-        }
+        setFlashSaleProducts(
+          products
+            .filter((product) => Number(product.originalPrice || 0) > Number(product.price || 0))
+            .slice(0, 4)
+            .map((product) => ({
+              id: product.id,
+              name: product.name,
+              category: product.category,
+              price: Number(product.price || 0),
+              originalPrice: Number(product.originalPrice || product.price || 0),
+              discountPercent: product.discountPercent || Math.round(((Number(product.originalPrice || product.price || 0) - Number(product.price || 0)) / Number(product.originalPrice || product.price || 1)) * 100),
+              stock: Number(product.stock || 0),
+              badge: 'Diskon Langsung',
+            }))
+        );
       } catch {
-        setVouchers(activeVouchers);
-        setFlashSaleProducts(defaultFlashSaleProducts);
+        setVouchers([]);
+        setFlashSaleProducts([]);
       }
     };
 
@@ -269,7 +203,7 @@ export default function PromoPage() {
           <div className="voucher-ticket-grid">
             {visibleVouchers.map((voucher) => {
               const isApplied = appliedPromoCode === voucher.code;
-              const waUrl = `https://wa.me/6281234567890?text=${encodeURIComponent(
+              const waUrl = `https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}?text=${encodeURIComponent(
                 `Halo Toko Glosir, saya ingin belanja dengan klaim kode promo: *${voucher.code}* (${voucher.name}). Mohon dibantu pesanannya ya.`
               )}`;
 
@@ -426,7 +360,7 @@ export default function PromoPage() {
           <div className="banner-buttons">
             <Link to="/products" className="btn btn-secondary">Belanja Sekarang</Link>
             <a
-              href="https://wa.me/6281234567890?text=Halo%20Glosir,%20saya%20ingin%20tanya%20paket%20grosir%20dan%20promo%20acara"
+              href={`https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}?text=Halo%20Glosir,%20saya%20ingin%20tanya%20paket%20grosir%20dan%20promo%20acara`}
               target="_blank"
               rel="noreferrer"
               className="btn btn-primary"

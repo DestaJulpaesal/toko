@@ -66,5 +66,21 @@ This is the initial project blueprint. It is meant to be expanded into a product
 ## Environment and Hosting
 
 Set `VITE_API_URL` in the frontend environment. Use `http://127.0.0.1:5000/api` for local development and the deployed API URL, such as `https://api.example.com/api`, in Vercel/Netlify environment settings.
+Set `VITE_STORE_WHATSAPP_NUMBER` to the store's customer-order number in international format (`62...`, without `+`, spaces, or a leading `0`). Keep it separate from `VITE_SUPPORT_WHATSAPP_NUMBER`.
 
 For the backend, set `DATABASE_URL`, `DIRECT_URL`, and a strong `JWT_SECRET`. `DATABASE_URL` should use the Supabase transaction pooler; `DIRECT_URL` should use the direct PostgreSQL connection for Prisma migrations. Never commit real `.env` files or service-role keys.
+
+## Implemented Controls
+
+- JWT sessions expire after 8 hours and automatically redirect to login when expired or rejected.
+- API requests use `VITE_API_URL`, and backend CORS is restricted by `FRONTEND_URL`.
+- Customer loyalty points are stored in `Customer.points`, separate from notes.
+- Finance and debt deletion uses soft-delete (`deletedAt`).
+- Stock opname, price/stock audit logs, and event package APIs are available to authenticated staff/admin users.
+- Admin routes: `/admin/stock-opname` and `/admin/event-packages`; public catalog: `/paket-acara`.
+- Optional nightly WhatsApp recap uses Fonnte when `ENABLE_NIGHTLY_RECAP=true`, `FONNTE_API_KEY`, and `OWNER_WHATSAPP_NUMBER` are configured.
+- WhatsApp owner commands are available at `POST /api/whatsapp/webhook`; configure the owner whitelist and optional `WHATSAPP_WEBHOOK_SECRET` before connecting a provider.
+- Customer WhatsApp commands: `cek pesanan`, `status`, and `lacak [nomor order]`. Status notifications are sent after admin updates an order through `PATCH /api/orders/:id/status`.
+- Parsel now uses `ProductVariant` contents, supports automatic/manual pricing, shows contents publicly, and deducts component stock during POS checkout.
+
+WhatsApp provider integration, error monitoring, and scheduled database backups still require deployment-specific credentials and infrastructure.

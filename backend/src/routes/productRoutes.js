@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, productCreateSchema, productUpdateSchema, productBulkSchema } from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ function formatProduct(product) {
     purchasePrice: basePrice,
     originalPrice,
     discountPercent,
+    isQuickAccess: Boolean(product.isQuickAccess),
     stock,
     status: statusFromDb(product.status, stock, product.stockWarning),
     badge: discountPercent > 0
@@ -73,12 +75,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(productCreateSchema), async (req, res) => {
   try {
-    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, status = 'Aktif' } = req.body || {};
-    if (!name || !category || price === undefined || stock === undefined) {
-      return res.status(400).json({ success: false, message: 'Nama, kategori, harga, dan stok wajib diisi' });
-    }
+    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, status = 'Aktif', isQuickAccess = false } = req.body || {};
 
     const categoryRecord = await findCategory(category);
     if (!categoryRecord) return res.status(400).json({ success: false, message: `Kategori ${category} belum tersedia` });
@@ -93,6 +92,7 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, r
         categoryId: categoryRecord.id,
         status: statusToDb[status] || 'ACTIVE',
         stockWarning: 5,
+        isQuickAccess: Boolean(isQuickAccess),
         variants: { create: { name: 'Kemasan utama', sku: `${internalSku}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null, basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), unit: 'unit', isDefault: true } },
       },
       include: { category: true, variants: { where: { isDefault: true }, take: 1 } },
@@ -103,12 +103,9 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, r
   }
 });
 
-router.post('/bulk', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.post('/bulk', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(productBulkSchema), async (req, res) => {
   try {
     const { products } = req.body || {};
-    if (!Array.isArray(products) || products.length === 0) {
-      return res.status(400).json({ success: false, message: 'Minimal satu produk wajib dikirim' });
-    }
 
     const categoryNames = [...new Set(products.map((item) => normalizeCategoryName(item.category).toLowerCase() === 'glosir' ? 'Warung' : normalizeCategoryName(item.category)).filter(Boolean))];
     const categoryRecords = await prisma.category.findMany({ where: { name: { in: categoryNames } } });
@@ -158,9 +155,41 @@ router.post('/bulk', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
   }
 });
 
-router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.get('/restock-suggestions', authenticateToken, async (req, res) => {
   try {
-    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, status = 'Aktif' } = req.body || {};
+    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    const variants = await prisma.productVariant.findMany({
+      where: { isActive: true },
+      include: { product: { select: { name: true, stockWarning: true } } },
+    });
+    const movements = await prisma.stockMovement.findMany({
+      where: { type: 'OUT', createdAt: { gte: since }, variantId: { not: null } },
+      select: { variantId: true, quantity: true },
+    });
+    const soldByVariant = new Map();
+    for (const movement of movements) soldByVariant.set(movement.variantId, (soldByVariant.get(movement.variantId) || 0) + movement.quantity);
+    const suggestions = variants.map((variant) => {
+      const averageDailyOut = (soldByVariant.get(variant.id) || 0) / 14;
+      const suggestedPurchase = Math.max(Math.ceil(averageDailyOut * 7 - variant.stockQty), 0);
+      return {
+        variantId: variant.id,
+        productName: variant.product.name,
+        stockQty: variant.stockQty,
+        stockWarning: variant.product.stockWarning,
+        averageDailyOut: Number(averageDailyOut.toFixed(2)),
+        estimatedDaysLeft: averageDailyOut > 0 ? Number((variant.stockQty / averageDailyOut).toFixed(1)) : null,
+        suggestedPurchase,
+      };
+    }).filter((item) => item.suggestedPurchase > 0 || item.stockQty <= item.stockWarning);
+    return res.json({ success: true, suggestions });
+  } catch (error) {
+    return res.status(503).json({ success: false, message: 'Rekomendasi restock belum dapat dihitung' });
+  }
+});
+
+router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(productUpdateSchema), async (req, res) => {
+  try {
+    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, status = 'Aktif', isQuickAccess = false } = req.body || {};
     const [categoryRecord, existing] = await Promise.all([
       findCategory(category),
       prisma.product.findUnique({ where: { id: req.params.id }, include: { category: true, variants: { where: { isDefault: true }, take: 1 } } }),
@@ -169,10 +198,15 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
     if (!existing) return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
     const variant = existing.variants[0];
     const calculatedBase = purchasePrice !== undefined ? Number(purchasePrice) : (originalPrice ? Number(originalPrice) : (variant ? Number(variant.basePrice) : Number(price)));
+    const changes = variant ? [
+      ['sellPrice', Number(variant.sellPrice), Number(price)],
+      ['wholesalePrice', variant.wholesalePrice == null ? null : Number(variant.wholesalePrice), wholesalePrice ? Number(wholesalePrice) : null],
+      ['stockQty', variant.stockQty, Number(stock)],
+    ].filter(([, oldValue, newValue]) => oldValue !== newValue) : [];
     const updatePromise = prisma.product.update({
       where: { id: req.params.id },
       data: {
-        name: String(name).trim(), sku: String(sku).trim(), categoryId: categoryRecord.id, status: statusToDb[status] || 'ACTIVE',
+        name: String(name).trim(), sku: String(sku).trim(), categoryId: categoryRecord.id, status: statusToDb[status] || 'ACTIVE', isQuickAccess: Boolean(isQuickAccess),
         variants: variant ? { update: { where: { id: variant.id }, data: { basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), sku: `${String(sku).trim()}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null } } } : { create: { name: 'Kemasan utama', sku: `${String(sku).trim()}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null, basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), unit: 'unit', isDefault: true } },
       },
       include: { category: true, variants: { where: { isDefault: true }, take: 1 } },
@@ -181,6 +215,18 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
       updatePromise,
       new Promise((_, reject) => setTimeout(() => reject(new Error('PRODUCT_UPDATE_TIMEOUT')), 12000)),
     ]);
+    if (changes.length) {
+      await prisma.auditLog.createMany({
+        data: changes.map(([field, oldValue, newValue]) => ({
+          entityType: 'ProductVariant',
+          entityId: variant.id,
+          field,
+          oldValue: oldValue == null ? null : String(oldValue),
+          newValue: newValue == null ? null : String(newValue),
+          changedById: req.user.id,
+        })),
+      });
+    }
     return res.json({ success: true, product: formatProduct(product) });
   } catch (error) {
     console.error('Product update failed:', error.message);
@@ -198,7 +244,9 @@ router.delete('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (r
       // Keep completed order history readable while releasing product identifiers.
       await transaction.orderItem.updateMany({ where: { OR: [{ productId: product.id }, { variantId: { in: variantIds } }] }, data: { productId: null, variantId: null } });
       await transaction.stockMovement.deleteMany({ where: { OR: [{ productId: product.id }, { variantId: { in: variantIds } }] } });
-      await transaction.parcelItem.deleteMany({ where: { productId: product.id } });
+      await transaction.stockOpname.deleteMany({ where: { variantId: { in: variantIds } } });
+      await transaction.eventPackageItem.deleteMany({ where: { variantId: { in: variantIds } } });
+      await transaction.parcelItem.deleteMany({ where: { variantId: { in: variantIds } } });
       await transaction.productVariant.deleteMany({ where: { productId: product.id } });
       await transaction.product.delete({ where: { id: product.id } });
     });

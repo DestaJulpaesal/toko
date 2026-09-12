@@ -3,6 +3,8 @@ import { useCart } from '../context/CartContext';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { Link } from 'react-router-dom';
+import { apiFetch } from '../services/api';
+import { isValidIndonesianPhone, normalizeIndonesianPhone } from '../utils/phoneUtils';
 
 export default function CheckoutPage() {
   const { items, totalPrice, promo, discount } = useCart();
@@ -15,20 +17,25 @@ export default function CheckoutPage() {
     setFormError('');
   };
 
-  const buildWhatsappLink = (event) => {
+  const buildWhatsappLink = async (event) => {
     event.preventDefault();
     if (!form.name.trim() || !form.phone.trim() || !form.address.trim()) {
       setFormError('Lengkapi nama, nomor WhatsApp, dan alamat terlebih dahulu.');
       return;
     }
+    if (!isValidIndonesianPhone(form.phone)) {
+      setFormError('Nomor WhatsApp tidak valid. Gunakan format 08..., 628..., atau +628... .');
+      return;
+    }
 
-    const whatsappMessage = encodeURIComponent(
-      `Halo Glosir, saya ingin pesan:\n\nNama: ${form.name}\nWhatsApp: ${form.phone}\nAlamat: ${form.address}\nCatatan: ${form.note || '-'}\nPromo: ${promo || '-'}\n\n${items
-        .map((item) => `${item.name} x${item.qty} - Rp ${(item.price * item.qty).toLocaleString('id-ID')}`)
-        .join('\n')}\n\nTotal: Rp ${total.toLocaleString('id-ID')}\nMohon dikonfirmasi.`
-    );
-
-    window.open(`https://wa.me/6281234567890?text=${whatsappMessage}`, '_blank', 'noopener,noreferrer');
+    try {
+      const response = await apiFetch('/orders/online', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerName: form.name.trim(), customerPhone: normalizeIndonesianPhone(form.phone), address: form.address.trim(), note: form.note.trim(), promoCode: promo, shippingCost: 25000, items: items.map((item) => ({ variantId: item.variantId, parcelId: item.parcelId, eventPackageId: item.eventPackageId, quantity: item.qty })) }) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Pesanan gagal dicatat.');
+      window.open(data.order.whatsappLink, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      setFormError(error.message || 'Pesanan gagal dicatat. WhatsApp tidak dibuka.');
+    }
   };
 
   if (items.length === 0) {

@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, siteProfileUpdateSchema } from '../middleware/security.js';
 
 const router = express.Router();
 const ownerEmail = 'owner@glosir.com';
@@ -40,15 +41,12 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.patch('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.patch('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(siteProfileUpdateSchema), async (req, res) => {
   try {
     const { name, email, phone, headline, story, photoUrl } = req.body || {};
     const trimmedName = String(name || '').trim();
     const trimmedEmail = String(email || '').trim().toLowerCase();
     const trimmedPhone = String(phone || '').trim();
-    if (!trimmedName || !trimmedEmail || !trimmedPhone) {
-      return res.status(400).json({ success: false, message: 'Nama, email, dan WhatsApp wajib diisi' });
-    }
 
     const owner = await getOwner();
     const saved = owner

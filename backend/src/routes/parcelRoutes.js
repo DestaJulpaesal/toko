@@ -25,8 +25,11 @@ function formatParcel(parcel) {
     itemCount: parcel.items?.length || 0,
     items: (parcel.items || []).map((item) => ({
       id: item.id,
-      productId: item.productId,
-      productName: item.product?.name || null,
+      variantId: item.variantId,
+      productId: item.variant?.productId || null,
+      productName: item.variant?.product?.name || null,
+      variantName: item.variant?.name || null,
+      sellPrice: Number(item.variant?.sellPrice || 0),
       quantity: item.quantity,
       notes: item.notes || '',
     })),
@@ -41,13 +44,7 @@ router.get('/', async (req, res) => {
       include: {
         items: {
           include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-              },
-            },
+            variant: { include: { product: { select: { id: true, name: true, sku: true } } } },
           },
         },
       },
@@ -61,11 +58,16 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+async function createParcel(req, res) {
   try {
-    const { name, description = '', type = 'STANDARD', price, imageUrl, isActive = true, items = [] } = req.body || {};
+    const { name, description = '', type = 'STANDARD', price, isManualPrice = false, imageUrl, isActive = true, items = [] } = req.body || {};
     const trimmedName = String(name || '').trim();
-    const normalizedPrice = Number(price || 0);
+    const normalizedItems = Array.isArray(items) ? items.map((item) => ({ variantId: String(item.variantId || ''), quantity: Number(item.quantity || 1), notes: item.notes ? String(item.notes).trim() : null })) : [];
+    const variantIds = normalizedItems.map((item) => item.variantId);
+    const variants = await prisma.productVariant.findMany({ where: { id: { in: variantIds }, isActive: true }, include: { product: true } });
+    if (normalizedItems.some((item) => !item.variantId || !Number.isInteger(item.quantity) || item.quantity < 1) || variants.length !== variantIds.length) return res.status(400).json({ success: false, message: 'Isi parsel tidak valid' });
+    const calculatedPrice = normalizedItems.reduce((sum, item) => sum + Number(variants.find((variant) => variant.id === item.variantId).sellPrice) * item.quantity, 0);
+    const normalizedPrice = isManualPrice ? Number(price || 0) : calculatedPrice;
     const slug = makeSlug(trimmedName);
 
     if (!trimmedName || !slug) {
@@ -87,15 +89,11 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, r
         isActive: Boolean(isActive),
         items: {
           create: Array.isArray(items)
-            ? items.map((item) => ({
-                productId: item.productId,
-                quantity: Number(item.quantity || 1),
-                notes: item.notes ? String(item.notes).trim() : null,
-              }))
+            ? normalizedItems.map((item) => ({ variantId: item.variantId, quantity: item.quantity, notes: item.notes }))
             : [],
         },
       },
-      include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+      include: { items: { include: { variant: { include: { product: { select: { id: true, name: true, sku: true } } } } } } },
     });
 
     return res.status(201).json({ success: true, parcel: formatParcel(parcel) });
@@ -105,23 +103,25 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, r
       message: error.code === 'P2002' ? 'Slug parcel sudah digunakan' : error.message || 'Parcel gagal disimpan',
     });
   }
-});
+}
+
+router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), createParcel);
 
 router.post('/custom', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
-  return router.handle({
-    ...req,
-    body: {
-      ...req.body,
-      type: 'CUSTOM',
-    },
-  }, res);
+  req.body = { ...req.body, type: 'CUSTOM', isManualPrice: true };
+  return createParcel(req, res);
 });
 
 router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
   try {
-    const { name, description = '', type = 'STANDARD', price, imageUrl, isActive = true, items = [] } = req.body || {};
+    const { name, description = '', type = 'STANDARD', price, isManualPrice = false, imageUrl, isActive = true, items = [] } = req.body || {};
     const trimmedName = String(name || '').trim();
-    const normalizedPrice = Number(price || 0);
+    const normalizedItems = Array.isArray(items) ? items.map((item) => ({ variantId: String(item.variantId || ''), quantity: Number(item.quantity || 1), notes: item.notes ? String(item.notes).trim() : null })) : [];
+    const variantIds = normalizedItems.map((item) => item.variantId);
+    const variants = await prisma.productVariant.findMany({ where: { id: { in: variantIds }, isActive: true } });
+    if (normalizedItems.some((item) => !item.variantId || !Number.isInteger(item.quantity) || item.quantity < 1) || variants.length !== variantIds.length) return res.status(400).json({ success: false, message: 'Isi parsel tidak valid' });
+    const calculatedPrice = normalizedItems.reduce((sum, item) => sum + Number(variants.find((variant) => variant.id === item.variantId).sellPrice) * item.quantity, 0);
+    const normalizedPrice = isManualPrice ? Number(price || 0) : calculatedPrice;
     const slug = makeSlug(trimmedName);
 
     if (!trimmedName || !slug) {
@@ -144,16 +144,10 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
         isActive: Boolean(isActive),
         items: {
           deleteMany: {},
-          create: Array.isArray(items)
-            ? items.map((item) => ({
-                productId: item.productId,
-                quantity: Number(item.quantity || 1),
-                notes: item.notes ? String(item.notes).trim() : null,
-              }))
-            : [],
+          create: normalizedItems,
         },
       },
-      include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+      include: { items: { include: { variant: { include: { product: { select: { id: true, name: true, sku: true } } } } } } },
     });
 
     return res.json({ success: true, parcel: formatParcel(parcel) });

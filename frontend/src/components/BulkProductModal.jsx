@@ -17,6 +17,10 @@ export default function BulkProductModal({ isOpen, onClose, onAddProducts, onRef
 
   if (!isOpen) return null;
 
+  const handleClose = () => {
+    if (!saving) onClose();
+  };
+
   const toggleSelectAll = (checked) => {
     setSelectedPresets((prev) => prev.map((p) => ({ ...p, isSelected: checked })));
   };
@@ -108,14 +112,14 @@ export default function BulkProductModal({ isOpen, onClose, onAddProducts, onRef
   const availableSelectedCount = availablePresets.filter((p) => p.isSelected).length;
 
   return (
-    <div className="scanner-modal-backdrop" onClick={onClose}>
+    <div className="scanner-modal-backdrop" onClick={handleClose}>
       <div className="bulk-modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="scanner-modal-header">
           <div>
             <h3>📦 Tambah Cepat Banyak Barang Sekaligus</h3>
             <p>Tidak perlu cape ngetik satu-satu! Pilih sembako populer atau tempel daftar barang.</p>
           </div>
-          <button className="scanner-close-btn" onClick={onClose} title="Tutup" aria-label="Tutup"><X size={18} /></button>
+          <button className="scanner-close-btn" onClick={handleClose} disabled={saving} title="Tutup" aria-label="Tutup"><X size={18} /></button>
         </div>
 
         {/* Tab Navigation */}
@@ -227,7 +231,7 @@ export default function BulkProductModal({ isOpen, onClose, onAddProducts, onRef
             </div>
 
             <div className="bulk-modal-actions">
-                <button className="btn btn-secondary small" onClick={onClose} disabled={saving}>Batal</button>
+                <button className="btn btn-secondary small" onClick={handleClose} disabled={saving}>Batal</button>
                   <button className="btn btn-primary" onClick={handleSavePresets} disabled={saving || availableSelectedCount === 0}>
                 <PackagePlus size={16} /> Masukkan {availableSelectedCount} Barang Terpilih Sekaligus
               </button>
@@ -252,7 +256,7 @@ export default function BulkProductModal({ isOpen, onClose, onAddProducts, onRef
             />
 
             <div className="bulk-modal-actions">
-              <button className="btn btn-secondary small" onClick={onClose} disabled={saving}>Batal</button>
+              <button className="btn btn-secondary small" onClick={handleClose} disabled={saving}>Batal</button>
               <button className="btn btn-primary" onClick={handleSaveBulkText} disabled={saving}>
                 <PackagePlus size={16} /> Simpan Semua Barang
               </button>

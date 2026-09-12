@@ -1,35 +1,45 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+// Halaman publik: tetap eager-loaded karena ini yang paling sering diakses pengunjung pertama kali.
 import HomePage from './pages/HomePage';
 import ProductPage from './pages/ProductPage';
 import ParcelPage from './pages/ParcelPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
-import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
-import CashierPage from './pages/CashierPage';
-import CashierHistoryPage from './pages/CashierHistoryPage';
-import AdminCustomersPage from './pages/AdminCustomersPage';
 import ProfilePage from './pages/ProfilePage';
 import PromoPage from './pages/PromoPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import FavoritesPage from './pages/FavoritesPage';
-import AdminProductsPage from './pages/AdminProductsPage';
-import AdminParcelsPage from './pages/AdminParcelsPage';
-import AdminPromosPage from './pages/AdminPromosPage';
-import AdminProfilePage from './pages/AdminProfilePage';
-import AdminCategoriesPage from './pages/AdminCategoriesPage';
-import AdminContentPage from './pages/AdminContentPage';
-import AdminFinancePage from './pages/AdminFinancePage';
-import AdminPersonalFinancePage from './pages/AdminPersonalFinancePage';
-import AdminParcelParticipantsPage from './pages/AdminParcelParticipantsPage';
-import AdminParcelProgramsPage from './pages/AdminParcelProgramsPage';
-import AdminParcelRegionsPage from './pages/AdminParcelRegionsPage';
-import ParcelCollectionPage from './pages/ParcelCollectionPage';
 import PublicInfoPage from './pages/PublicInfoPage';
+import EventPackagePage from './pages/EventPackagePage';
+
+// Halaman kasir & admin: lazy-loaded (code-splitting) supaya bundle publik tidak ikut membawa kode admin.
+const CashierPage = lazy(() => import('./pages/CashierPage'));
+const CashierHistoryPage = lazy(() => import('./pages/CashierHistoryPage'));
+const AdminCustomersPage = lazy(() => import('./pages/AdminCustomersPage'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminSimpleDashboard = lazy(() => import('./pages/AdminSimpleDashboard'));
+const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage'));
+const AdminParcelsPage = lazy(() => import('./pages/AdminParcelsPage'));
+const AdminPromosPage = lazy(() => import('./pages/AdminPromosPage'));
+const AdminProfilePage = lazy(() => import('./pages/AdminProfilePage'));
+const AdminCategoriesPage = lazy(() => import('./pages/AdminCategoriesPage'));
+const AdminContentPage = lazy(() => import('./pages/AdminContentPage'));
+const AdminFinancePage = lazy(() => import('./pages/AdminFinancePage'));
+const AdminPersonalFinancePage = lazy(() => import('./pages/AdminPersonalFinancePage'));
+const AdminParcelParticipantsPage = lazy(() => import('./pages/AdminParcelParticipantsPage'));
+const AdminParcelProgramsPage = lazy(() => import('./pages/AdminParcelProgramsPage'));
+const AdminParcelRegionsPage = lazy(() => import('./pages/AdminParcelRegionsPage'));
+const ParcelCollectionPage = lazy(() => import('./pages/ParcelCollectionPage'));
+const AdminStockOpnamePage = lazy(() => import('./pages/AdminStockOpnamePage'));
+const AdminEventPackagesPage = lazy(() => import('./pages/AdminEventPackagesPage'));
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import ConfirmDialog from './components/ConfirmDialog';
 import NoticeToast from './components/NoticeToast';
+import FirstTimeGuide from './components/FirstTimeGuide';
+import SupportButton from './components/SupportButton';
 
 // Route Guard: Proteksi menu khusus Owner/Admin agar Karyawan/Kasir dialihkan ke /kasir
 function getStoredUser() {
@@ -57,6 +67,9 @@ export default function App() {
         <Router>
           <ConfirmDialog />
           <NoticeToast />
+          <FirstTimeGuide />
+          <SupportButton />
+          <Suspense fallback={<div className="page-loading">Memuat halaman...</div>}>
           <Routes>
             {/* Toko Publik */}
             <Route path="/" element={<HomePage />} />
@@ -64,6 +77,8 @@ export default function App() {
             <Route path="/products/:id" element={<ProductDetailPage />} />
             <Route path="/favorit" element={<FavoritesPage />} />
             <Route path="/parsel" element={<ParcelPage />} />
+            <Route path="/paket-acara" element={<EventPackagePage />} />
+            <Route path="/event-packages/:id" element={<EventPackagePage />} />
             <Route path="/promo" element={<PromoPage />} />
             <Route path="/profil" element={<ProfilePage />} />
             <Route path="/syarat-ketentuan" element={<PublicInfoPage pageKey="terms" />} />
@@ -83,7 +98,8 @@ export default function App() {
             <Route path="/pelanggan" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminCustomersPage /></AuthRoute>} />
 
             {/* Menu Khusus Owner / Admin */}
-            <Route path="/admin" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminDashboard /></AuthRoute>} />
+            <Route path="/admin" element={<AuthRoute roles={['OWNER', 'ADMIN']}><OwnerDashboard /></AuthRoute>} />
+            <Route path="/admin/detail" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminDashboard /></AuthRoute>} />
             <Route path="/admin/products" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminProductsPage /></AuthRoute>} />
             <Route path="/admin/categories" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminCategoriesPage /></AuthRoute>} />
             <Route path="/admin/parcels" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelsPage /></AuthRoute>} />
@@ -96,14 +112,22 @@ export default function App() {
             <Route path="/admin/parcel-programs" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelProgramsPage /></AuthRoute>} />
             <Route path="/admin/parcel-regions" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelRegionsPage /></AuthRoute>} />
             <Route path="/admin/parcel-collections" element={<AuthRoute roles={['OWNER', 'ADMIN']}><ParcelCollectionPage /></AuthRoute>} />
+            <Route path="/admin/stock-opname" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminStockOpnamePage /></AuthRoute>} />
+            <Route path="/admin/event-packages" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminEventPackagesPage /></AuthRoute>} />
             <Route path="/parcel-manager" element={<AuthRoute roles={['PARCEL_MANAGER']}><AdminParcelParticipantsPage /></AuthRoute>} />
             <Route path="/parcel-manager/collections" element={<AuthRoute roles={['PARCEL_MANAGER']}><ParcelCollectionPage /></AuthRoute>} />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </Router>
       </CartProvider>
     </FavoritesProvider>
   );
+}
+
+function OwnerDashboard() {
+  const user = getStoredUser();
+  return user?.role === 'OWNER' ? <AdminSimpleDashboard /> : <AdminDashboard />;
 }

@@ -4,7 +4,7 @@ import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 
-const categories = ['Kebutuhan Harian', 'Parsel', 'Promo', 'Acara'];
+const categories = ['Kebutuhan Harian', 'Promo'];
 
 export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState([]);

@@ -20,15 +20,17 @@ export default function ParcelPage() {
           setPackages(
             data.parcels.map((parcel) => ({
               id: parcel.id,
+              parcelId: parcel.id,
               name: parcel.name,
               category: parcel.type === 'CUSTOM' ? 'Acara' : 'Parsel',
               price: Number(parcel.price || 0),
-              originalPrice: Number(parcel.price || 0),
+              originalPrice: parcel.originalPrice ? Number(parcel.originalPrice) : null,
               discountPercent: 0,
               badge: parcel.type === 'CUSTOM' ? 'Custom' : 'Parsel',
               text: parcel.description || 'Paket yang dibuat sesuai kebutuhan pelanggan.',
               tag: parcel.type === 'CUSTOM' ? 'Custom Acara' : 'Best Seller',
               artClass: parcel.type === 'CUSTOM' ? 'purple' : 'warm',
+              items: parcel.items || [],
             }))
           );
         }
@@ -63,16 +65,16 @@ export default function ParcelPage() {
       <main className="parcel-page-shell">
         <section className="inner-hero parcel-hero">
           <div>
-            <span className="eyebrow dark">Parsel & Paket Acara</span>
-            <h1>Paket Siap Berbagi dengan Diskon Spesial.</h1>
+            <span className="eyebrow dark">Parsel Glosir</span>
+            <h1>Paket Parsel Siap Berbagi dengan Diskon Spesial.</h1>
           </div>
           <div>
             <p>
-              Mulai dari parcel keluarga, hampers hari raya, hingga paket hajatan syukuran.
-              Semua dikemas rapi, berkualitas, dan hemat dengan potongan harga langsung!
+              Mulai dari parcel keluarga hingga hampers hari raya.
+              Semua dikemas rapi, berkualitas, dan hemat untuk dibagikan.
             </p>
             <div className="parcel-hero-actions">
-              <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer" className="btn btn-secondary">
+              <a href={`https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}`} target="_blank" rel="noreferrer" className="btn btn-secondary">
                 Chat Admin via WhatsApp
               </a>
               <Link to="/cart" className="btn btn-primary">
@@ -85,7 +87,7 @@ export default function ParcelPage() {
         <section className="parcel-grid">
           {packages.map((item) => {
             const savings = item.originalPrice - item.price;
-            const waUrl = `https://wa.me/6281234567890?text=${encodeURIComponent(
+            const waUrl = `https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}?text=${encodeURIComponent(
               `Halo Toko Glosir, saya ingin pesan *${item.name}* dengan harga promo Rp ${item.price.toLocaleString('id-ID')} (Diskon ${item.discountPercent}%). Mohon info stok dan pengirimannya ya.`
             )}`;
 
@@ -96,7 +98,7 @@ export default function ParcelPage() {
                     <span>GLOSIR</span>
                     <small>{item.tag}</small>
                   </div>
-                  {item.originalPrice && (
+                  {item.discountPercent > 0 && (
                     <div className="parcel-art-discount-badge">
                       -{item.discountPercent}%
                     </div>
@@ -105,19 +107,32 @@ export default function ParcelPage() {
 
                 <div className="catalog-badges-wrap">
                   <span className="catalog-badge">{item.badge}</span>
-                  <span className="discount-tag">-{item.discountPercent}%</span>
+                  {item.discountPercent > 0 && <span className="discount-tag">-{item.discountPercent}%</span>}
                 </div>
 
                 <h2>{item.name}</h2>
                 <p>{item.text}</p>
+                {item.items.length > 0 && (
+                  <div className="parcel-contents">
+                    <strong>Isi paket</strong>
+                    <ul>
+                      {item.items.map((entry) => (
+                        <li key={entry.id}>
+                          <span className="parcel-item-quantity">{entry.quantity}×</span>
+                          <span>{entry.productName || 'Produk'}{entry.variantName ? ` (${entry.variantName})` : ''}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div className="parcel-pricing-box">
                   <div className="price-stack">
                     <strong className="current-price">Rp {item.price.toLocaleString('id-ID')}</strong>
-                    <div className="original-price-row">
+                    {item.originalPrice && item.originalPrice > item.price && <div className="original-price-row">
                       <del className="original-price">Rp {item.originalPrice.toLocaleString('id-ID')}</del>
                       <span className="save-pill">Hemat Rp {savings.toLocaleString('id-ID')}</span>
-                    </div>
+                    </div>}
                   </div>
                 </div>
 
@@ -145,11 +160,11 @@ export default function ParcelPage() {
         <section className="parcel-cta">
           <div>
             <span className="eyebrow light">Butuh Kustomisasi?</span>
-            <h2>Ceritakan Kebutuhan Acara & Anggaran Anda.</h2>
-            <p>Kami siap menyusun komposisi paket parcel atau bingkisan hajatan yang tepat sesuai anggaran dan selera Anda.</p>
+            <h2>Ceritakan kebutuhan parcel dan anggaran Anda.</h2>
+            <p>Kami siap membantu menyesuaikan komposisi parcel sesuai anggaran dan selera Anda.</p>
           </div>
           <a
-            href="https://wa.me/6281234567890?text=Halo%20Glosir,%20saya%20butuh%20konsultasi%20custom%20paket%20parcel%20dan%20hajatan"
+            href={`https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}?text=Halo%20Glosir,%20saya%20butuh%20konsultasi%20custom%20paket%20parcel%20dan%20hajatan`}
             target="_blank"
             rel="noreferrer"
             className="btn btn-secondary"

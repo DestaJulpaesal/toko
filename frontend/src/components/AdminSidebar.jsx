@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Archive, CalendarRange, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
+import { apiFetch } from '../services/api';
+import { Archive, CalendarRange, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
 
 const ownerGroups = [
   { label: 'Ringkasan', links: [['01', 'Dashboard', '/admin']] },
@@ -21,6 +22,7 @@ const ownerGroups = [
     links: [['11', 'Keuangan', '/admin/finance'], ['12', 'Catatan Pribadi', '/admin/personal-finance']],
   },
   { label: 'Website', links: [['13', 'Konten Publik', '/admin/content'], ['14', 'Profil', '/admin/profile']] },
+  { label: 'Kontrol', links: [['15', 'Stok Opname', '/admin/stock-opname'], ['16', 'Paket Acara', '/admin/event-packages']] },
 ];
 
 const cashierGroups = [
@@ -37,6 +39,13 @@ export default function AdminSidebar({ active = '' }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState('');
+  const [pendingOrderCount, setPendingOrderCount] = useState(0);
+  const [largeText, setLargeText] = useState(() => localStorage.getItem('glosir_large_text') === 'true');
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--base-font-size', largeText ? '20px' : '16px');
+    localStorage.setItem('glosir_large_text', String(largeText));
+  }, [largeText]);
   const navRef = useRef(null);
 
   useEffect(() => {
@@ -52,6 +61,21 @@ export default function AdminSidebar({ active = '' }) {
       setCurrentUser({ name: 'Kasir Glosir', role: 'CASHIER' });
     }
   }, []);
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'PARCEL_MANAGER') return undefined;
+    const refreshPending = async () => {
+      const since = localStorage.getItem('glosir_orders_last_seen') || new Date(0).toISOString();
+      try {
+        const response = await apiFetch(`/orders/unread-count?since=${encodeURIComponent(since)}`);
+        const data = await response.json();
+        if (data.success) setPendingOrderCount(data.count || 0);
+      } catch { setPendingOrderCount(0); }
+    };
+    refreshPending();
+    const timer = window.setInterval(refreshPending, 15000);
+    return () => window.clearInterval(timer);
+  }, [currentUser]);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -114,9 +138,9 @@ export default function AdminSidebar({ active = '' }) {
           <div className="sidebar-nav-group" key={group.label}>
             <span className="nav-label">{group.label}</span>
             {group.links.map(([number, label, to]) => (
-              <Link key={to} title={label} className={active === label || (label === 'Kasir' && active === 'Kasir') ? 'active' : ''} to={to}>
+              <Link key={to} title={label} className={active === label || (label === 'Kasir' && active === 'Kasir') ? 'active' : ''} to={to} onClick={() => label === 'Riwayat Transaksi' && localStorage.setItem('glosir_orders_last_seen', new Date().toISOString())}>
                 <span className="sidebar-icon" aria-hidden="true">{getSidebarIcon(label, number)}</span>
-                <span className="sidebar-link-label">{label}</span>
+                <span className="sidebar-link-label">{label}</span>{label === 'Riwayat Transaksi' && pendingOrderCount > 0 && <span className="sidebar-order-badge">{pendingOrderCount > 99 ? '99+' : pendingOrderCount}</span>}
               </Link>
             ))}
           </div>
@@ -146,6 +170,7 @@ export default function AdminSidebar({ active = '' }) {
           <LogOut size={15} aria-hidden="true" />
           <span className="sidebar-logout-label">Keluar</span>
         </button>
+        <button type="button" className="sidebar-text-size" onClick={() => setLargeText((value) => !value)} title="Perbesar teks">A<span>+</span></button>
       </div>
     </aside>
   );
@@ -169,6 +194,8 @@ function getSidebarIcon(label, fallback) {
     'Catatan Pribadi': FileText,
     'Konten Publik': Globe2,
     Profil: Settings,
+    'Stok Opname': ClipboardCheck,
+    'Paket Acara': Package,
   };
   const Icon = icons[label];
   return Icon ? <Icon size={16} strokeWidth={1.9} aria-hidden="true" /> : fallback;

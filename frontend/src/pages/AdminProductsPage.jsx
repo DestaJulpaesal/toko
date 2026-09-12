@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, PackagePlus, Pencil, ShoppingBag, Trash2 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
@@ -11,8 +11,9 @@ import { generateAutoBarcode, playBeep } from '../utils/barcodeUtils';
 import CurrencyInput from '../components/CurrencyInput';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
+import * as XLSX from 'xlsx';
 
-const emptyForm = { name: '', sku: '', barcode: '', category: '', price: '', wholesalePrice: '', purchasePrice: '', originalPrice: '', stock: '', status: 'Aktif' };
+const emptyForm = { name: '', sku: '', barcode: '', category: '', price: '', wholesalePrice: '', purchasePrice: '', originalPrice: '', stock: '', status: 'Aktif', isQuickAccess: false };
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
@@ -26,12 +27,23 @@ export default function AdminProductsPage() {
   const [saving, setSaving] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+
+  const downloadExcel = () => {
+    const rows = visibleProducts.map((product) => ({ Nama: product.name, SKU: product.sku, Barcode: product.barcode || '', Kategori: product.category, Harga: product.price, Stok: product.stock, Status: product.status }));
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Produk');
+    XLSX.writeFile(book, `produk-glosir-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
 
   // Barcode & Bulk Modals
   const [scannerOpen, setScannerOpen] = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [printModalProduct, setPrintModalProduct] = useState(null);
+  const barcodeInputRef = useRef(null);
+  const scannerBufferRef = useRef('');
+  const scannerTimerRef = useRef(null);
 
   const loadProducts = async () => {
     setLoading(true);
@@ -71,6 +83,12 @@ export default function AdminProductsPage() {
     loadCategories();
   }, []);
 
+  useEffect(() => {
+    barcodeInputRef.current?.focus();
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(scannerTimerRef.current), []);
+
   const visibleProducts = products.filter((product) => {
     const matchesSearch = `${product.name} ${product.sku} ${product.category}`.toLowerCase().includes(search.toLowerCase());
     return matchesSearch && (statusFilter === 'Semua' || product.status === statusFilter);
@@ -86,17 +104,93 @@ export default function AdminProductsPage() {
     setBulkDeleting(true);
     const results = await Promise.allSettled(selectedProductIds.map((id) => apiFetch(`/products/${id}`, { method: 'DELETE' }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
     const deletedIds = results.filter((result) => result.status === 'fulfilled').map((result) => result.value);
+    const failedMessages = results.filter((result) => result.status === 'rejected').map((result) => result.reason?.message).filter(Boolean);
     setSelectedProductIds([]);
     setBulkDeleting(false);
     await loadProducts();
-    setNotice(`${deletedIds.length} produk berhasil dihapus${deletedIds.length < results.length ? `, ${results.length - deletedIds.length} gagal` : ''}.`);
+    setNotice(`${deletedIds.length} produk berhasil dihapus${deletedIds.length < results.length ? `, ${results.length - deletedIds.length} gagal: ${failedMessages[0] || 'periksa relasi data produk'}` : '.'}`);
   };
 
-  const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const normalizeBarcode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const fillFormFromProduct = (product, scannedCode = '') => {
+    setEditingId(product.id);
+    setForm({
+      ...product,
+      name: product.name || '',
+      sku: product.sku || scannedCode,
+      barcode: product.barcode || scannedCode,
+      category: product.category || categories[0]?.name || '',
+      price: product.price ?? '',
+      wholesalePrice: product.wholesalePrice ?? '',
+      purchasePrice: product.purchasePrice ?? '',
+      originalPrice: product.originalPrice ?? '',
+      stock: product.stock ?? '',
+      status: product.status || 'Aktif',
+    });
+    setNotice(`✓ ${product.name} terdeteksi. Nama produk otomatis dimasukkan.`);
+  };
+
+  const updateField = (event) => {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
+    if (name === 'barcode') {
+      const cleanCode = normalizeBarcode(value);
+      const matchedProduct = products.find((product) =>
+        [product.barcode, product.sku].some((item) => normalizeBarcode(item) === cleanCode)
+      );
+      if (matchedProduct && cleanCode.length >= 8) fillFormFromProduct(matchedProduct, value);
+    }
+  };
+
+  const detectProductFromBarcode = (rawCode) => {
+    const cleanCode = normalizeBarcode(rawCode);
+    if (!cleanCode) return;
+    const matchedProduct = products.find((product) =>
+      [product.barcode, product.sku].some((value) => normalizeBarcode(value) === cleanCode)
+    );
+    if (matchedProduct) {
+      fillFormFromProduct(matchedProduct, rawCode);
+    } else {
+      setNotice(`Barcode "${rawCode}" terbaca, tetapi belum terdaftar. Isi nama produk lalu simpan.`);
+    }
+    window.setTimeout(() => barcodeInputRef.current?.focus(), 0);
+  };
+
+  const handleBarcodeInputKeyDown = (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    event.stopPropagation();
+    detectProductFromBarcode(form.barcode);
+  };
+
+  useEffect(() => {
+    const handleScannerKeyDown = (event) => {
+      if (event.target !== barcodeInputRef.current && (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) return;
+      if (event.key === 'Enter') {
+        if (scannerBufferRef.current.length >= 8) {
+          event.preventDefault();
+          const code = scannerBufferRef.current;
+          scannerBufferRef.current = '';
+          detectProductFromBarcode(code);
+        }
+        return;
+      }
+      if (event.key.length !== 1 || !/[a-z0-9]/i.test(event.key)) return;
+      scannerBufferRef.current += event.key;
+      window.clearTimeout(scannerTimerRef.current);
+      scannerTimerRef.current = window.setTimeout(() => {
+        scannerBufferRef.current = '';
+      }, 150);
+    };
+    window.addEventListener('keydown', handleScannerKeyDown);
+    return () => window.removeEventListener('keydown', handleScannerKeyDown);
+  }, [products, categories]);
 
   const resetForm = () => {
     setForm(emptyForm);
     setEditingId(null);
+    setAuditLogs([]);
   };
 
   // 1-Click Auto Barcode
@@ -231,6 +325,7 @@ export default function AdminProductsPage() {
         purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : Number(form.price),
         originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
         stock: Number(form.stock),
+        isQuickAccess: Boolean(form.isQuickAccess),
       };
       const discountPercent = payload.originalPrice && payload.originalPrice > payload.price
         ? Math.round(((payload.originalPrice - payload.price) / payload.originalPrice) * 100)
@@ -282,6 +377,10 @@ export default function AdminProductsPage() {
       originalPrice: product.originalPrice ?? '',
       stock: product.stock ?? '',
     });
+    apiFetch(`/audit-logs?entityId=${encodeURIComponent(product.variantId || product.id)}`)
+      .then((response) => response.json())
+      .then((data) => setAuditLogs(data.logs || []))
+      .catch(() => setAuditLogs([]));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -330,20 +429,7 @@ export default function AdminProductsPage() {
           );
 
           if (matchedProduct) {
-            setEditingId(matchedProduct.id);
-            setForm({
-              name: matchedProduct.name || '',
-              sku: matchedProduct.sku || scannedSku,
-              barcode: matchedProduct.barcode || scannedSku,
-              category: matchedProduct.category || categories[0]?.name || '',
-              price: matchedProduct.price || '',
-              wholesalePrice: matchedProduct.wholesalePrice || '',
-              purchasePrice: matchedProduct.purchasePrice || '',
-              originalPrice: matchedProduct.originalPrice || '',
-              stock: matchedProduct.stock ?? '',
-              status: matchedProduct.status || 'Aktif',
-            });
-            setNotice(`✓ ${matchedProduct.name} ditemukan dan form otomatis terisi.`);
+            fillFormFromProduct(matchedProduct, scannedSku);
           } else {
             setForm((prev) => ({ ...prev, barcode: scannedSku, sku: prev.sku || scannedSku }));
             setNotice(`Barcode "${scannedSku}" berhasil dibaca, tetapi belum terdaftar. Lengkapi nama produk lalu simpan.`);
@@ -398,7 +484,7 @@ export default function AdminProductsPage() {
             >
               <ShoppingBag size={16} /> Barang Masuk
             </button>
-            <Link to="/products" className="btn btn-secondary"><Eye size={16} /> Lihat katalog</Link>
+            <button type="button" className="btn btn-secondary" onClick={downloadExcel}>Unduh Excel</button><Link to="/products" className="btn btn-secondary"><Eye size={16} /> Lihat katalog</Link>
           </div>
         </header>
 
@@ -428,9 +514,12 @@ export default function AdminProductsPage() {
               SKU / Barcode
               <div className="sku-input-wrapper">
                 <input
+                  ref={barcodeInputRef}
                   name="barcode"
                   value={form.barcode || ''}
                   onChange={updateField}
+                  onKeyDown={handleBarcodeInputKeyDown}
+                  autoComplete="off"
                   placeholder="Opsional: scan barcode pabrik"
                 />
                 <input
@@ -507,10 +596,14 @@ export default function AdminProductsPage() {
               <input name="stock" value={form.stock ?? ''} onChange={updateField} type="number" min="0" placeholder="25" />
             </label>
 
+            <label className="quick-access-toggle"><input type="checkbox" checked={Boolean(form.isQuickAccess)} onChange={(event) => setForm((current) => ({ ...current, isQuickAccess: event.target.checked }))} /><span><strong>Tampilkan sebagai tombol cepat di Kasir</strong><small>Untuk barang yang sering dijual tanpa perlu mencari.</small></span></label>
+
             <button className="btn btn-primary full" type="submit" disabled={saving}>
               {saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah produk'}
             </button>
           </form>
+
+          {editingId && <section className="product-audit-panel"><div className="panel-heading"><div><span className="panel-kicker">Kontrol perubahan</span><h2>Riwayat Perubahan</h2></div><span className="tool-count">{auditLogs.length} catatan</span></div>{auditLogs.length ? <div className="product-audit-list">{auditLogs.map((log) => <div className="product-audit-row" key={log.id}><strong>{log.field}</strong><span>{log.oldValue || '-'} → {log.newValue || '-'}</span><small>{log.changedBy?.name || 'User'} · {new Date(log.createdAt).toLocaleString('id-ID')}</small></div>)}</div> : <p className="tool-empty">Belum ada perubahan harga atau stok yang tercatat.</p>}</section>}
 
           <section className="crud-table-panel">
             <div className="crud-toolbar">

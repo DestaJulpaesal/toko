@@ -8,6 +8,7 @@ const navigation = [
   { label: 'Profil', to: '/profil' },
   { label: 'Produk', to: '/products' },
   { label: 'Parsel', to: '/parsel' },
+  { label: 'Paket Acara', to: '/paket-acara' },
   { label: 'Promo', to: '/promo' },
   { label: 'FAQ', to: '/faq' },
   { label: 'Kontak', to: '/contact-us' },
@@ -56,7 +57,7 @@ export default function PublicHeader() {
         )}
         <Link to="/favorit" className="favorite-nav-link" aria-label={`Favorit, ${favorites.length} produk`}><span>star</span><b>{favorites.length}</b></Link>
         <Link to="/cart" className="cart-nav-link" aria-label={`Keranjang, ${totalItems} item`}><span className="cart-icon">cart</span><b>{totalItems}</b></Link>
-        <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer" className="btn btn-primary">Pesan via WhatsApp</a>
+        <a href={`https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}`} target="_blank" rel="noreferrer" className="btn btn-primary">Pesan via WhatsApp</a>
       </div>
     </header>
   );

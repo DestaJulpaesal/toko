@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminSidebar from '../components/AdminSidebar';
 import { calculateEarnedPoints } from './CashierPage';
 import { apiFetch } from '../services/api';
+import * as XLSX from 'xlsx';
 
 const formatMoney = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 
@@ -11,6 +12,15 @@ export default function CashierHistoryPage() {
   const [methodFilter, setMethodFilter] = useState('ALL');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [voidTarget, setVoidTarget] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [voidSaving, setVoidSaving] = useState(false);
+
+  const downloadExcel = () => {
+    const rows = filteredOrders.map((order) => ({ Faktur: order.orderNumber, Waktu: new Date(order.createdAt).toLocaleString('id-ID'), Pelanggan: order.customer?.name || 'Pelanggan Umum', Metode: order.paymentMethod, Total: order.total, Status: order.status }));
+    const sheet = XLSX.utils.json_to_sheet(rows); const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Transaksi');
+    XLSX.writeFile(book, `riwayat-transaksi-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
 
   const loadOrders = async () => {
     setLoading(true);
@@ -57,6 +67,17 @@ export default function CashierHistoryPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const voidOrder = async () => {
+    if (!voidTarget || !voidReason.trim()) return;
+    setVoidSaving(true);
+    try {
+      const response = await apiFetch(`/orders/${voidTarget.id}/void`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: voidReason }) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Transaksi gagal dibatalkan');
+      setVoidTarget(null); setVoidReason(''); await loadOrders();
+    } catch (error) { setVoidReason(error.message); } finally { setVoidSaving(false); }
   };
 
   const printClosingReport = () => {
@@ -138,9 +159,7 @@ export default function CashierHistoryPage() {
               Daftar seluruh transaksi kasir, rincian pembayaran Tunai, QRIS, & Transfer, poin didapat, serta cetak ulang struk.
             </p>
           </div>
-          <button className="btn btn-light" onClick={loadOrders}>
-            🔄 Segarkan Data
-          </button>
+          <div className="admin-header-actions"><button className="btn btn-secondary" onClick={downloadExcel}>Unduh Excel</button><button className="btn btn-light" onClick={loadOrders}>🔄 Segarkan Data</button></div>
         </header>
 
         {/* Metric Summary Cards */}
@@ -286,7 +305,7 @@ export default function CashierHistoryPage() {
                         )}
                       </td>
                       <td>
-                        <span className="status-chip good">LUNAS</span>
+                        <span className={`status-chip ${ord.status === 'VOIDED' ? 'bad' : 'good'}`}>{ord.status === 'VOIDED' ? 'DIBATALKAN' : 'LUNAS'}</span>
                       </td>
                       <td>
                         <div className="row-actions">
@@ -297,6 +316,7 @@ export default function CashierHistoryPage() {
                           >
                             📄 Lihat Struk
                           </button>
+                          {ord.status !== 'VOIDED' && <button className="btn-view-struk void-action" onClick={() => { setVoidTarget(ord); setVoidReason(''); }}>Batalkan</button>}
                         </div>
                       </td>
                     </tr>
@@ -313,6 +333,8 @@ export default function CashierHistoryPage() {
             </table>
           </div>
         </section>
+
+        {voidTarget && <div className="receipt-modal-backdrop" onClick={() => !voidSaving && setVoidTarget(null)}><div className="void-dialog" onClick={(event) => event.stopPropagation()}><span className="panel-kicker">Kontrol transaksi</span><h2>Batalkan transaksi?</h2><p>{voidTarget.orderNumber} · {formatMoney(voidTarget.total)}</p><label>Alasan pembatalan<textarea value={voidReason} onChange={(event) => setVoidReason(event.target.value)} placeholder="Contoh: salah input jumlah barang" autoFocus /></label><div className="void-dialog-actions"><button className="btn btn-secondary" onClick={() => setVoidTarget(null)} disabled={voidSaving}>Kembali</button><button className="btn btn-danger" onClick={voidOrder} disabled={voidSaving || !voidReason.trim()}>{voidSaving ? 'Memproses...' : 'Ya, batalkan'}</button></div></div></div>}
 
         {/* Modal Struk Belanja / Cetak Ulang */}
         {selectedOrder && (

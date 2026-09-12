@@ -6,7 +6,7 @@ import { loginLimiter, loginSchema, validateBody } from '../middleware/security.
 const router = express.Router();
 
 router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res) => {
-  const { email, password } = req.body || {};
+  const { email, password, rememberMe = false } = req.body || {};
 
   if (!email || !password) {
     return res.status(400).json({
@@ -24,7 +24,7 @@ router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res) 
     });
   }
 
-  const token = generateToken(user);
+  const token = generateToken(user, Boolean(rememberMe));
 
   return res.json({
     success: true,

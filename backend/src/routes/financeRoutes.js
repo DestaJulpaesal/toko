@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, financeCreateSchema, financeUpdateSchema } from '../middleware/security.js';
 
 const router = express.Router();
 router.use(authenticateToken, requireRole('OWNER'));
@@ -36,23 +37,23 @@ async function calculateOrderProfit(startDate = null) {
 router.get('/summary', async (req, res) => {
   try {
     const [income, expense, transfer, debt] = await Promise.all([
-      prisma.financeTransaction.aggregate({
-        where: { type: 'INCOME' },
+        prisma.financeTransaction.aggregate({
+          where: { type: 'INCOME', deletedAt: null },
         _sum: { amount: true },
         _count: { _all: true },
       }),
-      prisma.financeTransaction.aggregate({
-        where: { type: 'EXPENSE' },
+        prisma.financeTransaction.aggregate({
+          where: { type: 'EXPENSE', deletedAt: null },
         _sum: { amount: true },
         _count: { _all: true },
       }),
-      prisma.financeTransaction.aggregate({
-        where: { type: 'TRANSFER' },
+        prisma.financeTransaction.aggregate({
+          where: { type: 'TRANSFER', deletedAt: null },
         _sum: { amount: true },
         _count: { _all: true },
       }),
-      prisma.financeTransaction.aggregate({
-        where: { type: 'DEBT' },
+        prisma.financeTransaction.aggregate({
+          where: { type: 'DEBT', deletedAt: null },
         _sum: { amount: true },
         _count: { _all: true },
       }),
@@ -74,11 +75,11 @@ router.get('/summary', async (req, res) => {
       const today = new Date();
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const todayIncomeRow = await prisma.financeTransaction.aggregate({
-        where: { type: 'INCOME', createdAt: { gte: todayStart } },
+        where: { type: 'INCOME', deletedAt: null, createdAt: { gte: todayStart } },
         _sum: { amount: true },
       });
       const todayExpenseRow = await prisma.financeTransaction.aggregate({
-        where: { type: 'EXPENSE', createdAt: { gte: todayStart } },
+        where: { type: 'EXPENSE', deletedAt: null, createdAt: { gte: todayStart } },
         _sum: { amount: true },
       });
       summary.todaysIncome = Number(todayIncomeRow._sum.amount || 0);
@@ -88,10 +89,10 @@ router.get('/summary', async (req, res) => {
       const weekStart = new Date(now); weekStart.setDate(now.getDate() - 6); weekStart.setHours(0, 0, 0, 0);
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const [weekIncome, monthIncome, weekExpense, monthExpense] = await Promise.all([
-        prisma.financeTransaction.aggregate({ where: { type: 'INCOME', createdAt: { gte: weekStart } }, _sum: { amount: true } }),
-        prisma.financeTransaction.aggregate({ where: { type: 'INCOME', createdAt: { gte: monthStart } }, _sum: { amount: true } }),
-        prisma.financeTransaction.aggregate({ where: { type: 'EXPENSE', createdAt: { gte: weekStart } }, _sum: { amount: true } }),
-        prisma.financeTransaction.aggregate({ where: { type: 'EXPENSE', createdAt: { gte: monthStart } }, _sum: { amount: true } }),
+        prisma.financeTransaction.aggregate({ where: { type: 'INCOME', deletedAt: null, createdAt: { gte: weekStart } }, _sum: { amount: true } }),
+        prisma.financeTransaction.aggregate({ where: { type: 'INCOME', deletedAt: null, createdAt: { gte: monthStart } }, _sum: { amount: true } }),
+        prisma.financeTransaction.aggregate({ where: { type: 'EXPENSE', deletedAt: null, createdAt: { gte: weekStart } }, _sum: { amount: true } }),
+        prisma.financeTransaction.aggregate({ where: { type: 'EXPENSE', deletedAt: null, createdAt: { gte: monthStart } }, _sum: { amount: true } }),
       ]);
       summary.weekIncome = Number(weekIncome._sum.amount || 0);
       summary.monthIncome = Number(monthIncome._sum.amount || 0);
@@ -146,7 +147,7 @@ router.get('/transactions', async (req, res) => {
     }
 
     const transactions = await prisma.financeTransaction.findMany({
-      where,
+      where: { ...where, deletedAt: null },
       include: {
         order: {
           select: {
@@ -177,13 +178,9 @@ router.get('/transactions', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validateBody(financeCreateSchema), async (req, res) => {
   try {
     const { orderId, userId, type, amount, description, category, paymentMethod } = req.body || {};
-
-    if (!type || !description || amount === undefined) {
-      return res.status(400).json({ success: false, message: 'Tipe, keterangan, dan nominal wajib diisi' });
-    }
 
     const transaction = await prisma.financeTransaction.create({
       data: {
@@ -207,7 +204,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', validateBody(financeUpdateSchema), async (req, res) => {
   try {
     const { type, amount, description, category, paymentMethod } = req.body || {};
 
@@ -237,8 +234,8 @@ router.patch('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.financeTransaction.delete({ where: { id: req.params.id } });
-    return res.json({ success: true, message: 'Transaksi berhasil dihapus' });
+    await prisma.financeTransaction.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } });
+    return res.json({ success: true, message: 'Transaksi dipindahkan ke arsip' });
   } catch (error) {
     return res.status(error.code === 'P2025' ? 404 : 500).json({
       success: false,

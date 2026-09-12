@@ -57,7 +57,7 @@ export default function ProductDetailPage() {
             <p className="detail-description">{product.description}</p>
             <div className="detail-stock"><span className="stock-dot" /> {product.stock} stok tersedia</div>
             <div className="detail-actions"><div className="quantity-stepper"><button onClick={() => setQuantity((value) => Math.max(1, value - 1))}>-</button><strong>{quantity}</strong><button onClick={() => setQuantity((value) => Math.min(product.stock, value + 1))}>+</button></div><button className="btn btn-primary" onClick={addToCart}>Tambah ke keranjang</button></div>
-            <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer" className="detail-whatsapp">Tanya produk lewat WhatsApp</a>
+            <a href={`https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}`} target="_blank" rel="noreferrer" className="detail-whatsapp">Tanya produk lewat WhatsApp</a>
           </div>
         </section>
       </main>

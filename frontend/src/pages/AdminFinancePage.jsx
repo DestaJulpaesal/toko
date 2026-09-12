@@ -4,6 +4,7 @@ import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
+import * as XLSX from 'xlsx';
 
 const emptyForm = { type: 'EXPENSE', amount: '', description: '', category: '', paymentMethod: 'Tunai' };
 const money = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
@@ -17,6 +18,7 @@ export default function AdminFinancePage() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const downloadExcel = () => { const rows = transactions.map((item) => ({ Tanggal: new Date(item.createdAt).toLocaleString('id-ID'), Jenis: item.type, Keterangan: item.description, Kategori: item.category || '', Nominal: item.amount, Metode: item.paymentMethod || '' })); const sheet = XLSX.utils.json_to_sheet(rows); const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Keuangan'); XLSX.writeFile(book, `laporan-keuangan-${new Date().toISOString().slice(0, 10)}.xlsx`); };
 
   const load = async () => {
     setLoading(true);
@@ -63,7 +65,7 @@ export default function AdminFinancePage() {
   };
 
   return <div className="admin-shell admin-crud-shell"><AdminSidebar active="Keuangan" /><main className="admin-main">
-    <header className="admin-header"><div><p className="eyebrow light">Finance management</p><h1>Keuangan & Laba</h1><p className="admin-subtitle">Catat pemasukan, pengeluaran, modal, dan pantau laba bersih toko.</p></div><span className="database-status ready"><i /> {loading ? 'Memuat data' : 'Terhubung ke API'}</span></header>
+    <header className="admin-header"><div><p className="eyebrow light">Finance management</p><h1>Keuangan & Laba</h1><p className="admin-subtitle">Catat pemasukan, pengeluaran, modal, dan pantau laba bersih toko.</p></div><div className="admin-header-actions"><button className="btn btn-secondary" onClick={downloadExcel}>Unduh Excel</button><span className="database-status ready"><i /> {loading ? 'Memuat data' : 'Terhubung ke API'}</span></div></header>
     {notice && <div className="crud-notice" role="status">{notice}<button onClick={() => setNotice('')}>×</button></div>}
     <section className="metric-grid finance-metric-grid"><div className="metric-card green"><span>Pendapatan Hari Ini</span><strong>{money(summary.todaysIncome)}</strong></div><div className="metric-card orange"><span>Pengeluaran Hari Ini</span><strong>{money(summary.todaysExpense)}</strong></div><div className="metric-card blue"><span>Laba Hari Ini</span><strong>{money(summary.todaysGrossProfit)}</strong></div><div className="metric-card red"><span>Laba Bulan Ini</span><strong>{money(summary.monthGrossProfit)}</strong></div></section>
     <div className="finance-period-strip"><span>7 hari pendapatan: <b>{money(summary.weekIncome)}</b></span><span>Bulan pendapatan: <b>{money(summary.monthIncome)}</b></span><span>7 hari pengeluaran: <b>{money(summary.weekExpense)}</b></span><span>Bulan pengeluaran: <b>{money(summary.monthExpense)}</b></span><span>Total laba: <b>{money(summary.grossProfit)}</b></span><span>Total piutang: <b>{money(summary.totalDebt)}</b></span></div>

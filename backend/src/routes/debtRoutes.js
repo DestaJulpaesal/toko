@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, debtCreateSchema, debtUpdateSchema } from '../middleware/security.js';
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -47,7 +48,7 @@ function formatDebtRecord(record) {
 router.get('/', async (req, res) => {
   try {
     const { customerId, status } = req.query || {};
-    const where = {};
+    const where = { deletedAt: null };
 
     if (customerId) where.customerId = String(customerId);
     if (status) where.status = String(status).toUpperCase();
@@ -74,14 +75,15 @@ router.get('/summary', async (req, res) => {
   try {
     const [open, paid, total] = await Promise.all([
       prisma.debtRecord.aggregate({
-        where: { status: 'OPEN' },
+        where: { status: 'OPEN', deletedAt: null },
         _sum: { amount: true },
       }),
       prisma.debtRecord.aggregate({
-        where: { status: 'PAID' },
+        where: { status: 'PAID', deletedAt: null },
         _sum: { amount: true },
       }),
       prisma.debtRecord.aggregate({
+        where: { deletedAt: null },
         _sum: { amount: true },
       }),
     ]);
@@ -109,7 +111,7 @@ router.get('/summary', async (req, res) => {
   }
 });
 
-router.post('/', requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.post('/', requireRole('OWNER', 'ADMIN'), validateBody(debtCreateSchema), async (req, res) => {
   try {
     const { customerId, amount, status = 'OPEN', dueDate, description } = req.body || {};
 
@@ -146,7 +148,7 @@ router.post('/', requireRole('OWNER', 'ADMIN'), async (req, res) => {
   }
 });
 
-router.patch('/:id', requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.patch('/:id', requireRole('OWNER', 'ADMIN'), validateBody(debtUpdateSchema), async (req, res) => {
   try {
     const { amount, status, dueDate, description } = req.body || {};
     const updateData = {};
@@ -173,8 +175,8 @@ router.patch('/:id', requireRole('OWNER', 'ADMIN'), async (req, res) => {
 
 router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req, res) => {
   try {
-    await prisma.debtRecord.delete({ where: { id: req.params.id } });
-    return res.json({ success: true, message: 'Data hutang berhasil dihapus' });
+    await prisma.debtRecord.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } });
+    return res.json({ success: true, message: 'Data hutang dipindahkan ke arsip' });
   } catch (error) {
     return res.status(error.code === 'P2025' ? 404 : 500).json({
       success: false,

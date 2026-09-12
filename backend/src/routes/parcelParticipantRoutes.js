@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { optionalAuth } from '../middleware/auth.js';
+import { validateBody, parcelParticipantCreateSchema, parcelParticipantUpdateSchema, parcelContributionSchema } from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -70,7 +71,7 @@ router.get('/', optionalAuth, async (req, res) => {
   } catch (error) { return res.status(500).json({ success: false, message: error.message || 'Peserta parsel gagal dimuat.' }); }
 });
 
-router.post('/', optionalAuth, async (req, res) => {
+router.post('/', optionalAuth, validateBody(parcelParticipantCreateSchema), async (req, res) => {
   try {
     const { customerId, participantPhone, participantName, parcelId, programId, name, targetAmount, contributionAmount, frequency = 'DAILY', startDate, endDate, notes } = req.body || {};
     const isManager = req.user?.role === 'PARCEL_MANAGER';
@@ -85,7 +86,7 @@ router.post('/', optionalAuth, async (req, res) => {
   } catch (error) { return res.status(400).json({ success: false, message: error.message || 'Peserta parsel gagal dibuat.' }); }
 });
 
-router.patch('/:id', optionalAuth, async (req, res) => {
+router.patch('/:id', optionalAuth, validateBody(parcelParticipantUpdateSchema), async (req, res) => {
   try {
     const { customerId, participantName, participantPhone, parcelId, programId, name, targetAmount, contributionAmount, frequency, startDate, endDate, status, notes } = req.body || {};
     const existing = await prisma.parcelParticipant.findUnique({ where: { id: req.params.id } });
@@ -96,7 +97,7 @@ router.patch('/:id', optionalAuth, async (req, res) => {
   } catch (error) { return res.status(error.code === 'P2025' ? 404 : 400).json({ success: false, message: error.message || 'Peserta parsel gagal diperbarui.' }); }
 });
 
-router.post('/:id/contributions', optionalAuth, async (req, res) => {
+router.post('/:id/contributions', optionalAuth, validateBody(parcelContributionSchema), async (req, res) => {
   try {
     const participant = await prisma.parcelParticipant.findUnique({ where: { id: req.params.id } });
     if (!participant) return res.status(404).json({ success: false, message: 'Peserta parsel tidak ditemukan.' });

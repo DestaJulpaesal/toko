@@ -19,12 +19,16 @@ import parcelProgramRoutes from './routes/parcelProgramRoutes.js';
 import parcelRegionRoutes from './routes/parcelRegionRoutes.js';
 import parcelManagerRoutes from './routes/parcelManagerRoutes.js';
 import parcelCollectionRoutes from './routes/parcelCollectionRoutes.js';
+import stockOpnameRoutes from './routes/stockOpnameRoutes.js';
+import auditLogRoutes from './routes/auditLogRoutes.js';
+import eventPackageRoutes from './routes/eventPackageRoutes.js';
+import whatsappWebhookRoutes from './routes/whatsappWebhookRoutes.js';
 
 dotenv.config();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5174' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -49,6 +53,10 @@ app.use('/api/parcel-programs', parcelProgramRoutes);
 app.use('/api/parcel-regions', parcelRegionRoutes);
 app.use('/api/parcel-managers', parcelManagerRoutes);
 app.use('/api/parcel-collections', parcelCollectionRoutes);
+app.use('/api/stock-opnames', stockOpnameRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/event-packages', eventPackageRoutes);
+app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

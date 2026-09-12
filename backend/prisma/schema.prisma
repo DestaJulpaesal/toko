@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -43,6 +43,7 @@ enum OrderStatus {
   READY
   COMPLETED
   CANCELLED
+  VOIDED
 }
 
 enum ParcelType {
@@ -60,186 +61,194 @@ enum SiteContentType {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  name          String
-  email         String   @unique
-  passwordHash  String
-  phone         String?
-  role          Role     @default(CASHIER)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  phone        String?
+  role         Role     @default(CASHIER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  orders        Order[]
-  transactions  FinanceTransaction[]
-  regionId      String?
-  region        ParcelRegion? @relation("RegionMembers", fields: [regionId], references: [id], onDelete: SetNull)
-  managedRegions ParcelRegion[] @relation("RegionManager")
-  collectionSessions CollectionSession[] @relation("CollectionManager")
-  verifiedCollections CollectionSession[] @relation("CollectionVerifier")
+  orders              Order[]
+  voidedOrders        Order[]              @relation("OrderVoidedBy")
+  transactions        FinanceTransaction[]
+  regionId            String?
+  region              ParcelRegion?        @relation("RegionMembers", fields: [regionId], references: [id], onDelete: SetNull)
+  managedRegions      ParcelRegion[]       @relation("RegionManager")
+  collectionSessions  CollectionSession[]  @relation("CollectionManager")
+  verifiedCollections CollectionSession[]  @relation("CollectionVerifier")
+  stockOpnames        StockOpname[]
+  auditLogs           AuditLog[]
 }
 
 model ParcelRegion {
-  id          String   @id @default(cuid())
-  name        String
-  code        String   @unique
-  managerId   String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  managerId String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  manager     User?    @relation("RegionManager", fields: [managerId], references: [id], onDelete: SetNull)
-  users       User[] @relation("RegionMembers")
-  participants ParcelParticipant[] @relation("RegionParticipants")
+  manager            User?               @relation("RegionManager", fields: [managerId], references: [id], onDelete: SetNull)
+  users              User[]              @relation("RegionMembers")
+  participants       ParcelParticipant[] @relation("RegionParticipants")
   collectionSessions CollectionSession[]
 
   @@index([managerId])
 }
 
 model Customer {
-  id            String   @id @default(cuid())
-  name          String
-  phone         String?
-  email         String?
-  address       String?
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  points    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  orders        Order[]
-  debts         DebtRecord[]
+  orders             Order[]
+  debts              DebtRecord[]
   parcelParticipants ParcelParticipant[]
 }
 
 model Category {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
-  slug        String    @unique
+  slug        String   @unique
   description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  products    Product[]
+  products Product[]
 }
 
 model Product {
-  id            String         @id @default(cuid())
-  sku           String         @unique
+  id            String        @id @default(cuid())
+  sku           String        @unique
   name          String
-  slug          String         @unique
+  slug          String        @unique
   description   String?
   categoryId    String
   imageUrl      String?
-  status        ProductStatus  @default(ACTIVE)
-  isFeatured    Boolean        @default(false)
-  isParcel      Boolean        @default(false)
-  stockWarning  Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  status        ProductStatus @default(ACTIVE)
+  isFeatured    Boolean       @default(false)
+  isParcel      Boolean       @default(false)
+  isQuickAccess Boolean       @default(false)
+  stockWarning  Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  category      Category       @relation(fields: [categoryId], references: [id])
-  variants      ProductVariant[]
-  orderItems    OrderItem[]
-  parcelItems   ParcelItem[]
+  category       Category         @relation(fields: [categoryId], references: [id])
+  variants       ProductVariant[]
+  orderItems     OrderItem[]
   stockMovements StockMovement[]
 }
 
 model ProductVariant {
-  id            String        @id @default(cuid())
-  productId     String
-  name          String        // e.g. "Bungkus", "Sachet", "Kg"
-  sku           String        @unique
-  barcode       String?       @unique
-  basePrice     Decimal       @db.Decimal(12,2)
-  sellPrice     Decimal       @db.Decimal(12,2)
-  wholesalePrice Decimal?     @db.Decimal(12,2)
-  stockQty      Int           @default(0)
-  unit          String
-  isDefault     Boolean       @default(false)
-  isActive      Boolean       @default(true)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id             String   @id @default(cuid())
+  productId      String
+  name           String // e.g. "Bungkus", "Sachet", "Kg"
+  sku            String   @unique
+  barcode        String?  @unique
+  basePrice      Decimal  @db.Decimal(12, 2)
+  sellPrice      Decimal  @db.Decimal(12, 2)
+  wholesalePrice Decimal? @db.Decimal(12, 2)
+  stockQty       Int      @default(0)
+  unit           String
+  isDefault      Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  product       Product       @relation(fields: [productId], references: [id])
-  orderItems    OrderItem[]
-  stockMovements StockMovement[]
+  product           Product            @relation(fields: [productId], references: [id])
+  orderItems        OrderItem[]
+  stockMovements    StockMovement[]
+  stockOpnames      StockOpname[]
+  eventPackageItems EventPackageItem[]
+  parcelItems       ParcelItem[]
 }
 
 model StockMovement {
-  id              String           @id @default(cuid())
-  productId       String
-  variantId       String?
-  type            String           // IN, OUT, ADJUSTMENT, RETURN
-  quantity        Int
-  note            String?
-  reference       String?
-  createdAt       DateTime         @default(now())
+  id        String   @id @default(cuid())
+  productId String
+  variantId String?
+  type      String // IN, OUT, ADJUSTMENT, RETURN
+  quantity  Int
+  note      String?
+  reference String?
+  createdAt DateTime @default(now())
 
-  product         Product          @relation(fields: [productId], references: [id])
-  variant         ProductVariant?  @relation(fields: [variantId], references: [id])
+  product Product         @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
 }
 
 model Parcel {
-  id            String       @id @default(cuid())
-  name          String
-  slug          String       @unique
-  description   String?
-  type          ParcelType   @default(STANDARD)
-  price         Decimal      @db.Decimal(12,2)
-  imageUrl      String?
-  isActive      Boolean      @default(true)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  type        ParcelType @default(STANDARD)
+  price       Decimal    @db.Decimal(12, 2)
+  imageUrl    String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  items         ParcelItem[]
-  orderItems    OrderItem[]
-  participants  ParcelParticipant[]
-  basePrice     Decimal?     @db.Decimal(12,2)
-  managerCommission Decimal   @default(0) @db.Decimal(12,2)
+  items             ParcelItem[]
+  orderItems        OrderItem[]
+  participants      ParcelParticipant[]
+  basePrice         Decimal?            @db.Decimal(12, 2)
+  managerCommission Decimal             @default(0) @db.Decimal(12, 2)
 }
 
 model ParcelProgram {
   id           String   @id @default(cuid())
   name         String
   year         Int
-  targetAmount Decimal  @db.Decimal(12,2)
+  targetAmount Decimal  @db.Decimal(12, 2)
   isActive     Boolean  @default(true)
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   participants ParcelParticipant[]
+
   @@unique([name, year])
 }
 
 model ParcelParticipant {
-  id              String   @id @default(cuid())
-  customerId      String?
-  parcelId        String?
-  programId       String?
-  name            String
-  participantPhone String?
-  targetAmount    Decimal  @db.Decimal(12,2)
-  regionId        String?
-  salePrice       Decimal  @default(0) @db.Decimal(12,2)
-  grossMargin     Decimal  @default(0) @db.Decimal(12,2)
-  managerCommission Decimal @default(0) @db.Decimal(12,2)
-  commissionStatus String   @default("PENDING")
-  contributionAmount Decimal @db.Decimal(12,2)
-  frequency       String   @default("DAILY")
-  startDate       DateTime @default(now())
-  endDate         DateTime?
-  status          String   @default("ACTIVE")
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  customerId         String?
+  parcelId           String?
+  programId          String?
+  name               String
+  participantPhone   String?
+  targetAmount       Decimal   @db.Decimal(12, 2)
+  regionId           String?
+  salePrice          Decimal   @default(0) @db.Decimal(12, 2)
+  grossMargin        Decimal   @default(0) @db.Decimal(12, 2)
+  managerCommission  Decimal   @default(0) @db.Decimal(12, 2)
+  commissionStatus   String    @default("PENDING")
+  contributionAmount Decimal   @db.Decimal(12, 2)
+  frequency          String    @default("DAILY")
+  startDate          DateTime  @default(now())
+  endDate            DateTime?
+  status             String    @default("ACTIVE")
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  parcel          Parcel? @relation(fields: [parcelId], references: [id], onDelete: SetNull)
-  program         ParcelProgram? @relation(fields: [programId], references: [id], onDelete: SetNull)
-  contributions   ParcelContribution[]
+  customer          Customer?            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  parcel            Parcel?              @relation(fields: [parcelId], references: [id], onDelete: SetNull)
+  program           ParcelProgram?       @relation(fields: [programId], references: [id], onDelete: SetNull)
+  contributions     ParcelContribution[]
   collectionEntries CollectionEntry[]
-  region          ParcelRegion? @relation("RegionParticipants", fields: [regionId], references: [id], onDelete: SetNull)
+  region            ParcelRegion?        @relation("RegionParticipants", fields: [regionId], references: [id], onDelete: SetNull)
 
   @@index([customerId])
   @@index([parcelId])
@@ -250,36 +259,36 @@ model ParcelParticipant {
 model ParcelContribution {
   id            String   @id @default(cuid())
   participantId String
-  amount        Decimal  @db.Decimal(12,2)
+  amount        Decimal  @db.Decimal(12, 2)
   paidAt        DateTime @default(now())
   note          String?
   createdAt     DateTime @default(now())
 
-  participant   ParcelParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  participant ParcelParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
   @@index([participantId])
   @@index([paidAt])
 }
 
 model CollectionSession {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   regionId       String
   managerId      String
-  collectionDate DateTime @default(now())
-  status         String   @default("SUBMITTED")
-  expectedAmount Decimal  @default(0) @db.Decimal(12,2)
+  collectionDate DateTime  @default(now())
+  status         String    @default("SUBMITTED")
+  expectedAmount Decimal   @default(0) @db.Decimal(12, 2)
   actualCash     Decimal?
   difference     Decimal?
   note           String?
   verifiedAt     DateTime?
   verifiedById   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  region         ParcelRegion @relation(fields: [regionId], references: [id], onDelete: Cascade)
-  manager        User @relation("CollectionManager", fields: [managerId], references: [id], onDelete: Restrict)
-  verifiedBy     User? @relation("CollectionVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
-  entries        CollectionEntry[]
+  region     ParcelRegion      @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  manager    User              @relation("CollectionManager", fields: [managerId], references: [id], onDelete: Restrict)
+  verifiedBy User?             @relation("CollectionVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  entries    CollectionEntry[]
 
   @@index([regionId, collectionDate])
   @@index([managerId, collectionDate])
@@ -289,94 +298,103 @@ model CollectionEntry {
   id            String   @id @default(cuid())
   sessionId     String
   participantId String
-  amount        Decimal  @db.Decimal(12,2)
+  amount        Decimal  @db.Decimal(12, 2)
   note          String?
   createdAt     DateTime @default(now())
 
-  session       CollectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  participant   ParcelParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  session     CollectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participant ParcelParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, participantId])
   @@index([participantId])
 }
 
 model ParcelItem {
-  id            String   @id @default(cuid())
-  parcelId      String
-  productId     String
-  quantity      Int
-  notes         String?
+  id        String  @id @default(cuid())
+  parcelId  String
+  variantId String
+  quantity  Int
+  notes     String?
 
-  parcel        Parcel   @relation(fields: [parcelId], references: [id])
-  product       Product  @relation(fields: [productId], references: [id])
+  parcel  Parcel         @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([parcelId, variantId])
 }
 
 model Order {
-  id             String      @id @default(cuid())
-  orderNumber    String      @unique
-  type           OrderType
-  status         OrderStatus @default(PENDING)
-  customerId     String?
-  userId         String?
-  subtotal       Decimal     @db.Decimal(12,2)
-  discount       Decimal     @db.Decimal(12,2) @default(0)
-  shippingCost   Decimal     @db.Decimal(12,2) @default(0)
-  total          Decimal     @db.Decimal(12,2)
-  notes          String?
-  whatsappLink   String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id           String      @id @default(cuid())
+  orderNumber  String      @unique
+  type         OrderType
+  status       OrderStatus @default(PENDING)
+  customerId   String?
+  userId       String?
+  subtotal     Decimal     @db.Decimal(12, 2)
+  discount     Decimal     @default(0) @db.Decimal(12, 2)
+  shippingCost Decimal     @default(0) @db.Decimal(12, 2)
+  total        Decimal     @db.Decimal(12, 2)
+  notes        String?
+  whatsappLink String?
+  voidReason   String?
+  voidedById   String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  customer       Customer?   @relation(fields: [customerId], references: [id])
-  user           User?       @relation(fields: [userId], references: [id])
+  customer       Customer?            @relation(fields: [customerId], references: [id])
+  user           User?                @relation(fields: [userId], references: [id])
+  voidedBy       User?                @relation("OrderVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
   items          OrderItem[]
   financeEntries FinanceTransaction[]
 }
 
 model OrderItem {
-  id            String   @id @default(cuid())
-  orderId       String
-  productId     String?
-  variantId     String?
-  parcelId      String?
-  name          String
-  quantity      Int
-  unitPrice     Decimal  @db.Decimal(12,2)
-  total         Decimal  @db.Decimal(12,2)
-  createdAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  orderId        String
+  productId      String?
+  variantId      String?
+  parcelId       String?
+  eventPackageId String?
+  name           String
+  quantity       Int
+  unitPrice      Decimal  @db.Decimal(12, 2)
+  total          Decimal  @db.Decimal(12, 2)
+  createdAt      DateTime @default(now())
 
-  order         Order    @relation(fields: [orderId], references: [id])
-  product       Product? @relation(fields: [productId], references: [id])
-  variant       ProductVariant? @relation(fields: [variantId], references: [id])
-  parcel        Parcel?  @relation(fields: [parcelId], references: [id])
+  order        Order           @relation(fields: [orderId], references: [id])
+  product      Product?        @relation(fields: [productId], references: [id])
+  variant      ProductVariant? @relation(fields: [variantId], references: [id])
+  parcel       Parcel?         @relation(fields: [parcelId], references: [id])
+  eventPackage EventPackage?   @relation(fields: [eventPackageId], references: [id])
 }
 
 model FinanceTransaction {
-  id            String           @id @default(cuid())
+  id            String          @id @default(cuid())
   orderId       String?
   userId        String?
   type          TransactionType
-  amount        Decimal          @db.Decimal(12,2)
+  amount        Decimal         @db.Decimal(12, 2)
   description   String
   category      String?
   paymentMethod String?
-  createdAt     DateTime         @default(now())
+  deletedAt     DateTime?
+  createdAt     DateTime        @default(now())
 
-  order         Order?           @relation(fields: [orderId], references: [id])
-  user          User?            @relation(fields: [userId], references: [id])
+  order Order? @relation(fields: [orderId], references: [id])
+  user  User?  @relation(fields: [userId], references: [id])
 }
 
 model DebtRecord {
-  id            String   @id @default(cuid())
-  customerId    String
-  amount        Decimal  @db.Decimal(12,2)
-  status        String   @default("OPEN")
-  dueDate       DateTime?
-  description   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String    @id @default(cuid())
+  customerId  String
+  amount      Decimal   @db.Decimal(12, 2)
+  status      String    @default("OPEN")
+  dueDate     DateTime?
+  description String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  customer      Customer @relation(fields: [customerId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
 }
 
 model PromoCampaign {
@@ -385,7 +403,7 @@ model PromoCampaign {
   slug          String    @unique
   description   String?
   discountType  String    @default("PERCENT")
-  discountValue Decimal   @db.Decimal(12,2)
+  discountValue Decimal   @db.Decimal(12, 2)
   startsAt      DateTime?
   endsAt        DateTime?
   isActive      Boolean   @default(true)
@@ -399,6 +417,66 @@ model SiteProfile {
   story     String
   photoUrl  String?
   updatedAt DateTime @updatedAt
+}
+
+model StockOpname {
+  id            String   @id @default(cuid())
+  variantId     String
+  systemQty     Int
+  physicalQty   Int
+  difference    Int
+  note          String?
+  performedById String
+  createdAt     DateTime @default(now())
+
+  variant     ProductVariant @relation(fields: [variantId], references: [id])
+  performedBy User           @relation(fields: [performedById], references: [id])
+
+  @@index([variantId, createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String
+  entityId    String
+  field       String
+  oldValue    String?
+  newValue    String?
+  changedById String
+  createdAt   DateTime @default(now())
+
+  changedBy User @relation(fields: [changedById], references: [id])
+
+  @@index([entityId, createdAt])
+}
+
+model EventPackage {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  imageUrl      String?
+  price         Decimal  @db.Decimal(12, 2)
+  isManualPrice Boolean  @default(false)
+  isCustom      Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items      EventPackageItem[]
+  orderItems OrderItem[]
+}
+
+model EventPackageItem {
+  id             String @id @default(cuid())
+  eventPackageId String
+  variantId      String
+  quantity       Int
+
+  eventPackage EventPackage   @relation(fields: [eventPackageId], references: [id], onDelete: Cascade)
+  variant      ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([eventPackageId, variantId])
 }
 
 model SiteContent {

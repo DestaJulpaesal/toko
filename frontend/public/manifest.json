@@ -1,0 +1,13 @@
+{
+  "name": "Glosir",
+  "short_name": "Glosir",
+  "description": "Ruang kerja toko Glosir",
+  "start_url": "/admin",
+  "display": "standalone",
+  "background_color": "#f5f4f1",
+  "theme_color": "#1f7a4a",
+  "lang": "id-ID",
+  "icons": [
+    { "src": "/glosir-icon.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

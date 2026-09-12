@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiFetch } from '../services/api';
+import { apiFetch, monitorSessionExpiry } from '../services/api';
 
 export default function LoginPage() {
-  const [form, setForm] = useState({ email: 'cashier@glosir.com', password: '123456' });
+  const [form, setForm] = useState({ email: 'cashier@glosir.com', password: '123456', rememberMe: true });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -12,7 +12,7 @@ export default function LoginPage() {
   };
 
   const handleSelectDemo = (email) => {
-    setForm({ email, password: '123456' });
+    setForm({ email, password: '123456', rememberMe: true });
     setMessage('');
   };
 
@@ -38,6 +38,7 @@ export default function LoginPage() {
 
       localStorage.setItem('glosir_token', data.token);
       localStorage.setItem('glosir_user', JSON.stringify(data.user));
+      monitorSessionExpiry();
 
       const roleLabel = data.user.role === 'OWNER' ? 'Owner / Admin' : 'Karyawan / Kasir';
       setMessage(`Login berhasil sebagai ${roleLabel}. Mengalihkan...`);
@@ -103,6 +104,7 @@ export default function LoginPage() {
                 placeholder="Masukkan password"
               />
             </label>
+            <label className="login-remember"><input name="rememberMe" type="checkbox" checked={form.rememberMe} onChange={(event) => setForm((current) => ({ ...current, rememberMe: event.target.checked }))} /> Ingat saya di perangkat ini</label>
             <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
               {loading ? 'Memproses login...' : 'Masuk ke sistem'}
             </button>

@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, parcelRegionCreateSchema, parcelRegionUpdateSchema } from '../middleware/security.js';
 
 const router = express.Router();
 const ownerOnly = [authenticateToken, requireRole('OWNER', 'ADMIN')];
@@ -41,10 +42,9 @@ router.get('/', ...ownerOnly, async (req, res) => {
   }
 });
 
-router.post('/', ...ownerOnly, async (req, res) => {
+router.post('/', ...ownerOnly, validateBody(parcelRegionCreateSchema), async (req, res) => {
   try {
     const { name, code, managerId } = req.body || {};
-    if (!name || !code) return res.status(400).json({ success: false, message: 'Nama dan kode wilayah wajib diisi.' });
     const region = await prisma.parcelRegion.create({ data: { name: String(name).trim(), code: String(code).trim().toUpperCase(), managerId: managerId || null }, include: includeData });
     if (managerId) await prisma.user.update({ where: { id: managerId }, data: { role: 'PARCEL_MANAGER', regionId: region.id } });
     return res.status(201).json({ success: true, region: formatRegion(region) });
@@ -53,7 +53,7 @@ router.post('/', ...ownerOnly, async (req, res) => {
   }
 });
 
-router.patch('/:id', ...ownerOnly, async (req, res) => {
+router.patch('/:id', ...ownerOnly, validateBody(parcelRegionUpdateSchema), async (req, res) => {
   try {
     const { name, code, managerId, isActive } = req.body || {};
     const current = await prisma.parcelRegion.findUnique({ where: { id: req.params.id } });

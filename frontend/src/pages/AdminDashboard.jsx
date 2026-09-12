@@ -27,6 +27,7 @@ export default function AdminDashboard() {
     todaysNet: 0,
   });
   const [transactions, setTransactions] = useState([]);
+  const [restockSuggestions, setRestockSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [backupLoading, setBackupLoading] = useState(false);
 
@@ -51,9 +52,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        const [summaryRes, txRes] = await Promise.all([
+        const [summaryRes, txRes, restockRes] = await Promise.all([
           apiFetch('/finance/summary'),
-          apiFetch('/finance/transactions?limit=200')
+          apiFetch('/finance/transactions?limit=200'),
+          apiFetch('/products/restock-suggestions'),
         ]);
 
         const summaryData = await summaryRes.json();
@@ -66,6 +68,8 @@ export default function AdminDashboard() {
         if (txData.success && Array.isArray(txData.transactions)) {
           setTransactions(txData.transactions.slice(0, 5));
         }
+        const restockData = await restockRes.json();
+        if (restockData.success) setRestockSuggestions(restockData.suggestions || []);
       } catch (error) {
         // no static fallback: data should come from the database
       } finally {
@@ -129,6 +133,11 @@ export default function AdminDashboard() {
           <div><span>Cash hari ini</span><strong>{formatCurrency(summary.todayCashIncome)}</strong><small>Uang tunai masuk</small></div>
           <div><span>Stok menipis</span><strong>{summary.lowStockCount || 0}</strong><small>Perlu restock</small><Link to="/admin/products">Lihat stok</Link></div>
           <div><span>Tagihan parsel</span><strong>{summary.parcelOverdueCount || 0}</strong><small>Perlu ditagih</small><Link to="/admin/parcel-participants">Buka penagihan</Link></div>
+        </section>
+
+        <section className="dashboard-panel restock-panel">
+          <div className="dashboard-panel-heading"><div><span className="panel-kicker">Inventory signal</span><h2>Rekomendasi restock</h2></div><Link className="dashboard-text-link" to="/admin/products">Kelola produk <span>→</span></Link></div>
+          {restockSuggestions.length ? <div className="dashboard-activity-table"><div className="dashboard-table-head"><span>Produk</span><span>Stok</span><span>Rata-rata/hari</span><span>Jumlah beli</span></div>{restockSuggestions.slice(0, 8).map((item) => <div className="dashboard-table-row" key={item.variantId}><strong>{item.productName}</strong><span>{item.stockQty}</span><span>{item.averageDailyOut}</span><input aria-label={`Jumlah beli ${item.productName}`} type="number" min="0" defaultValue={item.suggestedPurchase} /></div>)}</div> : <div className="dashboard-empty-state">Belum ada rekomendasi restock.</div>}
         </section>
 
         <section className="dashboard-content-grid">

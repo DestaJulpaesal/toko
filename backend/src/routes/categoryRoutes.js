@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, categorySchema } from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(categorySchema), async (req, res) => {
   try {
     const { name, description = '' } = req.body || {};
     const trimmedName = String(name || '').trim();
@@ -56,7 +57,7 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, r
   }
 });
 
-router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(categorySchema), async (req, res) => {
   try {
     const { name, description = '' } = req.body || {};
     const trimmedName = String(name || '').trim();

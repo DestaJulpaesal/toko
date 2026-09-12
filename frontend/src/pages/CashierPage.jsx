@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminSidebar from '../components/AdminSidebar';
 import CurrencyInput from '../components/CurrencyInput';
@@ -41,6 +41,7 @@ export default function CashierPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [customCustomerName, setCustomCustomerName] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
+  const [customerEnabled, setCustomerEnabled] = useState(false);
   const [customerType, setCustomerType] = useState('RETAIL');
 
   // Cart & Catalog states
@@ -51,33 +52,21 @@ export default function CashierPage() {
   // Promo Campaign state
   const [selectedPromoId, setSelectedPromoId] = useState('none');
 
-  // Loyalty Point Redemption state
-  const [usePoints, setUsePoints] = useState(false);
-  const [redeemedPointsQty, setRedeemedPointsQty] = useState(10); // 10 points = Rp 5.000
-
   // Payment states
-  const [paymentMethod, setPaymentMethod] = useState('CASH'); // CASH | QRIS | TRANSFER
+  const [paymentMethod] = useState('CASH');
   const [paidAmount, setPaidAmount] = useState('');
-
-  // QRIS states
-  const [qrisReference, setQrisReference] = useState('');
-
-  // Transfer states
-  const [selectedBank, setSelectedBank] = useState('BCA');
-  const [senderAccountName, setSenderAccountName] = useState('');
-  const [transferReference, setTransferReference] = useState('');
 
   // General UI states
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
-  const [copiedBank, setCopiedBank] = useState('');
 
   // Completed receipt modal
   const [completedOrder, setCompletedOrder] = useState(null);
 
   // Barcode Scanner Modal State
   const [scannerOpen, setScannerOpen] = useState(false);
+  const scanInputRef = useRef(null);
 
   // Load products & customers
   const loadData = async () => {
@@ -104,6 +93,10 @@ export default function CashierPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    scanInputRef.current?.focus();
+  }, []);
+
   // Compute categories
   const categories = useMemo(() => {
     const list = ['Semua', ...new Set(products.map((p) => p.category).filter(Boolean))];
@@ -120,6 +113,7 @@ export default function CashierPage() {
 
   // Selected customer object
   const activeCustomer = useMemo(() => {
+    if (!customerEnabled) return null;
     if (selectedCustomerId && selectedCustomerId !== 'NEW') {
       return customers.find((c) => c.id === selectedCustomerId) || null;
     }
@@ -127,7 +121,7 @@ export default function CashierPage() {
       return { name: customCustomerName.trim(), points: 0 };
     }
     return { name: 'Pelanggan Umum', points: 0 };
-  }, [selectedCustomerId, customCustomerName, customers]);
+  }, [customerEnabled, selectedCustomerId, customCustomerName, customers]);
 
   // Active Promo
   const activePromo = useMemo(() => {
@@ -152,24 +146,13 @@ export default function CashierPage() {
     return 0;
   }, [activePromo, subtotal]);
 
-  // Point redemption calculation (10 poin = diskon Rp 5.000)
-  const maxRedeemablePoints = activeCustomer?.points ? Math.floor(activeCustomer.points / 10) * 10 : 0;
-  const pointDiscount = useMemo(() => {
-    if (!usePoints || !maxRedeemablePoints) return 0;
-    const remainingAfterPromo = Math.max(subtotal - promoDiscount, 0);
-    const pts = Math.min(redeemedPointsQty, maxRedeemablePoints);
-    const discount = (pts / 10) * 5000;
-    return Math.min(discount, remainingAfterPromo);
-  }, [usePoints, redeemedPointsQty, maxRedeemablePoints, subtotal, promoDiscount]);
-
   // Total discounts combined
-  const totalDiscount = promoDiscount + pointDiscount;
+  const totalDiscount = promoDiscount;
 
   // Final Total to pay
   const finalTotal = Math.max(subtotal - totalDiscount, 0);
 
-  // Calculate points earned from this purchase
-  const earnedPoints = useMemo(() => calculateEarnedPoints(finalTotal), [finalTotal]);
+  const earnedPoints = 0;
 
   // Gamified progress to next point tier
   const nextPointProgress = useMemo(() => {
@@ -229,11 +212,8 @@ export default function CashierPage() {
 
   // Effective amount paid
   const effectivePaid = useMemo(() => {
-    if (paymentMethod === 'QRIS' || paymentMethod === 'TRANSFER') {
-      return finalTotal;
-    }
     return Number(paidAmount) || 0;
-  }, [paymentMethod, paidAmount, finalTotal]);
+  }, [paidAmount]);
 
   const change = effectivePaid - finalTotal;
 
@@ -246,6 +226,7 @@ export default function CashierPage() {
     const matchesCat = categoryFilter === 'Semua' || product.category === categoryFilter;
     return matchesSearch && matchesCat;
   });
+  const quickAccessProducts = products.filter((product) => product.isQuickAccess && Number(product.stock ?? 1) > 0);
 
   const filteredCustomers = useMemo(() => {
     const q = customerSearch.trim().toLowerCase();
@@ -378,21 +359,16 @@ export default function CashierPage() {
       return;
     }
 
+    const averageResponse = await apiFetch('/orders/average-transaction');
+    const averageData = await averageResponse.json().catch(() => ({}));
+    if (averageData.success && averageData.average > 0 && finalTotal > averageData.average * 5) {
+      const proceed = await confirmAction(`Nominal ini jauh lebih besar dari biasanya. Rata-rata 30 hari: ${formatMoney(averageData.average)}. Tetap lanjutkan?`);
+      if (!proceed) return;
+    }
     if (!await confirmAction(`Yakin menyelesaikan transaksi sebesar ${formatMoney(finalTotal)}?`)) return;
 
     setSaving(true);
     setNotice('');
-
-    let paymentReference = null;
-    if (paymentMethod === 'QRIS') {
-      paymentReference = qrisReference.trim() ? `QRIS (${qrisReference.trim()})` : 'QRIS (Terverifikasi)';
-    } else if (paymentMethod === 'TRANSFER') {
-      const sender = senderAccountName.trim() ? `a/n ${senderAccountName.trim()}` : 'a/n Pelanggan';
-      const ref = transferReference.trim() ? `Ref: ${transferReference.trim()}` : '';
-      paymentReference = `${selectedBank} - ${sender} ${ref}`.trim();
-    }
-
-    const actuallyRedeemed = usePoints ? Math.min(redeemedPointsQty, maxRedeemablePoints) : 0;
 
     const payload = {
       items: items.map((item) => ({
@@ -405,12 +381,11 @@ export default function CashierPage() {
       paidAmount: effectivePaid,
       paymentMethod,
       customerType,
-      paymentReference,
+      paymentReference: null,
       customerId: selectedCustomerId && selectedCustomerId !== 'NEW' ? selectedCustomerId : null,
-      customerName: activeCustomer.name,
+      customerName: activeCustomer?.name || null,
       cashierName: 'Kasir Glosir',
       discount: totalDiscount,
-      redeemedPoints: actuallyRedeemed,
       promoName: activePromo.id !== 'none' ? activePromo.name : null,
       promoDiscount,
     };
@@ -428,8 +403,8 @@ export default function CashierPage() {
         throw new Error(data.message || 'Transaksi gagal diproses.');
       }
 
-      const previousCustomerPoints = activeCustomer?.points || 0;
-      const currentCustomerPoints = Math.max(previousCustomerPoints - actuallyRedeemed + earnedPoints, 0);
+      const previousCustomerPoints = 0;
+      const currentCustomerPoints = 0;
 
       const receipt = {
         orderNumber: data.orderNumber || `POS-${Date.now()}`,
@@ -437,17 +412,16 @@ export default function CashierPage() {
         subtotal,
         promoName: activePromo.id !== 'none' ? activePromo.name : null,
         promoDiscount,
-        pointDiscount,
+        pointDiscount: 0,
         discount: totalDiscount,
         total: finalTotal,
         paidAmount: effectivePaid,
         change: Math.max(effectivePaid - finalTotal, 0),
         paymentMethod,
-        paymentReference,
+        paymentReference: null,
         customer: activeCustomer,
         cashierName: 'Kasir Glosir',
         earnedPoints,
-        redeemedPoints: actuallyRedeemed,
         previousPoints: previousCustomerPoints,
         currentPoints: currentCustomerPoints,
         createdAt: new Date().toISOString(),
@@ -456,14 +430,6 @@ export default function CashierPage() {
       setCompletedOrder(receipt);
 
       // Update customer list points locally
-      if (selectedCustomerId && selectedCustomerId !== 'NEW') {
-        setCustomers((prev) =>
-          prev.map((c) =>
-            c.id === selectedCustomerId ? { ...c, points: currentCustomerPoints } : c
-          )
-        );
-      }
-
       // Decrement stock
       setProducts((current) =>
         current.map((product) => {
@@ -474,8 +440,8 @@ export default function CashierPage() {
     } catch (error) {
       console.warn('Checkout offline, using simulated receipt:', error.message);
 
-      const previousCustomerPoints = activeCustomer?.points || 0;
-      const currentCustomerPoints = Math.max(previousCustomerPoints - actuallyRedeemed + earnedPoints, 0);
+      const previousCustomerPoints = 0;
+      const currentCustomerPoints = 0;
 
       const receipt = {
         orderNumber: `POS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -483,17 +449,16 @@ export default function CashierPage() {
         subtotal,
         promoName: activePromo.id !== 'none' ? activePromo.name : null,
         promoDiscount,
-        pointDiscount,
+        pointDiscount: 0,
         discount: totalDiscount,
         total: finalTotal,
         paidAmount: effectivePaid,
         change: Math.max(effectivePaid - finalTotal, 0),
         paymentMethod,
-        paymentReference,
+        paymentReference: null,
         customer: activeCustomer,
         cashierName: 'Kasir Glosir',
         earnedPoints,
-        redeemedPoints: actuallyRedeemed,
         previousPoints: previousCustomerPoints,
         currentPoints: currentCustomerPoints,
         createdAt: new Date().toISOString(),
@@ -508,15 +473,11 @@ export default function CashierPage() {
   const handleResetForNewOrder = () => {
     setItems([]);
     setPaidAmount('');
-    setQrisReference('');
-    setSenderAccountName('');
-    setTransferReference('');
+    setCustomerEnabled(false);
     setSelectedCustomerId('');
     setCustomCustomerName('');
     setSelectedPromoId('none');
     setCustomerType('RETAIL');
-    setUsePoints(false);
-    setRedeemedPointsQty(10);
     setCompletedOrder(null);
   };
 
@@ -540,13 +501,12 @@ export default function CashierPage() {
       `*STRUK PEMBELIAN RESMI GLOSIR*\n` +
       `No. Faktur: ${order.orderNumber}\n` +
       `Tanggal: ${new Date(order.createdAt).toLocaleString('id-ID')}\n` +
-      `Pelanggan: ${order.customer?.name || 'Pelanggan Umum'}\n` +
+      (order.customer?.name ? `Pelanggan: ${order.customer.name}\n` : '') +
       `--------------------------------\n` +
       `${itemsList}\n` +
       `--------------------------------\n` +
       `Subtotal: ${formatMoney(order.subtotal)}\n` +
       (order.promoDiscount > 0 ? `Diskon Promo (${order.promoName}): -${formatMoney(order.promoDiscount)}\n` : '') +
-      (order.pointDiscount > 0 ? `Diskon Poin Member: -${formatMoney(order.pointDiscount)}\n` : '') +
       `*TOTAL BELANJA: ${formatMoney(order.total)}*\n` +
       `Metode: ${methodLabels[order.paymentMethod] || order.paymentMethod}\n` +
       (order.paymentReference ? `Keterangan: ${order.paymentReference}\n` : '') +
@@ -618,10 +578,12 @@ export default function CashierPage() {
           {/* SISI KIRI: Katalog Produk */}
           <section className="pos-catalog-panel">
             {/* Toolbar Search & Kategori */}
+            {quickAccessProducts.length > 0 && <section className="cashier-quick-access"><div><span className="panel-kicker">Akses cepat</span><strong>Barang favorit</strong><small>Tekan sekali untuk memasukkan ke keranjang</small></div><div className="cashier-quick-grid">{quickAccessProducts.map((product) => <button type="button" key={product.id} onClick={() => addProduct(product)}><strong>{product.name}</strong><small>{formatMoney(getSellingPrice(product))}</small></button>)}</div></section>}
             <div className="pos-search-bar">
               <span className="search-icon">🔍</span>
               <input
-                value={search}
+                      ref={scanInputRef}
+                      value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Scan barcode gun / cari nama atau SKU... (Tekan Enter)"
@@ -711,49 +673,35 @@ export default function CashierPage() {
               )}
             </div>
 
-            {/* 1. Pemilih Pelanggan & Info Poin */}
+            {/* Pilih tipe harga tanpa perlu mengisi data pelanggan. */}
             <div className="pos-customer-box">
-              <div className="pos-cust-row">
-                <span className="pos-field-label">Pelanggan / Member:</span>
-                {activeCustomer?.points > 0 && (
-                  <span className="cust-point-badge">⭐ {activeCustomer.points} Poin</span>
-                )}
-              </div>
-
-              <input
-                className="pos-custom-name-input"
-                placeholder="Cari nama / nomor HP member..."
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-              />
-
-              <select
-                className="pos-cust-select"
-                value={selectedCustomerId}
-                onChange={(e) => {
-                  setSelectedCustomerId(e.target.value);
-                  setUsePoints(false);
-                }}
-              >
-                <option value="">Pelanggan Umum (Walk-in)</option>
-                {filteredCustomers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.points ? `(⭐ ${c.points} Poin)` : ''}
-                  </option>
-                ))}
-                <option value="NEW">+ Input Nama Pembeli Baru...</option>
-              </select>
-
-              {selectedCustomerId === 'NEW' && (
+              <label className="redeem-checkbox-label">
                 <input
-                  className="pos-custom-name-input"
-                  placeholder="Ketik nama pelanggan..."
-                  value={customCustomerName}
-                  onChange={(e) => setCustomCustomerName(e.target.value)}
+                  type="checkbox"
+                  checked={customerEnabled}
+                  onChange={(event) => {
+                    setCustomerEnabled(event.target.checked);
+                    if (!event.target.checked) {
+                      setSelectedCustomerId('');
+                      setCustomCustomerName('');
+                      setCustomerSearch('');
+                    }
+                  }}
                 />
+                <span>Tambahkan pelanggan/member (opsional)</span>
+              </label>
+              {customerEnabled && (
+                <>
+                  <input className="pos-custom-name-input" placeholder="Cari nama / nomor HP member..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
+                  <select className="pos-cust-select" value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)}>
+                    <option value="">Pilih pelanggan umum</option>
+                    {filteredCustomers.map((c) => <option key={c.id} value={c.id}>{c.name} {c.points ? `(⭐ ${c.points} Poin)` : ''}</option>)}
+                    <option value="NEW">+ Input Nama Pembeli Baru...</option>
+                  </select>
+                  {selectedCustomerId === 'NEW' && <input className="pos-custom-name-input" placeholder="Ketik nama pelanggan..." value={customCustomerName} onChange={(e) => setCustomCustomerName(e.target.value)} />}
+                </>
               )}
-
-              <div className="pos-cust-row" style={{ marginTop: '10px' }}>
+              <div className="pos-cust-row">
                 <span className="pos-field-label">Tipe harga:</span>
                 <div className="seg-control compact">
                   <button type="button" className={customerType === 'RETAIL' ? 'active' : ''} onClick={() => setCustomerType('RETAIL')}>Pribadi / Eceran</button>
@@ -786,23 +734,6 @@ export default function CashierPage() {
                 <small className="pos-promo-desc-hint">✓ {activePromo.desc}</small>
               )}
             </div>
-
-            {/* 3. Fitur Penukaran Poin (Redeem Points) */}
-            {maxRedeemablePoints >= 10 && items.length > 0 && (
-              <div className="redeem-point-box">
-                <label className="redeem-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={usePoints}
-                    onChange={(e) => setUsePoints(e.target.checked)}
-                  />
-                  <span>
-                    Tukarkan <strong>{maxRedeemablePoints} Poin</strong> (Diskon{' '}
-                    <strong>{formatMoney((maxRedeemablePoints / 10) * 5000)}</strong>)
-                  </span>
-                </label>
-              </div>
-            )}
 
             {/* Daftar Barang di Keranjang */}
             <div className="pos-cart-items-scroll">
@@ -845,33 +776,6 @@ export default function CashierPage() {
             {/* Rincian Subtotal, Diskon, Poin, dan Total */}
             {items.length > 0 && (
               <div className="pos-totals-container">
-                {/* Gamified Loyalty Card & Progress Bar */}
-                <div className="loyalty-gamified-card">
-                  <div className="loyalty-card-top">
-                    <div className="loyalty-title-wrap">
-                      <span className="loyalty-star-icon">⭐</span>
-                      <div>
-                        <strong>{nextPointProgress.title}</strong>
-                        <p>{nextPointProgress.message}</p>
-                      </div>
-                    </div>
-                    <span className="loyalty-pill-badge">{nextPointProgress.badge}</span>
-                  </div>
-
-                  <div className="loyalty-progress-track">
-                    <div
-                      className="loyalty-progress-fill"
-                      style={{ width: `${nextPointProgress.percent}%` }}
-                    />
-                  </div>
-
-                  <div className="loyalty-rule-footer">
-                    <span>💡 100rb = 10 Poin</span>
-                    <span>50rb = 2 Poin</span>
-                    <span>10 Poin = Diskon Rp 5.000</span>
-                  </div>
-                </div>
-
                 <div className="pos-price-lines">
                   <div className="price-line">
                     <span>Subtotal:</span>
@@ -885,45 +789,16 @@ export default function CashierPage() {
                     </div>
                   )}
 
-                  {pointDiscount > 0 && (
-                    <div className="price-line discount-line">
-                      <span>Diskon Poin ({maxRedeemablePoints} Poin):</span>
-                      <span>-{formatMoney(pointDiscount)}</span>
-                    </div>
-                  )}
-
                   <div className="price-line grand-total-line">
                     <strong>TOTAL BELANJA:</strong>
                     <strong>{formatMoney(finalTotal)}</strong>
                   </div>
                 </div>
 
-                {/* Segmented Payment Tabs */}
+                {/* Pembayaran tunai */}
                 <div className="pos-payment-selector">
                   <span className="payment-label-text">Metode Pembayaran:</span>
-                  <div className="pos-segmented-tabs">
-                    <button
-                      type="button"
-                      className={`seg-tab ${paymentMethod === 'CASH' ? 'active' : ''}`}
-                      onClick={() => setPaymentMethod('CASH')}
-                    >
-                      💵 Tunai
-                    </button>
-                    <button
-                      type="button"
-                      className={`seg-tab ${paymentMethod === 'QRIS' ? 'active' : ''}`}
-                      onClick={() => setPaymentMethod('QRIS')}
-                    >
-                      📱 QRIS
-                    </button>
-                    <button
-                      type="button"
-                      className={`seg-tab ${paymentMethod === 'TRANSFER' ? 'active' : ''}`}
-                      onClick={() => setPaymentMethod('TRANSFER')}
-                    >
-                      🏦 Transfer
-                    </button>
-                  </div>
+                  <strong>💵 Tunai / Cash</strong>
                 </div>
 
                 {/* DETAIL: 1. TUNAI */}
@@ -966,8 +841,8 @@ export default function CashierPage() {
                   </div>
                 )}
 
-                {/* DETAIL: 2. QRIS */}
-                {paymentMethod === 'QRIS' && (
+                {/* QRIS dan transfer dinonaktifkan sementara; kasir menggunakan tunai. */}
+                {false && paymentMethod === 'QRIS' && (
                   <div className="pos-method-detail qris-box">
                     <div className="qris-card-visual-clean">
                       <div className="qris-card-header-clean">
@@ -1038,7 +913,7 @@ export default function CashierPage() {
                 )}
 
                 {/* DETAIL: 3. TRANSFER */}
-                {paymentMethod === 'TRANSFER' && (
+                {false && paymentMethod === 'TRANSFER' && (
                   <div className="pos-method-detail transfer-box">
                     <span className="pos-sub-title">Nomor Rekening Toko Glosir:</span>
                     <div className="pos-bank-list">
@@ -1108,14 +983,14 @@ export default function CashierPage() {
           </aside>
         </section>
 
-        {/* MODAL STRUK DENGAN PROMO DAN RINCIAN POIN MENARIK */}
+        {/* MODAL STRUK DENGAN PROMO */}
         {completedOrder && (
           <div className="receipt-modal-backdrop" onClick={handleResetForNewOrder}>
             <div className="receipt-modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="receipt-modal-header no-print">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="badge-success-tick">✓</span>
-                  <h3>Transaksi Sukses & Poin Dicatat</h3>
+                  <h3>Transaksi Tunai Berhasil</h3>
                 </div>
                 <button className="receipt-close-btn" onClick={handleResetForNewOrder}>
                   ×
@@ -1146,10 +1021,12 @@ export default function CashierPage() {
                     <span>Kasir:</span>
                     <span>{completedOrder.cashierName || 'Kasir Glosir'}</span>
                   </div>
-                  <div>
-                    <span>Pelanggan:</span>
-                    <strong>{completedOrder.customer?.name || 'Pelanggan Umum'}</strong>
-                  </div>
+                  {completedOrder.customer?.name && (
+                    <div>
+                      <span>Pelanggan:</span>
+                      <strong>{completedOrder.customer.name}</strong>
+                    </div>
+                  )}
                 </div>
 
                 <div className="receipt-divider-dash" />
@@ -1234,10 +1111,10 @@ export default function CashierPage() {
                   </div>
                 </div>
 
-                {/* BAGIAN RINCIAN POIN MEMBER DI STRUK (ELEGAN & MENARIK) */}
-                <div className="receipt-divider-dash" />
+                {completedOrder.customer?.name && <>{/* BAGIAN RINCIAN POIN MEMBER DI STRUK (ELEGAN & MENARIK) */}
+                <div className="receipt-divider-dash" /></>}
 
-                <div className="receipt-point-summary-box">
+                {false && <div className="receipt-point-summary-box">
                   <div className="receipt-point-header">
                     <span>★ PROGRAM LOYALITAS MEMBER ★</span>
                   </div>
@@ -1272,7 +1149,7 @@ export default function CashierPage() {
                     <small>• Tukarkan 10 Poin = Potongan Rp 5.000 di kasir</small>
                     <small>Terima kasih telah setia berbelanja di Glosir!</small>
                   </div>
-                </div>
+                </div>}
 
                 <div className="receipt-divider-dash" />
 

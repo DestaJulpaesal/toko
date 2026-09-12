@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, promoCreateSchema, promoUpdateSchema } from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -55,7 +56,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(promoCreateSchema), async (req, res) => {
   try {
     const { name, description = '', discountType = 'PERCENT', discountValue, startsAt, endsAt, isActive = true } = req.body || {};
     const trimmedName = String(name || '').trim();
@@ -87,7 +88,7 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, r
   }
 });
 
-router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(promoUpdateSchema), async (req, res) => {
   try {
     const { name, description, discountType, discountValue, startsAt, endsAt, isActive } = req.body || {};
     const payload = {};

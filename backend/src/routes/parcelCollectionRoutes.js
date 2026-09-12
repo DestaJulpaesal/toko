@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, parcelCollectionCreateSchema, parcelCollectionVerifySchema } from '../middleware/security.js';
 
 const router = express.Router();
 const ownerRoles = ['OWNER', 'ADMIN'];
@@ -60,7 +61,7 @@ router.get('/', ...allowedRoles, async (req, res) => {
   }
 });
 
-router.post('/', ...allowedRoles, async (req, res) => {
+router.post('/', ...allowedRoles, validateBody(parcelCollectionCreateSchema), async (req, res) => {
   try {
     const { regionId, collectionDate, entries = [], note } = req.body || {};
     if (!regionId || !Array.isArray(entries) || !entries.length) return res.status(400).json({ success: false, message: 'Wilayah dan minimal satu setoran peserta wajib diisi.' });
@@ -85,10 +86,9 @@ router.post('/', ...allowedRoles, async (req, res) => {
   }
 });
 
-router.patch('/:id/verify', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.patch('/:id/verify', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(parcelCollectionVerifySchema), async (req, res) => {
   try {
     const actualCash = Number(req.body?.actualCash);
-    if (!Number.isFinite(actualCash) || actualCash < 0) return res.status(400).json({ success: false, message: 'Nominal cash diterima tidak valid.' });
     const current = await prisma.collectionSession.findUnique({ where: { id: req.params.id } });
     if (!current) return res.status(404).json({ success: false, message: 'Rekap penagihan tidak ditemukan.' });
     const updated = await prisma.collectionSession.update({ where: { id: req.params.id }, data: { actualCash, difference: actualCash - Number(current.expectedAmount), status: 'VERIFIED', verifiedAt: new Date(), verifiedById: req.user.id, note: req.body?.note ? String(req.body.note).trim() : current.note }, include: includeData });

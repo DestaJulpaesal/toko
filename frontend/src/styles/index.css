@@ -113,6 +113,7 @@ a:focus-visible {
 
 .topbar {
   display: flex;
+  gap: 16px;
   justify-content: space-between;
   align-items: center;
   padding: 18px 22px;
@@ -133,7 +134,10 @@ a:focus-visible {
 
 .nav {
   display: flex;
-  gap: 28px;
+  flex: 1 1 auto;
+  justify-content: center;
+  gap: clamp(12px, 1.6vw, 24px);
+  min-width: 0;
 }
 
 .mobile-menu-button { display: none; }
@@ -142,12 +146,21 @@ a:focus-visible {
   text-decoration: none;
   color: var(--text);
   font-weight: 600;
+  font-size: 0.88rem;
+  white-space: nowrap;
 }
 
 .actions {
   display: flex;
-  gap: 12px;
+  flex: 0 0 auto;
+  gap: 8px;
   align-items: center;
+}
+
+.actions .btn {
+  padding-left: 13px;
+  padding-right: 13px;
+  font-size: 0.78rem;
 }
 
 .cart-nav-link { display: inline-flex; align-items: center; gap: 5px; color: var(--text); text-decoration: none; }
@@ -868,7 +881,7 @@ a:focus-visible {
   background: rgba(31, 122, 74, 0.08);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .hero,
   .owner-section {
     grid-template-columns: 1fr;
@@ -1139,6 +1152,7 @@ a:focus-visible {
 .parcel-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: start;
   gap: 22px;
   max-width: 1200px;
   margin: 0 auto;
@@ -1146,6 +1160,7 @@ a:focus-visible {
 }
 
 .parcel-feature-card {
+  align-self: start;
   padding: 20px;
   border: 1px solid var(--border);
   border-radius: 24px;
@@ -1225,12 +1240,164 @@ a:focus-visible {
 }
 
 .parcel-feature-card p {
-  min-height: 48px;
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.5;
   margin: 0 0 16px;
-  flex-grow: 1;
+}
+
+.parcel-contents {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #e4eee5;
+  border-radius: 14px;
+  background: #f7fbf7;
+}
+
+.parcel-contents strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #315b43;
+  font-size: 0.78rem;
+}
+
+.parcel-contents ul,
+.catalog-package-items {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parcel-contents li {
+  display: flex;
+  gap: 8px;
+  color: #657267;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.parcel-item-quantity {
+  min-width: 26px;
+  color: var(--primary-dark);
+  font-weight: 800;
+}
+
+.catalog-package-items {
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.catalog-package-items li::before {
+  content: '•';
+  margin-right: 6px;
+  color: var(--primary);
+}
+
+.event-catalog-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 42px 20px 80px;
+}
+
+.event-catalog-hero {
+  max-width: 760px;
+  margin: 0 auto 34px;
+  text-align: center;
+}
+
+.event-catalog-hero h1 {
+  margin: 12px 0;
+  font-size: clamp(2.4rem, 5vw, 4.2rem);
+  letter-spacing: -0.07em;
+}
+
+.event-catalog-hero p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.event-package-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  align-items: start;
+  gap: 22px;
+}
+
+.event-package-card {
+  align-self: start;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(36, 31, 25, 0.06);
+}
+
+.event-package-art {
+  display: grid;
+  place-items: center;
+  min-height: 170px;
+  gap: 5px;
+  color: #5d287d;
+  background: linear-gradient(145deg, #e3d2f2, #f9f2ff);
+}
+
+.event-package-art span {
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.event-package-art small {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.event-package-content {
+  display: flex;
+  flex-direction: column;
+  padding: 22px;
+}
+
+.event-package-content h2 {
+  margin: 14px 0 8px;
+}
+
+.event-package-content p {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.event-package-items {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #faf7fc;
+  color: #6e6672;
+  font-size: 0.8rem;
+}
+
+.event-package-items strong {
+  color: #5d287d;
+}
+
+.event-package-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.event-package-footer > strong {
+  color: var(--primary-dark);
+  white-space: nowrap;
 }
 
 .parcel-pricing-box {
@@ -1999,4 +2166,13 @@ a:focus-visible {
   .promo-bottom-banner { padding: 24px; }
   .banner-buttons { flex-direction: column; width: 100%; }
   .banner-buttons .btn { width: 100%; }
+}
+
+.page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  color: #888;
+  font-size: 0.95rem;
 }

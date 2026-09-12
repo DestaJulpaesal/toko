@@ -1,7 +1,7 @@
 # BLUEPRINT SISTEM
 ## Digitalisasi Usaha Glosir, Parsel, E-Commerce & Keuangan Keluarga
 
-*Dokumen rancangan awal — versi 2 (revisi: integrasi Kasir + E-Commerce + WhatsApp Order + Keuangan otomatis)*
+*Dokumen rancangan — September 2026; implementation status is noted on delivered modules.*
 *September 2026*
 
 ---
@@ -66,6 +66,8 @@ Karena barang glosir dijual dalam berbagai satuan dan sebagian bisa pecahan (ece
 
 ### 3.2 Paket Glosir untuk Acara (Hajatan, Nikahan, dll.)
 
+**Status:** Database model, CRUD API, automatic/manual pricing, admin page, public catalog, cart integration, and checkout stock deduction are implemented.
+
 Selain dijual satuan/eceran, barang Glosir bisa **dipaketkan** untuk kebutuhan acara besar — mirip konsep Parsel, tapi berbasis kebutuhan grosir dalam jumlah besar.
 
 | Fitur | Keterangan |
@@ -77,6 +79,8 @@ Selain dijual satuan/eceran, barang Glosir bisa **dipaketkan** untuk kebutuhan a
 | Tampil di E-Commerce | Paket acara ditampilkan sebagai kategori tersendiri di etalase online Glosir, dengan foto & deskripsi. |
 
 ### 3.3 Rekomendasi Restock (Barang Perlu Dibeli)
+
+**Status:** API and dashboard recommendations are implemented from 14-day `OUT` movement averages; final purchase quantity remains manually editable.
 
 Sistem menghitung otomatis daftar barang yang perlu dibeli untuk hari berikutnya, berdasarkan stok saat ini dan rata-rata penjualan harian (gabungan penjualan kasir + online). Hasil ini tetap bisa diedit manual sebelum dijadikan daftar belanja final.
 
@@ -91,10 +95,10 @@ Sistem menghitung otomatis daftar barang yang perlu dibeli untuk hari berikutnya
 | --- | --- |
 | Stok masuk & keluar | Tercatat otomatis dari transaksi kasir, pesanan online, & input pembelian, dalam satuan dasar. |
 | Utang-piutang pelanggan | Sistem tempo/kredit untuk pelanggan langganan. |
-| Stok opname | Pencocokan stok fisik vs stok sistem secara berkala, untuk mendeteksi selisih akibat rusak/hilang/susut. |
+| Stok opname | **Implemented:** physical/system reconciliation, stock adjustment, movement record, and history. |
 | Alert kadaluarsa | Notifikasi barang yang mendekati tanggal kadaluarsa, supaya bisa dijual/diskon lebih dulu. |
 | Deteksi jual rugi | Peringatan otomatis jika transaksi terjadi dengan harga jual di bawah harga modal. |
-| Log audit harga & stok | Riwayat siapa mengubah harga/stok, kapan, dan dari nilai berapa ke berapa. |
+| Log audit harga & stok | **Implemented:** variant price/stock changes record user, timestamp, and old/new values. |
 | Laporan untung vs laku | Membedakan barang paling laris dengan barang paling menguntungkan. |
 
 ---
@@ -107,7 +111,7 @@ Menangani produk rakitan/kombinasi, dijual baik langsung di toko maupun lewat E-
 | --- | --- |
 | Data bahan/isi parsel | Diambil dari stok barang Glosir bila bahan yang sama dipakai di kedua modul. |
 | "Resep" paket parsel | Kombinasi bahan + jumlah per paket → sistem otomatis menghitung harga pokok & menyarankan harga jual. |
-| Pemotongan stok otomatis | Saat parsel dirakit/terjual, stok bahan yang dipakai otomatis berkurang. |
+| Pemotongan stok otomatis | **Implemented for POS checkout:** stok varian bahan parsel berkurang atomik dan `StockMovement` tercatat per varian. |
 | Pesanan / pre-order | Catat nama pelanggan, tanggal ambil, jumlah, status pesanan (dipesan/diproses/selesai) — baik dari toko langsung maupun dari pesanan online via WA. |
 | Custom parsel | Pelanggan bisa minta isi parsel disesuaikan lewat WA, dicatat sebagai varian custom dari resep dasar. |
 | Tampil di E-Commerce | Katalog parsel (paket standar + galeri contoh) ditampilkan di etalase online, kategori terpisah dari Glosir. |

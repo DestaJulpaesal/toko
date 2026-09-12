@@ -6,7 +6,7 @@ const getJwtSecret = () => {
   return process.env.JWT_SECRET;
 };
 
-export function generateToken(user) {
+export function generateToken(user, rememberMe = false) {
   return jwt.sign(
     {
       id: user.id,
@@ -16,7 +16,7 @@ export function generateToken(user) {
       regionId: user.regionId || null,
     },
     getJwtSecret(),
-    { expiresIn: '8h' }
+    { expiresIn: user.role === 'OWNER' && rememberMe ? '30d' : '8h' }
   );
 }
 

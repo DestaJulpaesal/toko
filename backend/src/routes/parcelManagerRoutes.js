@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, managerCreateSchema, managerUpdateSchema } from '../middleware/security.js';
 
 const router = express.Router();
 const ownerOnly = [authenticateToken, requireRole('OWNER', 'ADMIN')];
@@ -31,13 +32,10 @@ router.get('/', ...ownerOnly, async (req, res) => {
   }
 });
 
-router.post('/', ...ownerOnly, async (req, res) => {
+router.post('/', ...ownerOnly, validateBody(managerCreateSchema), async (req, res) => {
   try {
     const { name, email, password, phone, regionId } = req.body || {};
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    if (!name || !normalizedEmail || !password || String(password).length < 6) {
-      return res.status(400).json({ success: false, message: 'Nama, email, dan password minimal 6 karakter wajib diisi.' });
-    }
     const hashRows = await prisma.$queryRaw`SELECT crypt(${String(password)}, gen_salt('bf')) AS hash`;
     const user = await prisma.user.create({
       data: {
@@ -59,7 +57,7 @@ router.post('/', ...ownerOnly, async (req, res) => {
   }
 });
 
-router.patch('/:id', ...ownerOnly, async (req, res) => {
+router.patch('/:id', ...ownerOnly, validateBody(managerUpdateSchema), async (req, res) => {
   try {
     const { name, email, password, phone, regionId, isActive } = req.body || {};
     const current = await prisma.user.findUnique({ where: { id: req.params.id }, include: { region: true } });
@@ -74,7 +72,6 @@ router.patch('/:id', ...ownerOnly, async (req, res) => {
       role: nextRegionId ? 'PARCEL_MANAGER' : 'CASHIER',
     };
     if (password) {
-      if (String(password).length < 6) return res.status(400).json({ success: false, message: 'Password minimal 6 karakter.' });
       const hashRows = await prisma.$queryRaw`SELECT crypt(${String(password)}, gen_salt('bf')) AS hash`;
       data.passwordHash = hashRows[0].hash;
     }

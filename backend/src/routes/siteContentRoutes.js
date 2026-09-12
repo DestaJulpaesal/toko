@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { validateBody, siteContentCreateSchema, siteContentUpdateSchema } from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -246,7 +247,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(siteContentCreateSchema), async (req, res) => {
   try {
     const { type, title, content, sortOrder = 0, isPublished = true } = req.body || {};
     const normalizedType = normalizeType(type);
@@ -305,7 +306,7 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, r
   }
 });
 
-router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(siteContentUpdateSchema), async (req, res) => {
   try {
     const { type, title, content, sortOrder, isPublished } = req.body || {};
     const payload = {};
