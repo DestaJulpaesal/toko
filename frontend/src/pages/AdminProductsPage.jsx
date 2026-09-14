@@ -13,7 +13,7 @@ import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
 import * as XLSX from 'xlsx';
 
-const emptyForm = { name: '', sku: '', barcode: '', category: '', price: '', wholesalePrice: '', purchasePrice: '', originalPrice: '', stock: '', status: 'Aktif', isQuickAccess: false };
+const emptyForm = { name: '', sku: '', barcode: '', category: '', price: '', wholesalePrice: '', purchasePrice: '', originalPrice: '', stock: '', status: 'Aktif', isQuickAccess: false, packages: [] };
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
@@ -22,6 +22,8 @@ export default function AdminProductsPage() {
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Semua');
+  const [categoryFilter, setCategoryFilter] = useState('Semua');
+  const [sortBy, setSortBy] = useState('newest');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,7 +74,11 @@ export default function AdminProductsPage() {
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Kategori gagal dimuat');
       setCategories(data.categories || []);
-      setForm((current) => ({ ...current, category: current.category && data.categories.some((item) => item.name === current.category) ? current.category : data.categories[0]?.name || '' }));
+      setForm((current) => {
+        const currentCategory = String(current.category || '').trim().toLowerCase();
+        const matchedCategory = data.categories.find((item) => item.name.trim().toLowerCase() === currentCategory);
+        return { ...current, category: matchedCategory?.name || '' };
+      });
     } catch (error) {
       setNotice(error.message === 'Failed to fetch' ? 'Backend sedang tersambung ulang. Coba segarkan halaman.' : error.message || 'Kategori gagal dimuat.');
     }
@@ -91,7 +97,22 @@ export default function AdminProductsPage() {
 
   const visibleProducts = products.filter((product) => {
     const matchesSearch = `${product.name} ${product.sku} ${product.category}`.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch && (statusFilter === 'Semua' || product.status === statusFilter);
+    const matchesStatus = statusFilter === 'Semua' || product.status === statusFilter;
+    const matchesCategory = categoryFilter === 'Semua' || product.category === categoryFilter;
+    return matchesSearch && matchesStatus && matchesCategory;
+  }).sort((first, second) => {
+    const textCompare = (left, right) => String(left || '').localeCompare(String(right || ''), 'id', { sensitivity: 'base' });
+    switch (sortBy) {
+      case 'nameAsc': return textCompare(first.name, second.name);
+      case 'nameDesc': return textCompare(second.name, first.name);
+      case 'categoryAsc': return textCompare(first.category, second.category) || textCompare(first.name, second.name);
+      case 'categoryDesc': return textCompare(second.category, first.category) || textCompare(first.name, second.name);
+      case 'priceAsc': return Number(first.price || 0) - Number(second.price || 0);
+      case 'priceDesc': return Number(second.price || 0) - Number(first.price || 0);
+      case 'stockAsc': return Number(first.stock || 0) - Number(second.stock || 0);
+      case 'stockDesc': return Number(second.stock || 0) - Number(first.stock || 0);
+      default: return 0;
+    }
   });
 
   const allVisibleProductsSelected = visibleProducts.length > 0 && visibleProducts.every((product) => selectedProductIds.includes(product.id));
@@ -301,8 +322,9 @@ export default function AdminProductsPage() {
 
   const submitForm = async (event) => {
     event.preventDefault();
-    if (!String(form.name || '').trim() || !form.price || !form.stock) {
-      setNotice('Lengkapi nama, harga, dan stok produk.');
+    const selectedCategory = categories.find((item) => item.name.trim().toLowerCase() === String(form.category || '').trim().toLowerCase());
+    if (!String(form.name || '').trim() || !form.price || !form.stock || !selectedCategory) {
+      setNotice(!selectedCategory ? 'Pilih kategori produk terlebih dahulu.' : 'Lengkapi nama, harga, dan stok produk.');
       return;
     }
 
@@ -318,7 +340,7 @@ export default function AdminProductsPage() {
         name: String(form.name || '').trim(),
         sku: String(form.sku || '').trim() || `GLS-${Date.now()}`,
         barcode: String(form.barcode || '').trim() || null,
-        category: String(form.category || '').trim(),
+        category: selectedCategory.name,
         status: String(form.status || 'Aktif'),
         price: Number(form.price),
         wholesalePrice: form.wholesalePrice ? Number(form.wholesalePrice) : null,
@@ -344,7 +366,12 @@ export default function AdminProductsPage() {
       });
       window.clearTimeout(timeoutId);
       const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.message || `Produk gagal disimpan (HTTP ${response.status}).`);
+      if (!response.ok || !data.success) {
+        const validationDetails = Array.isArray(data.errors)
+          ? data.errors.map((item) => `${item.field || 'field'}: ${item.message}`).join(', ')
+          : '';
+        throw new Error(validationDetails || data.message || `Produk gagal disimpan (HTTP ${response.status}).`);
+      }
       setProducts((previous) => {
         const nextProducts = editingId
           ? previous.map((product) => product.id === editingId ? data.product : product)
@@ -352,6 +379,18 @@ export default function AdminProductsPage() {
         localStorage.setItem('glosir_products_cache', JSON.stringify(nextProducts));
         return nextProducts;
       });
+      if (data.product?.id && form.packages?.length) {
+        for (const packageForm of form.packages) {
+          const packageResponse = await apiFetch(packageForm.id ? `/products/${data.product.id}/variants/${packageForm.id}` : `/products/${data.product.id}/variants`, {
+            method: packageForm.id ? 'PATCH' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(packageForm),
+          });
+          const packageData = await packageResponse.json();
+          if (!packageResponse.ok || !packageData.success) throw new Error(packageData.message || 'Kemasan gagal disimpan.');
+        }
+        await loadProducts();
+      }
       setNotice(editingId ? 'Produk berhasil diperbarui di database.' : 'Produk berhasil ditambahkan ke database.');
       resetForm();
     } catch (error) {
@@ -376,6 +415,16 @@ export default function AdminProductsPage() {
       purchasePrice: product.purchasePrice ?? '',
       originalPrice: product.originalPrice ?? '',
       stock: product.stock ?? '',
+      packages: (product.variants || []).filter((variant) => !variant.isDefault).map((variant) => ({
+        id: variant.id,
+        name: variant.name || '',
+        sku: variant.sku || '',
+        barcode: variant.barcode || '',
+        price: variant.price ?? '',
+        wholesalePrice: variant.wholesalePrice ?? '',
+        purchasePrice: variant.purchasePrice ?? '',
+        stock: variant.stock ?? '',
+      })),
     });
     apiFetch(`/audit-logs?entityId=${encodeURIComponent(product.variantId || product.id)}`)
       .then((response) => response.json())
@@ -554,6 +603,7 @@ export default function AdminProductsPage() {
               <label>
                 Kategori
                 <select name="category" value={form.category || ''} onChange={updateField}>
+                  <option value="">Pilih kategori produk</option>
                   {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
                 </select>
               </label>
@@ -596,6 +646,29 @@ export default function AdminProductsPage() {
               <input name="stock" value={form.stock ?? ''} onChange={updateField} type="number" min="0" placeholder="25" />
             </label>
 
+            <section className="product-packages-panel">
+              <div className="panel-heading">
+                <div><span className="panel-kicker">Kemasan tambahan</span><h3>Pak / Dus / Slop</h3></div>
+                <button type="button" className="text-button" onClick={() => setForm((current) => ({ ...current, packages: [...(current.packages || []), { name: 'Dus', sku: '', barcode: '', price: '', wholesalePrice: '', purchasePrice: '', stock: '' }] }))}>+ Tambah kemasan</button>
+              </div>
+              <small className="tool-empty">Satu produk bisa memiliki barcode, harga, dan stok berbeda untuk kemasan pak, dus, atau slop.</small>
+              {(form.packages || []).map((packageForm, index) => (
+                <div className="product-package-row" key={packageForm.id || index}>
+                  {['name', 'sku', 'barcode', 'price', 'wholesalePrice', 'purchasePrice', 'stock'].map((field) => (
+                    <input
+                      key={field}
+                      type={['price', 'wholesalePrice', 'purchasePrice', 'stock'].includes(field) ? 'number' : 'text'}
+                      min={field === 'stock' ? 0 : undefined}
+                      placeholder={field === 'name' ? 'Nama satuan (Dus)' : field === 'price' ? 'Harga jual' : field === 'wholesalePrice' ? 'Harga warung' : field === 'purchasePrice' ? 'Modal' : field === 'stock' ? 'Stok' : field === 'sku' ? 'SKU kemasan' : 'Barcode kemasan'}
+                      value={packageForm[field] ?? ''}
+                      onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: event.target.value } : item) }))}
+                    />
+                  ))}
+                  <button type="button" className="text-button" onClick={() => setForm((current) => ({ ...current, packages: current.packages.filter((_, itemIndex) => itemIndex !== index) }))}>Hapus</button>
+                </div>
+              ))}
+            </section>
+
             <label className="quick-access-toggle"><input type="checkbox" checked={Boolean(form.isQuickAccess)} onChange={(event) => setForm((current) => ({ ...current, isQuickAccess: event.target.checked }))} /><span><strong>Tampilkan sebagai tombol cepat di Kasir</strong><small>Untuk barang yang sering dijual tanpa perlu mencari.</small></span></label>
 
             <button className="btn btn-primary full" type="submit" disabled={saving}>
@@ -616,6 +689,21 @@ export default function AdminProductsPage() {
                 <option>Aktif</option>
                 <option>Stok menipis</option>
                 <option>Draft</option>
+              </select>
+              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Filter kategori">
+                <option>Semua</option>
+                {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
+              </select>
+              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} aria-label="Urutkan produk">
+                <option value="newest">Terbaru ditambahkan</option>
+                <option value="nameAsc">Nama A-Z</option>
+                <option value="nameDesc">Nama Z-A</option>
+                <option value="categoryAsc">Kategori A-Z</option>
+                <option value="categoryDesc">Kategori Z-A</option>
+                <option value="priceAsc">Harga terendah</option>
+                <option value="priceDesc">Harga tertinggi</option>
+                <option value="stockAsc">Stok terendah</option>
+                <option value="stockDesc">Stok tertinggi</option>
               </select>
             </div>
             <BulkTableActions selectedCount={selectedProductIds.length} totalCount={visibleProducts.length} allSelected={allVisibleProductsSelected} onToggleAll={toggleAllProducts} onDelete={deleteSelectedProducts} deleting={bulkDeleting} />

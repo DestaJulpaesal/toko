@@ -30,7 +30,7 @@ export const checkoutSchema = z.object({
     quantity: z.coerce.number().int().positive(),
   }).refine((item) => item.variantId || item.eventPackageId || item.parcelId, 'Item harus memiliki produk atau paket')).min(1, 'Keranjang belanja masih kosong'),
   paidAmount: z.coerce.number().nonnegative(),
-  paymentMethod: z.enum(['CASH', 'QRIS', 'TRANSFER']).default('CASH'),
+  paymentMethod: z.enum(['CASH', 'QRIS', 'TRANSFER', 'DEBT']).default('CASH'),
   paymentReference: z.string().nullable().optional(),
   customerId: z.string().nullable().optional(),
   customerName: z.string().nullable().optional(),
@@ -99,9 +99,88 @@ export const financeCreateSchema = z.object({
   amount: z.coerce.number(),
   description: z.string().trim().min(1, 'Keterangan wajib diisi'),
   category: z.string().trim().optional().nullable(),
+  categoryId: z.string().trim().optional().nullable(),
+  accountId: z.string().trim().optional().nullable(),
   paymentMethod: z.string().trim().optional().nullable(),
+  splits: z.array(z.object({
+    categoryId: z.string().min(1),
+    amount: z.coerce.number().positive(),
+    note: z.string().trim().optional().nullable(),
+  })).optional(),
+  tagIds: z.array(z.string().min(1)).optional(),
 });
 export const financeUpdateSchema = financeCreateSchema.partial();
+
+export const financeCategorySchema = z.object({
+  name: z.string().trim().min(1, 'Nama kategori wajib diisi'),
+  type: z.enum(['INCOME', 'EXPENSE', 'DEBT', 'TRANSFER']),
+  icon: z.string().trim().optional().nullable(),
+  isDefault: z.coerce.boolean().optional(),
+});
+export const financeAccountSchema = z.object({
+  name: z.string().trim().min(1, 'Nama akun wajib diisi'),
+  type: z.enum(['CASH', 'BANK', 'EWALLET', 'OTHER']),
+  startBalance: z.coerce.number().nonnegative().optional().default(0),
+  isActive: z.coerce.boolean().optional().default(true),
+});
+export const accountTransferSchema = z.object({
+  fromAccountId: z.string().min(1),
+  toAccountId: z.string().min(1),
+  amount: z.coerce.number().positive(),
+  note: z.string().trim().optional().nullable(),
+}).refine((value) => value.fromAccountId !== value.toAccountId, {
+  message: 'Akun asal dan tujuan harus berbeda',
+  path: ['toAccountId'],
+});
+export const budgetSchema = z.object({
+  categoryId: z.string().min(1),
+  month: z.coerce.number().int().min(1).max(12),
+  year: z.coerce.number().int().min(2000).max(2200),
+  limitAmount: z.coerce.number().positive(),
+});
+export const recurringTransactionSchema = z.object({
+  type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER', 'DEBT']),
+  amount: z.coerce.number().positive(),
+  description: z.string().trim().min(1),
+  categoryId: z.string().optional().nullable(),
+  accountId: z.string().optional().nullable(),
+  frequency: z.enum(['DAILY', 'WEEKLY', 'MONTHLY']),
+  dayOfMonth: z.coerce.number().int().min(1).max(31).optional().nullable(),
+  startDate: z.union([z.string(), z.date()]),
+  endDate: z.union([z.string(), z.date()]).optional().nullable(),
+  isActive: z.coerce.boolean().optional().default(true),
+});
+export const savingsGoalSchema = z.object({
+  name: z.string().trim().min(1, 'Nama target wajib diisi'),
+  targetAmount: z.coerce.number().positive(),
+  dailyAmount: z.coerce.number().positive(),
+  status: z.enum(['ACTIVE', 'COMPLETED', 'ARCHIVED']).optional(),
+});
+export const savingsDepositSchema = z.object({
+  amount: z.coerce.number().positive().optional(),
+  date: z.union([z.string(), z.date()]).optional(),
+});
+export const reconciliationSchema = z.object({
+  accountId: z.string().min(1),
+  physicalCount: z.coerce.number().nonnegative(),
+  note: z.string().trim().optional().nullable(),
+});
+
+export const financeBulkPastePreviewSchema = z.object({
+  text: z.string().trim().min(1, 'Tempelan transaksi wajib diisi').max(50000),
+  type: z.enum(['INCOME', 'EXPENSE']).optional().default('EXPENSE'),
+});
+
+export const financeBulkPasteConfirmSchema = z.object({
+  transactions: z.array(z.object({
+    type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER', 'DEBT']).default('EXPENSE'),
+    amount: z.coerce.number().positive('Nominal harus lebih besar dari nol'),
+    description: z.string().trim().min(1, 'Keterangan wajib diisi').max(500),
+    categoryId: z.string().trim().optional().nullable(),
+    accountId: z.string().trim().optional().nullable(),
+    paymentMethod: z.string().trim().optional().nullable(),
+  })).min(1, 'Minimal satu transaksi wajib diisi').max(500),
+});
 
 // ---- Penagihan Parsel ----
 export const parcelCollectionCreateSchema = z.object({

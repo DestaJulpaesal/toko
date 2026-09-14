@@ -8,10 +8,12 @@ const money = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 export default function AdminSimpleDashboard() {
   const [summary, setSummary] = useState({ income: 0, lowStock: 0, dueDebts: 0, newOrders: 0 });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const load = async () => {
       try {
+        setError('');
         const [financeResponse, stockResponse, ordersResponse, debtsResponse] = await Promise.all([
           apiFetch('/finance/summary'),
           apiFetch('/products/restock-suggestions'),
@@ -25,6 +27,8 @@ export default function AdminSimpleDashboard() {
         const weekAhead = Date.now() + 7 * 24 * 60 * 60 * 1000;
         const dueDebts = (debts.debts || []).filter((debt) => debt.dueDate && new Date(debt.dueDate).getTime() <= weekAhead).length;
         setSummary({ income: finance.summary?.todaysIncome || 0, lowStock: stock.suggestions?.length || 0, dueDebts, newOrders: orders.count || 0 });
+      } catch (err) {
+        setError('Gagal memuat data ringkasan. Coba refresh halaman.');
       } finally {
         setLoading(false);
       }
@@ -39,5 +43,5 @@ export default function AdminSimpleDashboard() {
     { label: 'Pesanan Baru', value: `${summary.newOrders} pesanan`, className: summary.newOrders ? 'simple-card-blue simple-card-attention' : 'simple-card-blue', to: '/kasir/riwayat' },
   ];
 
-  return <div className="admin-shell admin-simple-shell"><AdminSidebar active="Dashboard" /><main className="admin-main simple-dashboard-main"><header className="simple-dashboard-header"><div><span className="eyebrow light">Ringkasan mudah</span><h1>Halo, cek toko hari ini</h1><p>Lihat empat hal penting tanpa membuka laporan rumit.</p></div><Link className="btn btn-secondary large-touch" to="/admin/detail">Lihat tampilan lengkap</Link></header><section className="simple-dashboard-grid">{cards.map((card) => <Link key={card.label} to={card.to} className={`simple-dashboard-card ${card.className}`}><span>{card.label}</span><strong>{loading ? '...' : card.value}</strong><small>Ketuk untuk melihat detail <b>→</b></small></Link>)}</section><div className="simple-dashboard-help"><strong>Butuh bantuan?</strong><span>Mulai dari kotak di atas. Angka akan diperbarui saat halaman dibuka.</span><Link to="/admin/detail">Buka laporan lengkap →</Link></div></main></div>;
+  return <div className="admin-shell admin-simple-shell"><AdminSidebar active="Dashboard" /><main className="admin-main simple-dashboard-main"><header className="simple-dashboard-header"><div><span className="eyebrow light">Ringkasan mudah</span><h1>Halo, cek toko hari ini</h1><p>Lihat empat hal penting tanpa membuka laporan rumit.</p></div><Link className="btn btn-secondary large-touch" to="/admin/detail">Lihat tampilan lengkap</Link></header>{error && <div className="crud-notice" role="alert">{error}</div>}<section className="simple-dashboard-grid">{cards.map((card) => <Link key={card.label} to={card.to} className={`simple-dashboard-card ${card.className}`}><span>{card.label}</span><strong>{loading ? '...' : card.value}</strong><small>Ketuk untuk melihat detail <b>→</b></small></Link>)}</section><div className="simple-dashboard-help"><strong>Butuh bantuan?</strong><span>Mulai dari kotak di atas. Angka akan diperbarui saat halaman dibuka.</span><Link to="/admin/detail">Buka laporan lengkap →</Link></div></main></div>;
 }

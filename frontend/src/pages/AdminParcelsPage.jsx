@@ -113,7 +113,7 @@ export default function AdminParcelsPage() {
           </div>
         )}
 
-        <section className="crud-layout">
+        <section className="crud-layout parcel-admin-layout">
           <form className="crud-form-panel" onSubmit={submitForm}>
             <div className="panel-heading">
               <div>

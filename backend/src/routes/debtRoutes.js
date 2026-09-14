@@ -6,182 +6,130 @@ import { validateBody, debtCreateSchema, debtUpdateSchema } from '../middleware/
 const router = express.Router();
 router.use(authenticateToken);
 
-const demoDebtRecords = [
-  {
-    id: 'debt-demo-1',
-    customerId: 'customer-demo-budi',
-    customer: { id: 'customer-demo-budi', name: 'Warung Bu Siti', phone: '085712345678' },
-    amount: 420000,
-    status: 'OPEN',
-    dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'Piutang pembelian beras 10 karung',
-    createdAt: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'debt-demo-2',
-    customerId: 'customer-demo-andi',
-    customer: { id: 'customer-demo-andi', name: 'Andi Pratama', phone: '081234567890' },
-    amount: 180000,
-    status: 'PAID',
-    dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    description: 'Pelunasanparsel dan kebutuhan harian',
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-function formatDebtRecord(record) {
+function formatDebt(record) {
+  const amount = Number(record.amount || 0);
+  const paidAmount = Number(record.paidAmount || 0);
   return {
     id: record.id,
     customerId: record.customerId,
+    customer: record.customer ? { id: record.customer.id, name: record.customer.name, phone: record.customer.phone } : null,
     customerName: record.customer?.name || null,
-    amount: Number(record.amount || 0),
+    amount,
+    paidAmount,
+    remainingAmount: Math.max(amount - paidAmount, 0),
     status: record.status,
     dueDate: record.dueDate,
     description: record.description || '',
+    financeTransactionId: record.financeTransactionId || null,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
 }
 
+const include = { customer: { select: { id: true, name: true, phone: true } } };
+
 router.get('/', async (req, res) => {
   try {
     const { customerId, status } = req.query || {};
-    const where = { deletedAt: null };
-
-    if (customerId) where.customerId = String(customerId);
-    if (status) where.status = String(status).toUpperCase();
-
-    const records = await prisma.debtRecord.findMany({
-      where,
-      include: { customer: { select: { id: true, name: true, phone: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return res.json({ success: true, debts: records.map(formatDebtRecord) });
+    const where = { deletedAt: null, ...(customerId ? { customerId: String(customerId) } : {}) };
+    if (status) {
+      const normalized = String(status).toUpperCase();
+      if (normalized === 'OVERDUE') where.status = 'OPEN', where.dueDate = { lt: new Date() };
+      else if (normalized !== 'ALL') where.status = normalized;
+    }
+    const records = await prisma.debtRecord.findMany({ where, include, orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }] });
+    return res.json({ success: true, data: records.map(formatDebt), debts: records.map(formatDebt) });
   } catch (error) {
-    const filtered = demoDebtRecords.filter((record) => {
-      const { customerId, status } = req.query || {};
-      if (customerId && record.customerId !== String(customerId)) return false;
-      if (status && record.status !== String(status).toUpperCase()) return false;
-      return true;
-    });
-    return res.json({ success: true, source: 'demo', debts: filtered.map(formatDebtRecord) });
+    console.error('Debt list failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Data piutang tidak dapat diambil dari database.' });
   }
 });
 
 router.get('/summary', async (req, res) => {
   try {
-    const [open, paid, total] = await Promise.all([
-      prisma.debtRecord.aggregate({
-        where: { status: 'OPEN', deletedAt: null },
-        _sum: { amount: true },
-      }),
-      prisma.debtRecord.aggregate({
-        where: { status: 'PAID', deletedAt: null },
-        _sum: { amount: true },
-      }),
-      prisma.debtRecord.aggregate({
-        where: { deletedAt: null },
-        _sum: { amount: true },
-      }),
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [openRows, paidRows, due] = await Promise.all([
+      prisma.debtRecord.findMany({ where: { status: 'OPEN', deletedAt: null }, select: { amount: true, paidAmount: true } }),
+      prisma.debtRecord.aggregate({ where: { status: 'PAID', deletedAt: null, paidAt: { gte: monthStart } }, _sum: { paidAmount: true } }),
+      prisma.debtRecord.findMany({ where: { status: 'OPEN', deletedAt: null, dueDate: { lt: now } }, include }),
     ]);
-
+    const openAmount = openRows.reduce((sum, row) => sum + Math.max(Number(row.amount) - Number(row.paidAmount || 0), 0), 0);
     return res.json({
       success: true,
-      summary: {
-        openAmount: Number(open._sum.amount || 0),
-        paidAmount: Number(paid._sum.amount || 0),
-        totalAmount: Number(total._sum.amount || 0),
-      },
+      data: { openAmount, paidThisMonth: Number(paidRows._sum.paidAmount || 0), overdue: due.map(formatDebt) },
+      summary: { openAmount, paidAmount: Number(paidRows._sum.paidAmount || 0), totalAmount: openAmount, paidThisMonth: Number(paidRows._sum.paidAmount || 0), overdueCount: due.length },
     });
   } catch (error) {
-    const openAmount = demoDebtRecords.filter((item) => item.status === 'OPEN').reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const paidAmount = demoDebtRecords.filter((item) => item.status === 'PAID').reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    return res.json({
-      success: true,
-      source: 'demo',
-      summary: {
-        openAmount,
-        paidAmount,
-        totalAmount: openAmount + paidAmount,
-      },
-    });
+    return res.status(503).json({ success: false, message: 'Ringkasan piutang tidak dapat diambil.' });
   }
 });
 
 router.post('/', requireRole('OWNER', 'ADMIN'), validateBody(debtCreateSchema), async (req, res) => {
   try {
-    const { customerId, amount, status = 'OPEN', dueDate, description } = req.body || {};
-
-    if (!customerId || amount === undefined) {
-      return res.status(400).json({ success: false, message: 'Customer dan nominal hutang wajib diisi' });
-    }
-
-    const record = await prisma.debtRecord.create({
-      data: {
-        customerId: String(customerId),
-        amount: Number(amount),
-        status: String(status).toUpperCase(),
-        dueDate: dueDate ? new Date(dueDate) : null,
-        description: description ? String(description).trim() : null,
-      },
-      include: { customer: { select: { id: true, name: true, phone: true } } },
-    });
-
-    return res.status(201).json({ success: true, debt: formatDebtRecord(record) });
+    const { customerId, amount, status = 'OPEN', dueDate, description } = req.body;
+    const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) return res.status(400).json({ success: false, message: 'Customer tidak ditemukan.' });
+    const record = await prisma.debtRecord.create({ data: { customerId, amount, status: String(status).toUpperCase(), dueDate: dueDate ? new Date(dueDate) : null, description: description || null }, include });
+    return res.status(201).json({ success: true, data: formatDebt(record), debt: formatDebt(record) });
   } catch (error) {
-    const newRecord = {
-      id: `debt-local-${Date.now()}`,
-      customerId: String(req.body?.customerId),
-      customer: { id: String(req.body?.customerId), name: req.body?.customerName || 'Pelanggan', phone: req.body?.customerPhone || '' },
-      amount: Number(req.body?.amount || 0),
-      status: String(req.body?.status || 'OPEN').toUpperCase(),
-      dueDate: req.body?.dueDate ? new Date(req.body.dueDate).toISOString() : null,
-      description: req.body?.description ? String(req.body.description).trim() : '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    demoDebtRecords.unshift(newRecord);
-    return res.status(201).json({ success: true, source: 'demo', debt: formatDebtRecord(newRecord) });
+    return res.status(400).json({ success: false, message: error.message || 'Piutang gagal dibuat.' });
   }
 });
 
 router.patch('/:id', requireRole('OWNER', 'ADMIN'), validateBody(debtUpdateSchema), async (req, res) => {
   try {
-    const { amount, status, dueDate, description } = req.body || {};
-    const updateData = {};
-
-    if (amount !== undefined) updateData.amount = Number(amount);
-    if (status !== undefined) updateData.status = String(status).toUpperCase();
-    if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
-    if (description !== undefined) updateData.description = description ? String(description).trim() : null;
-
-    const record = await prisma.debtRecord.update({
-      where: { id: req.params.id },
-      data: updateData,
-      include: { customer: { select: { id: true, name: true, phone: true } } },
-    });
-
-    return res.json({ success: true, debt: formatDebtRecord(record) });
+    const existing = await prisma.debtRecord.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Data piutang tidak ditemukan.' });
+    const data = { ...req.body };
+    if (data.dueDate !== undefined) data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    const record = await prisma.debtRecord.update({ where: { id: req.params.id }, data, include });
+    return res.json({ success: true, data: formatDebt(record), debt: formatDebt(record) });
   } catch (error) {
-    return res.status(error.code === 'P2025' ? 404 : 400).json({
-      success: false,
-      message: error.code === 'P2025' ? 'Data hutang tidak ditemukan' : error.message || 'Data hutang gagal diperbarui',
+    return res.status(400).json({ success: false, message: error.message || 'Data piutang gagal diperbarui.' });
+  }
+});
+
+router.post('/:id/pay', requireRole('OWNER', 'ADMIN'), async (req, res) => {
+  try {
+    const amount = Number(req.body?.amount);
+    const accountId = String(req.body?.accountId || '');
+    if (!Number.isFinite(amount) || amount <= 0 || !accountId) return res.status(400).json({ success: false, message: 'Nominal pembayaran dan akun wajib diisi.' });
+    const record = await prisma.debtRecord.findFirst({ where: { id: req.params.id, deletedAt: null }, include });
+    if (!record) return res.status(404).json({ success: false, message: 'Data piutang tidak ditemukan.' });
+    const remaining = Math.max(Number(record.amount) - Number(record.paidAmount || 0), 0);
+    if (remaining <= 0 || record.status === 'PAID') return res.status(400).json({ success: false, message: 'Piutang sudah lunas.' });
+    if (amount > remaining) return res.status(400).json({ success: false, message: `Nominal pembayaran melebihi sisa piutang (${remaining}).` });
+    const account = await prisma.financeAccount.findFirst({ where: { id: accountId, deletedAt: null, isActive: true } });
+    if (!account) return res.status(400).json({ success: false, message: 'Akun penerimaan tidak valid.' });
+    const paidAmount = Number(record.paidAmount || 0) + amount;
+    const status = paidAmount >= Number(record.amount) ? 'PAID' : 'OPEN';
+    const result = await prisma.$transaction(async (tx) => {
+      const category = await tx.financeCategory.upsert({
+        where: { name_type: { name: 'Pembayaran piutang', type: 'INCOME' } },
+        create: { name: 'Pembayaran piutang', type: 'INCOME', isDefault: true },
+        update: {},
+      });
+      const transaction = await tx.financeTransaction.create({ data: { type: 'INCOME', amount, accountId, categoryId: category.id, userId: req.user.id, description: `Pembayaran piutang ${record.customer?.name || record.customerId}` } });
+      const updatedDebt = await tx.debtRecord.update({ where: { id: record.id }, data: { paidAmount, status, paidAt: status === 'PAID' ? new Date() : null, financeTransactionId: transaction.id }, include });
+      if (record.orderId) {
+        await tx.order.update({ where: { id: record.orderId }, data: { paidAmount, paymentStatus: status === 'PAID' ? 'PAID' : 'PARTIAL' } });
+      }
+      return updatedDebt;
     });
+    return res.json({ success: true, data: formatDebt(result), debt: formatDebt(result) });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || 'Pembayaran piutang gagal.' });
   }
 });
 
 router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req, res) => {
   try {
-    await prisma.debtRecord.update({ where: { id: req.params.id }, data: { deletedAt: new Date() } });
-    return res.json({ success: true, message: 'Data hutang dipindahkan ke arsip' });
-  } catch (error) {
-    return res.status(error.code === 'P2025' ? 404 : 500).json({
-      success: false,
-      message: error.code === 'P2025' ? 'Data hutang tidak ditemukan' : 'Data hutang gagal dihapus',
-    });
+    const result = await prisma.debtRecord.updateMany({ where: { id: req.params.id, deletedAt: null }, data: { deletedAt: new Date() } });
+    if (!result.count) return res.status(404).json({ success: false, message: 'Data piutang tidak ditemukan.' });
+    return res.json({ success: true, message: 'Data piutang dipindahkan ke arsip.' });
+  } catch {
+    return res.status(400).json({ success: false, message: 'Data piutang gagal dihapus.' });
   }
 });
 

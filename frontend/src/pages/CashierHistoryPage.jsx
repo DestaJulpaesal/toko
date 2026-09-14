@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminSidebar from '../components/AdminSidebar';
 import { calculateEarnedPoints } from './CashierPage';
 import { apiFetch } from '../services/api';
+import { printReceipt } from '../utils/printReceipt';
 import * as XLSX from 'xlsx';
 
 const formatMoney = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
@@ -15,6 +16,12 @@ export default function CashierHistoryPage() {
   const [voidTarget, setVoidTarget] = useState(null);
   const [voidReason, setVoidReason] = useState('');
   const [voidSaving, setVoidSaving] = useState(false);
+  const [cashAccounts, setCashAccounts] = useState([]);
+  const [closingAccountId, setClosingAccountId] = useState('');
+  const [physicalCash, setPhysicalCash] = useState('');
+  const [reconciliation, setReconciliation] = useState(null);
+  const [reconciliationSaving, setReconciliationSaving] = useState(false);
+  const [reconciliationError, setReconciliationError] = useState('');
 
   const downloadExcel = () => {
     const rows = filteredOrders.map((order) => ({ Faktur: order.orderNumber, Waktu: new Date(order.createdAt).toLocaleString('id-ID'), Pelanggan: order.customer?.name || 'Pelanggan Umum', Metode: order.paymentMethod, Total: order.total, Status: order.status }));
@@ -37,8 +44,22 @@ export default function CashierHistoryPage() {
     }
   };
 
+  const loadCashAccounts = async () => {
+    try {
+      const response = await apiFetch('/finance/accounts');
+      const data = await response.json();
+      if (!response.ok || !data.success) return;
+      const accounts = (data.data || data.accounts || []).filter((account) => account.type === 'CASH' && account.isActive !== false);
+      setCashAccounts(accounts);
+      setClosingAccountId((current) => current || accounts[0]?.id || '');
+    } catch (error) {
+      console.warn('Cash accounts unavailable:', error.message);
+    }
+  };
+
   useEffect(() => {
     loadOrders();
+    loadCashAccounts();
   }, []);
 
   const filteredOrders = orders.filter((ord) => {
@@ -66,7 +87,11 @@ export default function CashierHistoryPage() {
   const todayNonCash = todayOrders.filter((order) => order.paymentMethod !== 'CASH').reduce((sum, order) => sum + Number(order.total || 0), 0);
 
   const handlePrint = () => {
-    window.print();
+    try {
+      printReceipt('printable-receipt');
+    } catch (error) {
+      setReconciliationError(error.message);
+    }
   };
 
   const voidOrder = async () => {
@@ -85,6 +110,26 @@ export default function CashierHistoryPage() {
     if (!report) return;
     report.document.write(`<html><head><title>Laporan Tutup Kasir</title><style>body{font:14px Arial;padding:28px;color:#202820}h1{font-size:22px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}td:last-child,th:last-child{text-align:right}.total{font-size:18px;font-weight:bold}</style></head><body><h1>Laporan Tutup Kasir</h1><p>Tanggal: ${new Date().toLocaleDateString('id-ID')}</p><table><tr><th>Ringkasan</th><th>Jumlah</th></tr><tr><td>Total transaksi</td><td>${todayOrders.length}</td></tr><tr><td>Cash</td><td>${formatMoney(todayCash)}</td></tr><tr><td>Non-cash</td><td>${formatMoney(todayNonCash)}</td></tr><tr class="total"><td>Total penjualan</td><td>${formatMoney(todayCash + todayNonCash)}</td></tr></table><p style="margin-top:40px">Kasir: ____________________</p><p>Owner: ____________________</p><script>window.print()</script></body></html>`);
     report.document.close();
+  };
+
+  const submitClosing = async (event) => {
+    event.preventDefault();
+    setReconciliationError('');
+    setReconciliationSaving(true);
+    try {
+      const response = await apiFetch('/finance/reconciliation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: closingAccountId, physicalCount: Number(physicalCash), note: `Tutup kasir ${new Date().toLocaleDateString('id-ID')}` }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Tutup kasir gagal disimpan.');
+      setReconciliation(data.data);
+    } catch (error) {
+      setReconciliationError(error.message || 'Tutup kasir gagal disimpan.');
+    } finally {
+      setReconciliationSaving(false);
+    }
   };
 
   const getMethodBadgeClass = (method) => {
@@ -202,8 +247,38 @@ export default function CashierHistoryPage() {
         </section>
 
         <section className="cashier-closing-panel">
-          <div><span className="panel-kicker">Tutup shift hari ini</span><h2>Rekap kasir</h2><p>{todayOrders.length} transaksi, cash {formatMoney(todayCash)}, non-cash {formatMoney(todayNonCash)}</p></div>
-          <button className="btn btn-primary" type="button" onClick={printClosingReport}>Cetak laporan tutup kasir</button>
+          <div className="cashier-closing-main">
+            <div className="cashier-closing-heading">
+              <div>
+                <span className="panel-kicker">Tutup shift hari ini</span>
+                <h2>Rekap kasir</h2>
+              </div>
+              <span className="cashier-closing-date">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            </div>
+            <div className="cashier-closing-summary">
+              <span><strong>{todayOrders.length}</strong> transaksi</span>
+              <span><strong>{formatMoney(todayCash)}</strong> tunai</span>
+              <span><strong>{formatMoney(todayNonCash)}</strong> non-cash</span>
+            </div>
+            <form className="cashier-closing-form" onSubmit={submitClosing}>
+              <label>
+                <span>Akun kas</span>
+                <select value={closingAccountId} onChange={(event) => setClosingAccountId(event.target.value)} required disabled={!cashAccounts.length || reconciliationSaving}>
+                  <option value="">Pilih akun kas</option>
+                  {cashAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Uang fisik</span>
+                <input type="number" min="0" value={physicalCash} onChange={(event) => setPhysicalCash(event.target.value)} placeholder="Rp 0" required disabled={reconciliationSaving} />
+              </label>
+              <button className="btn btn-primary" type="submit" disabled={!cashAccounts.length || reconciliationSaving}>{reconciliationSaving ? 'Menyimpan...' : 'Simpan tutup kasir'}</button>
+            </form>
+            {!cashAccounts.length && <small className="cashier-closing-help">Belum ada akun kas aktif untuk direkonsiliasi.</small>}
+            {reconciliationError && <small className="cashier-closing-help error">{reconciliationError}</small>}
+            {reconciliation && <small className={`cashier-closing-help ${Number(reconciliation.difference) < 0 ? 'error' : 'success'}`}>Tersimpan. Selisih: {formatMoney(reconciliation.difference)}</small>}
+          </div>
+          <button className="btn btn-secondary cashier-closing-print" type="button" onClick={printClosingReport}>🖨️ Cetak laporan</button>
         </section>
 
         {/* Filter Toolbar */}
@@ -305,7 +380,9 @@ export default function CashierHistoryPage() {
                         )}
                       </td>
                       <td>
-                        <span className={`status-chip ${ord.status === 'VOIDED' ? 'bad' : 'good'}`}>{ord.status === 'VOIDED' ? 'DIBATALKAN' : 'LUNAS'}</span>
+                        <span className={`status-chip ${ord.status === 'VOIDED' ? 'bad' : ord.paymentStatus === 'PAID' ? 'good' : 'warning'}`}>
+                          {ord.status === 'VOIDED' ? 'DIBATALKAN' : ord.paymentStatus === 'PAID' ? 'LUNAS' : ord.paymentStatus === 'PARTIAL' ? 'DIBAYAR SEBAGIAN' : 'BELUM LUNAS'}
+                        </span>
                       </td>
                       <td>
                         <div className="row-actions">
@@ -415,11 +492,6 @@ export default function CashierHistoryPage() {
                     <strong>{formatMoney(selectedOrder.total)}</strong>
                   </div>
 
-                  <div className="receipt-sum-row">
-                    <span>Metode Bayar</span>
-                    <strong>{getMethodLabel(selectedOrder.paymentMethod)}</strong>
-                  </div>
-
                   {selectedOrder.paymentMethod === 'CASH' && (
                     <>
                       <div className="receipt-sum-row">
@@ -442,7 +514,9 @@ export default function CashierHistoryPage() {
 
                   <div className="receipt-sum-row">
                     <span>Status</span>
-                    <strong style={{ color: '#177d47' }}>LUNAS</strong>
+                    <strong style={{ color: selectedOrder.paymentStatus === 'PAID' ? '#177d47' : '#b45309' }}>
+                      {selectedOrder.paymentStatus === 'PAID' ? 'LUNAS' : selectedOrder.paymentStatus === 'PARTIAL' ? 'DIBAYAR SEBAGIAN' : 'BELUM LUNAS'}
+                    </strong>
                   </div>
                 </div>
 

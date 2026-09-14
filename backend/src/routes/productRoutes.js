@@ -34,6 +34,17 @@ function formatProduct(product) {
     discountPercent,
     isQuickAccess: Boolean(product.isQuickAccess),
     stock,
+    variants: (product.variants || []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      sku: item.sku,
+      barcode: item.barcode,
+      price: Number(item.sellPrice || 0),
+      wholesalePrice: item.wholesalePrice == null ? null : Number(item.wholesalePrice),
+      purchasePrice: Number(item.basePrice || 0),
+      stock: item.stockQty || 0,
+      isDefault: Boolean(item.isDefault),
+    })),
     status: statusFromDb(product.status, stock, product.stockWarning),
     badge: discountPercent > 0
       ? `Diskon ${discountPercent}%`
@@ -57,7 +68,7 @@ router.get('/', async (req, res) => {
   try {
     const products = await prisma.product.findMany({
       where: req.query.all === 'true' ? { status: { not: 'HIDDEN' } } : { status: 'ACTIVE' },
-      include: { category: true, variants: { where: { isDefault: true, isActive: true }, take: 1 } },
+      include: { category: true, variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } } },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -95,7 +106,7 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
         isQuickAccess: Boolean(isQuickAccess),
         variants: { create: { name: 'Kemasan utama', sku: `${internalSku}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null, basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), unit: 'unit', isDefault: true } },
       },
-      include: { category: true, variants: { where: { isDefault: true }, take: 1 } },
+      include: { category: true, variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } } },
     });
     return res.status(201).json({ success: true, product: formatProduct(product) });
   } catch (error) {
@@ -210,6 +221,53 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
         variants: variant ? { update: { where: { id: variant.id }, data: { basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), sku: `${String(sku).trim()}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null } } } : { create: { name: 'Kemasan utama', sku: `${String(sku).trim()}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null, basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), unit: 'unit', isDefault: true } },
       },
       include: { category: true, variants: { where: { isDefault: true }, take: 1 } },
+    });
+
+    router.post('/:id/variants', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+      try {
+        const { name, sku, barcode, price, wholesalePrice, purchasePrice, stock } = req.body || {};
+        if (!String(name || '').trim() || !String(sku || '').trim() || Number(price) < 0 || Number(stock) < 0) {
+          return res.status(400).json({ success: false, message: 'Nama kemasan, SKU, harga, dan stok wajib diisi.' });
+        }
+        const variant = await prisma.productVariant.create({
+          data: {
+            productId: req.params.id,
+            name: String(name).trim(),
+            sku: String(sku).trim(),
+            barcode: barcode ? String(barcode).trim() : null,
+            basePrice: Number(purchasePrice || price),
+            sellPrice: Number(price),
+            wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null,
+            stockQty: Number(stock),
+            unit: String(name).trim(),
+            isDefault: false,
+          },
+        });
+
+        router.patch('/:id/variants/:variantId', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+          try {
+            const { name, sku, barcode, price, wholesalePrice, purchasePrice, stock } = req.body || {};
+            const variant = await prisma.productVariant.update({
+              where: { id: req.params.variantId },
+              data: {
+                name: String(name).trim(),
+                sku: String(sku).trim(),
+                barcode: barcode ? String(barcode).trim() : null,
+                basePrice: Number(purchasePrice || price),
+                sellPrice: Number(price),
+                wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null,
+                stockQty: Number(stock),
+              },
+            });
+            return res.json({ success: true, variant });
+          } catch (error) {
+            return res.status(400).json({ success: false, message: error.code === 'P2002' ? 'SKU atau barcode kemasan sudah digunakan.' : 'Kemasan gagal diperbarui.' });
+          }
+        });
+        return res.status(201).json({ success: true, variant });
+      } catch (error) {
+        return res.status(400).json({ success: false, message: error.code === 'P2002' ? 'SKU atau barcode kemasan sudah digunakan.' : 'Kemasan gagal ditambahkan.' });
+      }
     });
     const product = await Promise.race([
       updatePromise,

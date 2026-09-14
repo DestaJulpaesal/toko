@@ -6,6 +6,7 @@ import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import { playBeep } from '../utils/barcodeUtils';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
+import { printReceipt } from '../utils/printReceipt';
 
 const formatMoney = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 
@@ -29,14 +30,9 @@ export const availablePromos = [
   { id: 'promo-hemat25', name: 'Hemat 25 Ribu', code: 'HEMAT25', type: 'FIXED', value: 25000, tag: 'POTONGAN 25RB', desc: 'Potongan langsung Rp 25.000' },
 ];
 
-const storeBankAccounts = [
-  { bank: 'BCA', number: '8830-1234-5678', name: 'Toko Glosir', color: '#005baa' },
-  { bank: 'Mandiri', number: '137-00-9876543-2', name: 'Toko Glosir', color: '#e69800' },
-  { bank: 'BRI', number: '0123-01-001234-53-1', name: 'Toko Glosir', color: '#00529c' },
-];
-
 export default function CashierPage() {
   const [products, setProducts] = useState([]);
+  const [databaseCategories, setDatabaseCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [customCustomerName, setCustomCustomerName] = useState('');
@@ -53,7 +49,7 @@ export default function CashierPage() {
   const [selectedPromoId, setSelectedPromoId] = useState('none');
 
   // Payment states
-  const [paymentMethod] = useState('CASH');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [paidAmount, setPaidAmount] = useState('');
 
   // General UI states
@@ -72,18 +68,43 @@ export default function CashierPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prodRes] = await Promise.all([
+      const [prodRes, categoryRes, customerRes] = await Promise.all([
         apiFetch('/products').then((r) => r.json()).catch(() => null),
+        apiFetch('/categories').then((r) => r.json()).catch(() => null),
+        apiFetch('/customers').then((r) => r.json()).catch(() => null),
       ]);
 
       if (prodRes?.success && Array.isArray(prodRes.products)) {
-        setProducts(prodRes.products.filter((p) => p.stock > 0 || p.stock === undefined));
+        const catalogProducts = prodRes.products.flatMap((product) => (product.variants?.length
+          ? product.variants.map((variant) => ({
+            ...product,
+            id: variant.id,
+            productId: product.id,
+            variantId: variant.id,
+            name: `${product.name} (${variant.name})`,
+            sku: variant.sku || product.sku,
+            barcode: variant.barcode,
+            price: variant.price,
+            wholesalePrice: variant.wholesalePrice,
+            purchasePrice: variant.purchasePrice,
+            stock: variant.stock,
+          }))
+          : [product]));
+        setProducts(catalogProducts.filter((p) => p.stock > 0 || p.stock === undefined));
       } else {
         setProducts([]);
         setNotice(prodRes?.message || 'Produk tidak bisa dimuat dari database.');
       }
 
-      setCustomers([]);
+      if (categoryRes?.success && Array.isArray(categoryRes.categories)) {
+        setDatabaseCategories(categoryRes.categories.map((category) => category.name).filter(Boolean));
+      }
+
+      if (customerRes?.success && Array.isArray(customerRes.customers)) {
+        setCustomers(customerRes.customers);
+      } else if (customerRes?.message) {
+        setNotice(customerRes.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -97,11 +118,28 @@ export default function CashierPage() {
     scanInputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (loading || scannerOpen || completedOrder) return undefined;
+
+    const focusBarcodeInput = () => {
+      const active = document.activeElement;
+      const isEditing = active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName);
+      if (!isEditing || active === scanInputRef.current) {
+        scanInputRef.current?.focus();
+      }
+    };
+
+    focusBarcodeInput();
+    window.addEventListener('focus', focusBarcodeInput);
+    return () => window.removeEventListener('focus', focusBarcodeInput);
+  }, [loading, scannerOpen, completedOrder]);
+
   // Compute categories
   const categories = useMemo(() => {
-    const list = ['Semua', ...new Set(products.map((p) => p.category).filter(Boolean))];
+    const productCategories = products.map((p) => p.category).filter(Boolean);
+    const list = ['Semua', ...new Set([...databaseCategories, ...productCategories])];
     return list;
-  }, [products]);
+  }, [databaseCategories, products]);
 
   const getSellingPrice = (product) => customerType === 'WHOLESALE' && Number(product.wholesalePrice) > 0
     ? Number(product.wholesalePrice)
@@ -341,12 +379,6 @@ export default function CashierPage() {
     setPaidAmount(String(amount));
   };
 
-  const handleCopyAccount = (number, bank) => {
-    navigator.clipboard.writeText(number.replace(/-/g, ''));
-    setCopiedBank(bank);
-    setTimeout(() => setCopiedBank(''), 2500);
-  };
-
   // Complete Transaction
   const completeTransaction = async () => {
     if (!items.length) {
@@ -356,6 +388,10 @@ export default function CashierPage() {
 
     if (paymentMethod === 'CASH' && effectivePaid < finalTotal) {
       setNotice('Jumlah uang tunai yang diterima kurang dari total tagihan.');
+      return;
+    }
+    if (paymentMethod === 'DEBT' && !selectedCustomerId) {
+      setNotice('Pilih pelanggan terdaftar untuk transaksi bon/utang.');
       return;
     }
 
@@ -373,12 +409,12 @@ export default function CashierPage() {
     const payload = {
       items: items.map((item) => ({
         variantId: item.variantId || item.id,
-        productId: item.id,
+        productId: item.productId || item.id,
         name: item.name,
         price: item.price,
         quantity: item.qty,
       })),
-      paidAmount: effectivePaid,
+      paidAmount: paymentMethod === 'DEBT' ? 0 : effectivePaid,
       paymentMethod,
       customerType,
       paymentReference: null,
@@ -415,9 +451,11 @@ export default function CashierPage() {
         pointDiscount: 0,
         discount: totalDiscount,
         total: finalTotal,
-        paidAmount: effectivePaid,
-        change: Math.max(effectivePaid - finalTotal, 0),
-        paymentMethod,
+        paidAmount: data.paidAmount ?? (paymentMethod === 'DEBT' ? 0 : effectivePaid),
+        change: data.change ?? Math.max(effectivePaid - finalTotal, 0),
+        paymentMethod: data.paymentMethod || paymentMethod,
+        paymentStatus: data.paymentStatus || (paymentMethod === 'DEBT' ? 'UNPAID' : 'PAID'),
+        remainingAmount: data.remainingAmount ?? (paymentMethod === 'DEBT' ? finalTotal : 0),
         paymentReference: null,
         customer: activeCustomer,
         cashierName: 'Kasir Glosir',
@@ -479,6 +517,14 @@ export default function CashierPage() {
     setSelectedPromoId('none');
     setCustomerType('RETAIL');
     setCompletedOrder(null);
+  };
+
+  const handlePrint = () => {
+    try {
+      printReceipt('printable-receipt');
+    } catch (error) {
+      setNotice(error.message);
+    }
   };
 
   const handleShareWhatsApp = (order) => {
@@ -582,11 +628,12 @@ export default function CashierPage() {
             <div className="pos-search-bar">
               <span className="search-icon">🔍</span>
               <input
-                      ref={scanInputRef}
-                      value={search}
+                ref={scanInputRef}
+                autoFocus
+                value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Scan barcode gun / cari nama atau SKU... (Tekan Enter)"
+                placeholder="Scan barcode langsung di sini / cari nama atau SKU..."
               />
               {search && (
                 <button className="clear-search-btn" onClick={() => setSearch('')}>
@@ -795,10 +842,12 @@ export default function CashierPage() {
                   </div>
                 </div>
 
-                {/* Pembayaran tunai */}
                 <div className="pos-payment-selector">
                   <span className="payment-label-text">Metode Pembayaran:</span>
-                  <strong>💵 Tunai / Cash</strong>
+                  <div className="payment-method-buttons">
+                    <button type="button" className={paymentMethod === 'CASH' ? 'active' : ''} onClick={() => setPaymentMethod('CASH')}>💵 Tunai</button>
+                    <button type="button" className={paymentMethod === 'DEBT' ? 'active' : ''} onClick={() => setPaymentMethod('DEBT')}>📒 Bon / Utang</button>
+                  </div>
                 </div>
 
                 {/* DETAIL: 1. TUNAI */}
@@ -840,144 +889,28 @@ export default function CashierPage() {
                     </button>
                   </div>
                 )}
-
-                {/* QRIS dan transfer dinonaktifkan sementara; kasir menggunakan tunai. */}
-                {false && paymentMethod === 'QRIS' && (
-                  <div className="pos-method-detail qris-box">
-                    <div className="qris-card-visual-clean">
-                      <div className="qris-card-header-clean">
-                        <span className="qris-logo-clean">QRIS</span>
-                        <span className="qris-sub-clean">PEMBAYARAN DIGITAL NASIONAL</span>
-                      </div>
-
-                      <div className="qris-merchant-clean">
-                        <strong>GLOSIR TOKO & SEMBAKO</strong>
-                        <small>NMID: ID1020304050607</small>
-                      </div>
-
-                      {/* Barcode SVG */}
-                      <div className="qris-qr-container">
-                        <svg viewBox="0 0 100 100" className="qris-qr-svg">
-                          <rect width="100" height="100" fill="#ffffff" />
-                          <rect x="8" y="8" width="28" height="28" fill="#000" />
-                          <rect x="13" y="13" width="18" height="18" fill="#fff" />
-                          <rect x="17" y="17" width="10" height="10" fill="#000" />
-                          <rect x="64" y="8" width="28" height="28" fill="#000" />
-                          <rect x="69" y="13" width="18" height="18" fill="#fff" />
-                          <rect x="73" y="17" width="10" height="10" fill="#000" />
-                          <rect x="8" y="64" width="28" height="28" fill="#000" />
-                          <rect x="13" y="69" width="18" height="18" fill="#fff" />
-                          <rect x="17" y="73" width="10" height="10" fill="#000" />
-                          <rect x="42" y="12" width="6" height="8" fill="#000" />
-                          <rect x="52" y="18" width="6" height="6" fill="#000" />
-                          <rect x="40" y="30" width="20" height="6" fill="#000" />
-                          <rect x="64" y="44" width="10" height="8" fill="#000" />
-                          <rect x="42" y="54" width="16" height="16" fill="#1b6336" />
-                          <rect x="64" y="64" width="12" height="6" fill="#000" />
-                          <rect x="80" y="74" width="12" height="16" fill="#000" />
-                          <rect x="44" y="76" width="14" height="14" fill="#000" />
-                          <circle cx="50" cy="50" r="9" fill="#f0ba3f" />
-                          <text x="50" y="54" fontSize="10" fontWeight="bold" textAnchor="middle" fill="#14251e">
-                            G
-                          </text>
-                        </svg>
-                      </div>
-
-                      <div className="qris-exact-amount">
-                        <span>Nominal Pas Bayar:</span>
-                        <strong>{formatMoney(finalTotal)}</strong>
-                      </div>
+                {paymentMethod === 'DEBT' && (
+                  <div className="pos-method-detail debt-box">
+                    <strong>📒 Transaksi bon</strong>
+                    <p>
+                      {activeCustomer?.name && activeCustomer.name !== 'Pelanggan Umum'
+                        ? `Pelanggan: ${activeCustomer.name}. Pembayaran dapat dicatat kemudian dari menu Piutang.`
+                        : 'Pilih pelanggan di bagian pelanggan sebelum menyimpan transaksi bon.'}
+                    </p>
+                    <div className="pos-change-box valid">
+                      <span>Sisa utang:</span>
+                      <strong>{formatMoney(finalTotal)}</strong>
                     </div>
-
-                    <div className="pos-guide-note">
-                      💡 Minta pelanggan scan kode QRIS di atas dengan aplikasi apa saja (BCA, Mandiri, BRImo, GoPay, Dana, OVO, ShopeePay).
-                    </div>
-
-                    <label className="pos-input-label">
-                      <span>No. Referensi / RRN Bukti Bayar (Opsional):</span>
-                      <input
-                        placeholder="Contoh: RRN-9928314..."
-                        value={qrisReference}
-                        onChange={(e) => setQrisReference(e.target.value)}
-                      />
-                    </label>
-
                     <button
-                      className="btn-finish-pay btn-qris-pay"
-                      disabled={saving}
+                      className="btn-finish-pay btn-cash-pay"
+                      disabled={saving || !selectedCustomerId || selectedCustomerId === 'NEW'}
                       onClick={completeTransaction}
                     >
-                      {saving ? 'Memverifikasi Transaksi...' : `📱 Konfirmasi QRIS Lunas & Cetak Struk`}
+                      {saving ? 'Menyimpan Transaksi...' : `Simpan Bon ${formatMoney(finalTotal)}`}
                     </button>
                   </div>
                 )}
 
-                {/* DETAIL: 3. TRANSFER */}
-                {false && paymentMethod === 'TRANSFER' && (
-                  <div className="pos-method-detail transfer-box">
-                    <span className="pos-sub-title">Nomor Rekening Toko Glosir:</span>
-                    <div className="pos-bank-list">
-                      {storeBankAccounts.map((acc) => (
-                        <div key={acc.bank} className="pos-bank-item">
-                          <span className="bank-pill" style={{ background: acc.color }}>
-                            {acc.bank}
-                          </span>
-                          <div className="bank-text">
-                            <strong>{acc.number}</strong>
-                            <small>a.n. {acc.name}</small>
-                          </div>
-                          <button
-                            type="button"
-                            className="btn-copy-chip"
-                            onClick={() => handleCopyAccount(acc.number, acc.bank)}
-                          >
-                            {copiedBank === acc.bank ? '✓ Disalin' : 'Salin'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="form-two-columns" style={{ marginTop: '8px' }}>
-                      <label className="pos-input-label">
-                        <span>Bank Tujuan:</span>
-                        <select
-                          value={selectedBank}
-                          onChange={(e) => setSelectedBank(e.target.value)}
-                        >
-                          <option value="BCA">BCA (Toko Glosir)</option>
-                          <option value="Mandiri">Mandiri (Toko Glosir)</option>
-                          <option value="BRI">BRI (Toko Glosir)</option>
-                        </select>
-                      </label>
-
-                      <label className="pos-input-label">
-                        <span>Nama Pengirim: *</span>
-                        <input
-                          placeholder="Nama pemilik rekening..."
-                          value={senderAccountName}
-                          onChange={(e) => setSenderAccountName(e.target.value)}
-                        />
-                      </label>
-                    </div>
-
-                    <label className="pos-input-label">
-                      <span>No. Referensi / Berita Transfer:</span>
-                      <input
-                        placeholder="Contoh: REF-88390..."
-                        value={transferReference}
-                        onChange={(e) => setTransferReference(e.target.value)}
-                      />
-                    </label>
-
-                    <button
-                      className="btn-finish-pay btn-transfer-pay"
-                      disabled={saving}
-                      onClick={completeTransaction}
-                    >
-                      {saving ? 'Memproses Transfer...' : `🏦 Konfirmasi Transfer Lunas (${formatMoney(finalTotal)})`}
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </aside>
@@ -990,7 +923,7 @@ export default function CashierPage() {
               <div className="receipt-modal-header no-print">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="badge-success-tick">✓</span>
-                  <h3>Transaksi Tunai Berhasil</h3>
+                  <h3>{completedOrder.paymentMethod === 'DEBT' ? 'Transaksi Bon Berhasil' : 'Transaksi Tunai Berhasil'}</h3>
                 </div>
                 <button className="receipt-close-btn" onClick={handleResetForNewOrder}>
                   ×
@@ -1076,15 +1009,6 @@ export default function CashierPage() {
                     <strong>{formatMoney(completedOrder.total)}</strong>
                   </div>
 
-                  <div className="receipt-sum-row">
-                    <span>Metode Bayar</span>
-                    <strong>
-                      {completedOrder.paymentMethod === 'CASH' && '💵 Tunai (Cash)'}
-                      {completedOrder.paymentMethod === 'QRIS' && '📱 QRIS'}
-                      {completedOrder.paymentMethod === 'TRANSFER' && '🏦 Transfer Bank'}
-                    </strong>
-                  </div>
-
                   {completedOrder.paymentMethod === 'CASH' && (
                     <>
                       <div className="receipt-sum-row">
@@ -1107,7 +1031,9 @@ export default function CashierPage() {
 
                   <div className="receipt-sum-row">
                     <span>Status</span>
-                    <strong style={{ color: '#177d47' }}>LUNAS</strong>
+                    <strong style={{ color: completedOrder.paymentStatus === 'PAID' ? '#177d47' : '#b45309' }}>
+                      {completedOrder.paymentStatus === 'PAID' ? 'LUNAS' : completedOrder.paymentStatus === 'PARTIAL' ? 'DIBAYAR SEBAGIAN' : 'BELUM LUNAS'}
+                    </strong>
                   </div>
                 </div>
 
@@ -1163,7 +1089,7 @@ export default function CashierPage() {
 
               {/* Action Buttons */}
               <div className="receipt-modal-actions no-print">
-                <button className="btn btn-primary" onClick={() => window.print()}>
+                <button className="btn btn-primary" onClick={handlePrint}>
                   🖨️ Cetak Struk
                 </button>
                 <button

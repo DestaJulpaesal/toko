@@ -1,0 +1,13 @@
+ALTER TABLE "Order"
+ADD COLUMN "paymentMethod" TEXT NOT NULL DEFAULT 'CASH',
+ADD COLUMN "paymentStatus" TEXT NOT NULL DEFAULT 'PAID',
+ADD COLUMN "paidAmount" DECIMAL(12,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE "DebtRecord"
+ADD COLUMN "orderId" TEXT;
+
+CREATE UNIQUE INDEX "DebtRecord_orderId_key" ON "DebtRecord"("orderId");
+
+ALTER TABLE "DebtRecord"
+ADD CONSTRAINT "DebtRecord_orderId_fkey"
+FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE SET NULL ON UPDATE CASCADE;

@@ -29,11 +29,15 @@ export default function AdminDashboard() {
   const [transactions, setTransactions] = useState([]);
   const [restockSuggestions, setRestockSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [backupLoading, setBackupLoading] = useState(false);
+  const [widgets, setWidgets] = useState(['cashflow', 'networth', 'budget', 'debts', 'approvals', 'reminders']);
+  const [draggedWidget, setDraggedWidget] = useState(null);
 
   const downloadBackup = async () => {
     setBackupLoading(true);
     try {
+      setError('');
       const token = localStorage.getItem('glosir_token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const endpoints = { products: '/api/products?all=true', categories: '/api/categories', orders: '/api/orders', finance: '/api/finance/transactions', parcels: '/api/parcel-participants' };
@@ -71,14 +75,16 @@ export default function AdminDashboard() {
         const restockData = await restockRes.json();
         if (restockData.success) setRestockSuggestions(restockData.suggestions || []);
       } catch (error) {
-        // no static fallback: data should come from the database
+        setError('Gagal memuat sebagian data dashboard dari server.');
       } finally {
         setLoading(false);
       }
     };
 
     loadDashboard();
+    apiFetch('/auth/me').then((response) => response.json()).then((result) => { if (Array.isArray(result.user?.dashboardLayout)) setWidgets(result.user.dashboardLayout); }).catch(() => {});
   }, []);
+  const saveWidgets = (next) => { setWidgets(next); apiFetch('/auth/me/dashboard-layout', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ layout: next }) }).catch(() => {}); };
 
   const periodValues = {
     'Hari ini': { income: summary.todaysIncome, expense: summary.todaysExpense },
@@ -111,6 +117,7 @@ export default function AdminDashboard() {
       <AdminSidebar active="Dashboard" />
 
       <main className="admin-main">
+        {error && <div className="crud-notice" role="alert">{error}</div>}
         <header className="admin-header dashboard-hero">
           <div>
             <p className="eyebrow light">Owner workspace / Overview</p>
@@ -121,6 +128,7 @@ export default function AdminDashboard() {
         </header>
 
         <div className="dashboard-toolbar"><span className="toolbar-label">Periode</span>{['Hari ini', '7 hari', 'Bulan ini'].map((option) => <button key={option} className={period === option ? 'selected' : ''} onClick={() => setPeriod(option)}>{option}</button>)}</div>
+        <section className="dashboard-widget-picker" aria-label="Widget dashboard"><strong>Widget cepat</strong>{widgets.map((widget) => <button key={widget} draggable onDragStart={() => setDraggedWidget(widget)} onDragOver={(event) => event.preventDefault()} onDrop={() => { if (!draggedWidget || draggedWidget === widget) return; const next = [...widgets]; const from = next.indexOf(draggedWidget); const to = next.indexOf(widget); next.splice(from, 1); next.splice(to, 0, draggedWidget); saveWidgets(next); }} title="Tarik untuk mengatur urutan">{widget}</button>)}</section>
 
         <section className="dashboard-metric-grid">
           <div className="dashboard-balance-card"><div className="dashboard-card-icon">▣</div><span>Total pemasukan</span><strong>{formatCurrency(periodIncome)}</strong><small>{period} / transaksi tercatat</small><Link to="/admin/finance">Lihat detail <span>→</span></Link></div>

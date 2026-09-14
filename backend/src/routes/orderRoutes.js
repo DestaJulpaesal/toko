@@ -48,6 +48,7 @@ router.get('/', authenticateToken, async (req, res) => {
         customer: true,
         items: true,
         financeEntries: true,
+        debtRecord: true,
         user: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -65,9 +66,11 @@ router.get('/', authenticateToken, async (req, res) => {
         subtotal: Number(o.subtotal),
         discount: Number(o.discount || 0),
         total: Number(o.total),
-        paidAmount: finance ? Number(finance.amount) : Number(o.total),
+        paidAmount: Number(o.paidAmount || finance?.amount || 0),
         change: 0,
-        paymentMethod: finance?.paymentMethod || 'CASH',
+        paymentMethod: o.paymentMethod || finance?.paymentMethod || 'CASH',
+        paymentStatus: o.paymentStatus || (o.debtRecord ? 'UNPAID' : 'PAID'),
+        remainingAmount: Math.max(Number(o.total) - Number(o.paidAmount || finance?.amount || 0), 0),
         paymentReference: finance?.description?.includes('Ref:') ? finance.description.split('Ref:')[1]?.trim() : null,
         customer: o.customer ? { id: o.customer.id, name: o.customer.name, phone: o.customer.phone } : null,
         cashierName: o.user?.name || 'Kasir Glosir',
@@ -94,9 +97,14 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 router.get('/unread-count', authenticateToken, async (req, res) => {
-  const since = req.query.since ? new Date(String(req.query.since)) : new Date(0);
-  const count = await prisma.order.count({ where: { status: 'PENDING', createdAt: { gt: Number.isNaN(since.getTime()) ? new Date(0) : since } } });
-  return res.json({ success: true, count });
+  try {
+    const since = req.query.since ? new Date(String(req.query.since)) : new Date(0);
+    const count = await prisma.order.count({ where: { status: 'PENDING', createdAt: { gt: Number.isNaN(since.getTime()) ? new Date(0) : since } } });
+    return res.json({ success: true, count });
+  } catch (error) {
+    console.error('Unread order count failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Jumlah pesanan baru tidak dapat diambil dari database.' });
+  }
 });
 
 router.get('/average-transaction', authenticateToken, async (req, res) => {
@@ -353,9 +361,13 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
           paid = total;
         }
 
-        if (!Number.isFinite(paid) || paid < total) {
+        if (paymentMethod === 'DEBT' && !customerId) {
+          throw new Error('Pelanggan wajib dipilih untuk transaksi bon/utang');
+        }
+        if (paymentMethod !== 'DEBT' && (!Number.isFinite(paid) || paid < total)) {
           throw new Error('Uang dibayar kurang dari total belanja');
         }
+        if (paymentMethod === 'DEBT') paid = 0;
 
         // Customer linking
         let linkedCustomerId = customerId;
@@ -379,6 +391,9 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
             subtotal,
             discount: discountAmount,
             total,
+            paymentMethod,
+            paymentStatus: paymentMethod === 'DEBT' ? 'UNPAID' : 'PAID',
+            paidAmount: paid,
             notes: `Points: +${earnedPoints} / -${redeemedPoints}`,
             items: {
               create: lines.map((line) => ({
@@ -432,17 +447,44 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
         const financeDesc = paymentReference
           ? `Penjualan kasir ${orderNumber} (${paymentMethod}) Ref: ${paymentReference}`
           : `Penjualan kasir ${orderNumber} (${paymentMethod})`;
-
-        await transaction.financeTransaction.create({
-          data: {
-            orderId: order.id,
-            type: 'INCOME',
-            amount: total,
-            description: financeDesc,
-            category: saleCategories.join(', ') || 'Penjualan',
-            paymentMethod,
-          },
+        const defaultAccount = await transaction.financeAccount.upsert({
+          where: { id: 'finance-default-cash' },
+          create: { id: 'finance-default-cash', name: 'Kas Toko', type: 'CASH', startBalance: 0 },
+          update: {},
         });
+        const salesCategory = await transaction.financeCategory.upsert({
+          where: { name_type: { name: 'Penjualan', type: 'INCOME' } },
+          create: { name: 'Penjualan', type: 'INCOME', isDefault: true },
+          update: {},
+        });
+
+        if (paymentMethod !== 'DEBT') {
+          await transaction.financeTransaction.create({
+            data: {
+              orderId: order.id,
+              type: 'INCOME',
+              amount: total,
+              description: financeDesc,
+              category: saleCategories.join(', ') || 'Penjualan',
+              accountId: defaultAccount.id,
+              categoryId: salesCategory.id,
+              paymentMethod,
+            },
+          });
+        }
+
+        if (paymentMethod === 'DEBT') {
+          await transaction.debtRecord.create({
+            data: {
+              orderId: order.id,
+              customerId: linkedCustomerId,
+              amount: total,
+              paidAmount: 0,
+              status: 'OPEN',
+              description: `Bon kasir ${orderNumber}`,
+            },
+          });
+        }
 
         // Update customer points
         let pointDetails = { previousPoints: 0, currentPoints: earnedPoints };
@@ -465,6 +507,8 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
           paidAmount: paid,
           change: Math.max(paid - total, 0),
           paymentMethod,
+          paymentStatus: order.paymentStatus,
+          remainingAmount: Math.max(total - paid, 0),
           paymentReference,
           customer: order.customer ? { id: order.customer.id, name: order.customer.name, phone: order.customer.phone } : customerName ? { name: customerName } : null,
           cashierName,

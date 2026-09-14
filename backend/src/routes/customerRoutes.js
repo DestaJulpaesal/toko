@@ -4,7 +4,7 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, customerCreateSchema, customerUpdateSchema } from '../middleware/security.js';
 
 const router = express.Router();
-router.use(authenticateToken, requireRole('OWNER', 'ADMIN'));
+router.use(authenticateToken);
 
 // Helper to add or deduct points from customer
 export async function updateCustomerPoints(customerId, pointsDelta) {
@@ -78,7 +78,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/customers - Create a new customer
-router.post('/', validateBody(customerCreateSchema), async (req, res) => {
+router.post('/', requireRole('OWNER', 'ADMIN'), validateBody(customerCreateSchema), async (req, res) => {
   const { name, phone, email, address, notes, points = 0 } = req.body || {};
 
   if (!name || !name.trim()) {
@@ -120,7 +120,7 @@ router.post('/', validateBody(customerCreateSchema), async (req, res) => {
 });
 
 // PATCH /api/customers/:id - Update customer
-router.patch('/:id', validateBody(customerUpdateSchema), async (req, res) => {
+router.patch('/:id', requireRole('OWNER', 'ADMIN'), validateBody(customerUpdateSchema), async (req, res) => {
   const { id } = req.params;
   const { name, phone, email, address, notes, points } = req.body || {};
 
@@ -159,7 +159,7 @@ router.patch('/:id', validateBody(customerUpdateSchema), async (req, res) => {
 });
 
 // DELETE /api/customers/:id - Delete customer
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req, res) => {
   const { id } = req.params;
 
   try {

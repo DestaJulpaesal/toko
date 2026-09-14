@@ -8,6 +8,17 @@ import productRoutes from './routes/productRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import parcelRoutes from './routes/parcelRoutes.js';
 import financeRoutes from './routes/financeRoutes.js';
+import financeCategoryRoutes from './routes/financeCategoryRoutes.js';
+import financeAccountRoutes from './routes/financeAccountRoutes.js';
+import budgetRoutes from './routes/budgetRoutes.js';
+import recurringTransactionRoutes from './routes/recurringTransactionRoutes.js';
+import savingsGoalRoutes from './routes/savingsGoalRoutes.js';
+import financeTagRoutes from './routes/financeTagRoutes.js';
+import financeReminderRoutes from './routes/financeReminderRoutes.js';
+import netWorthRoutes from './routes/netWorthRoutes.js';
+import financeApprovalRoutes from './routes/financeApprovalRoutes.js';
+import financeAdvancedRoutes from './routes/financeAdvancedRoutes.js';
+import path from 'node:path';
 import categoryRoutes from './routes/categoryRoutes.js';
 import siteProfileRoutes from './routes/siteProfileRoutes.js';
 import siteContentRoutes from './routes/siteContentRoutes.js';
@@ -23,6 +34,7 @@ import stockOpnameRoutes from './routes/stockOpnameRoutes.js';
 import auditLogRoutes from './routes/auditLogRoutes.js';
 import eventPackageRoutes from './routes/eventPackageRoutes.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhookRoutes.js';
+import restockRoutes from './routes/restockRoutes.js';
 
 dotenv.config();
 
@@ -32,6 +44,7 @@ app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5174' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Glosir API is running' });
@@ -41,7 +54,17 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/parcels', parcelRoutes);
+app.use('/api/finance', financeAdvancedRoutes);
+app.use('/api/finance/networth', netWorthRoutes);
 app.use('/api/finance', financeRoutes);
+app.use('/api/finance/categories', financeCategoryRoutes);
+app.use('/api/finance/accounts', financeAccountRoutes);
+app.use('/api/finance/budgets', budgetRoutes);
+app.use('/api/finance/recurring', recurringTransactionRoutes);
+app.use('/api/finance/tags', financeTagRoutes);
+app.use('/api/finance/reminders', financeReminderRoutes);
+app.use('/api/finance/approvals', financeApprovalRoutes);
+app.use('/api/savings', savingsGoalRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/site-profile', siteProfileRoutes);
 app.use('/api/site-content', siteContentRoutes);
@@ -57,6 +80,7 @@ app.use('/api/stock-opnames', stockOpnameRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/event-packages', eventPackageRoutes);
 app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
+app.use('/api/restock', restockRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

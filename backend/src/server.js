@@ -2,6 +2,9 @@ import 'dotenv/config';
 import app from './app.js';
 import prisma from './config/db.js';
 import { startNightlyRecap } from './jobs/nightlyRecap.js';
+import { startRecurringJob } from './jobs/recurringJob.js';
+import { startReminderJob } from './jobs/reminderJob.js';
+import { startDailyLoggingReminderJob } from './jobs/dailyLoggingReminder.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -19,6 +22,9 @@ async function startServer() {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     startNightlyRecap();
+    startRecurringJob();
+    startReminderJob();
+    startDailyLoggingReminderJob();
   });
 }
 

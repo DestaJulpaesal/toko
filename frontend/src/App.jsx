@@ -28,11 +28,18 @@ const AdminCategoriesPage = lazy(() => import('./pages/AdminCategoriesPage'));
 const AdminContentPage = lazy(() => import('./pages/AdminContentPage'));
 const AdminFinancePage = lazy(() => import('./pages/AdminFinancePage'));
 const AdminPersonalFinancePage = lazy(() => import('./pages/AdminPersonalFinancePage'));
+const AdminDebtsPage = lazy(() => import('./pages/AdminDebtsPage'));
+const AdminFinanceReportsPage = lazy(() => import('./pages/AdminFinanceReportsPage'));
+const AdminFinanceCalendarPage = lazy(() => import('./pages/AdminFinanceCalendarPage'));
+const AdminNetWorthPage = lazy(() => import('./pages/AdminNetWorthPage'));
+const AdminApprovalsPage = lazy(() => import('./pages/AdminApprovalsPage'));
+const FinanceAuditLogPage = lazy(() => import('./pages/FinanceAuditLogPage'));
 const AdminParcelParticipantsPage = lazy(() => import('./pages/AdminParcelParticipantsPage'));
 const AdminParcelProgramsPage = lazy(() => import('./pages/AdminParcelProgramsPage'));
 const AdminParcelRegionsPage = lazy(() => import('./pages/AdminParcelRegionsPage'));
 const ParcelCollectionPage = lazy(() => import('./pages/ParcelCollectionPage'));
 const AdminStockOpnamePage = lazy(() => import('./pages/AdminStockOpnamePage'));
+const AdminRestockPage = lazy(() => import('./pages/AdminRestockPage'));
 const AdminEventPackagesPage = lazy(() => import('./pages/AdminEventPackagesPage'));
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
@@ -40,6 +47,7 @@ import ConfirmDialog from './components/ConfirmDialog';
 import NoticeToast from './components/NoticeToast';
 import FirstTimeGuide from './components/FirstTimeGuide';
 import SupportButton from './components/SupportButton';
+import QuickAddFab from './components/QuickAddFab';
 
 // Route Guard: Proteksi menu khusus Owner/Admin agar Karyawan/Kasir dialihkan ke /kasir
 function getStoredUser() {
@@ -69,6 +77,7 @@ export default function App() {
           <NoticeToast />
           <FirstTimeGuide />
           <SupportButton />
+          <QuickAddFab />
           <Suspense fallback={<div className="page-loading">Memuat halaman...</div>}>
           <Routes>
             {/* Toko Publik */}
@@ -108,11 +117,18 @@ export default function App() {
             <Route path="/admin/content" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminContentPage /></AuthRoute>} />
             <Route path="/admin/finance" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinancePage /></AuthRoute>} />
             <Route path="/admin/personal-finance" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminPersonalFinancePage /></AuthRoute>} />
+            <Route path="/admin/debts" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminDebtsPage /></AuthRoute>} />
+            <Route path="/admin/finance/reports" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinanceReportsPage /></AuthRoute>} />
+            <Route path="/admin/finance/calendar" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinanceCalendarPage /></AuthRoute>} />
+            <Route path="/admin/finance/networth" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminNetWorthPage /></AuthRoute>} />
+            <Route path="/admin/finance/approvals" element={<AuthRoute roles={['OWNER']}><AdminApprovalsPage /></AuthRoute>} />
+            <Route path="/admin/finance/audit" element={<AuthRoute roles={['OWNER']}><FinanceAuditLogPage /></AuthRoute>} />
             <Route path="/admin/parcel-participants" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelParticipantsPage /></AuthRoute>} />
             <Route path="/admin/parcel-programs" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelProgramsPage /></AuthRoute>} />
             <Route path="/admin/parcel-regions" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelRegionsPage /></AuthRoute>} />
             <Route path="/admin/parcel-collections" element={<AuthRoute roles={['OWNER', 'ADMIN']}><ParcelCollectionPage /></AuthRoute>} />
             <Route path="/admin/stock-opname" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminStockOpnamePage /></AuthRoute>} />
+            <Route path="/admin/restock" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminRestockPage /></AuthRoute>} />
             <Route path="/admin/event-packages" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminEventPackagesPage /></AuthRoute>} />
             <Route path="/parcel-manager" element={<AuthRoute roles={['PARCEL_MANAGER']}><AdminParcelParticipantsPage /></AuthRoute>} />
             <Route path="/parcel-manager/collections" element={<AuthRoute roles={['PARCEL_MANAGER']}><ParcelCollectionPage /></AuthRoute>} />

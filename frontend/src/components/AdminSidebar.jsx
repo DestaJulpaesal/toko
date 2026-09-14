@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../services/api';
-import { Archive, CalendarRange, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
+import ReminderBell from './ReminderBell';
+import { Archive, CalendarRange, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
 
 const ownerGroups = [
   { label: 'Ringkasan', links: [['01', 'Dashboard', '/admin']] },
@@ -19,10 +20,10 @@ const ownerGroups = [
   },
   {
     label: 'Keuangan',
-    links: [['11', 'Keuangan', '/admin/finance'], ['12', 'Catatan Pribadi', '/admin/personal-finance']],
+    links: [['11', 'Keuangan', '/admin/finance'], ['12', 'Piutang', '/admin/debts'], ['13', 'Catatan Pribadi', '/admin/personal-finance'], ['14', 'Laporan Keuangan', '/admin/finance/reports'], ['15', 'Kalender Keuangan', '/admin/finance/calendar'], ['16', 'Net Worth', '/admin/finance/networth'], ['17', 'Approval Keuangan', '/admin/finance/approvals'], ['18', 'Audit Keuangan', '/admin/finance/audit']],
   },
   { label: 'Website', links: [['13', 'Konten Publik', '/admin/content'], ['14', 'Profil', '/admin/profile']] },
-  { label: 'Kontrol', links: [['15', 'Stok Opname', '/admin/stock-opname'], ['16', 'Paket Acara', '/admin/event-packages']] },
+  { label: 'Kontrol', links: [['15', 'Stok Opname', '/admin/stock-opname'], ['16', 'Restock', '/admin/restock'], ['17', 'Paket Acara', '/admin/event-packages']] },
 ];
 
 const cashierGroups = [
@@ -128,6 +129,10 @@ export default function AdminSidebar({ active = '' }) {
           <small>{isParcelManager ? 'Manager Parsel' : isCashier ? 'Portal Karyawan' : 'Owner Workspace'}</small>
         </div>
       </div>
+      <button type="button" className="admin-mobile-menu-button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={menuOpen ? 'Tutup menu' : 'Buka menu'}>
+        <span /><span /><span />
+      </button>
+      <ReminderBell />
 
       <nav ref={navRef} className={menuOpen ? 'admin-nav-open' : ''} onClick={() => setMenuOpen(false)}>
         <label className="sidebar-search" onClick={(event) => event.stopPropagation()}>
@@ -192,9 +197,15 @@ function getSidebarIcon(label, fallback) {
     'Wilayah Parsel': MapPinned,
     Keuangan: WalletCards,
     'Catatan Pribadi': FileText,
+    'Laporan Keuangan': FileText,
+    'Kalender Keuangan': CalendarRange,
+    'Net Worth': WalletCards,
+    'Approval Keuangan': ClipboardCheck,
+    'Audit Keuangan': History,
     'Konten Publik': Globe2,
     Profil: Settings,
     'Stok Opname': ClipboardCheck,
+    Restock: PackagePlus,
     'Paket Acara': Package,
   };
   const Icon = icons[label];
