@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminSidebar from '../components/AdminSidebar';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
+import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 
 const emptyForm = {
@@ -139,10 +140,11 @@ export default function AdminContentPage() {
   const deleteSelected = async () => {
     if (!selectedIds.length || !await confirmAction(`Hapus ${selectedIds.length} konten terpilih?`)) return;
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/site-content/${id}`, { method: 'DELETE' }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/site-content/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
     const count = results.filter((result) => result.status === 'fulfilled').length;
     setSelectedIds([]); setBulkDeleting(false); await loadItems();
     setNotice(`${count} konten berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
+    showNotice(`${count} konten berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
   };
 
   return (

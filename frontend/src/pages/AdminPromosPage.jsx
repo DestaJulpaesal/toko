@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
+import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 
 const emptyForm = { name: '', code: '', type: 'Persentase', value: '', status: 'Aktif' };
@@ -46,10 +47,11 @@ export default function AdminPromosPage() {
   const deleteSelected = async () => {
     if (!selectedIds.length || !await confirmAction(`Hapus ${selectedIds.length} promo terpilih?`)) return;
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/promos/${id}`, { method: 'DELETE' }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/promos/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
     const count = results.filter((result) => result.status === 'fulfilled').length;
     setSelectedIds([]); setBulkDeleting(false); await loadPromos();
     setNotice(`${count} promo berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
+    showNotice(`${count} promo berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
   };
 
   const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));

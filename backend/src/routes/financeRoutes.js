@@ -143,6 +143,27 @@ router.get('/transactions', async (req, res) => {
   } catch (error) { return res.status(503).json({ success: false, message: 'Transaksi tidak dapat diambil dari database.' }); }
 });
 
+router.get('/unified-history', async (req, res) => {
+  try {
+    const [transactions, contributions, deposits, netWorth] = await Promise.all([
+      prisma.financeTransaction.findMany({ where: { deletedAt: null }, include: transactionInclude(), orderBy: { createdAt: 'desc' }, take: 500 }),
+      prisma.parcelContribution.findMany({ include: { participant: { select: { name: true, program: { select: { name: true } } } } }, orderBy: { paidAt: 'desc' }, take: 500 }),
+      prisma.savingsDeposit.findMany({ include: { goal: { select: { name: true } } }, orderBy: { depositDate: 'desc' }, take: 500 }),
+      prisma.netWorthItemHistory.findMany({ include: { item: { select: { name: true, kind: true } } }, orderBy: { addedAt: 'desc' }, take: 500 }),
+    ]);
+    const data = [
+      ...transactions.map((row) => ({ ...formatTransaction(row), source: row.orderId ? 'KASIR / PENJUALAN' : (row.type === 'EXPENSE' ? 'PENGELUARAN' : 'KEUANGAN LAINNYA'), date: row.createdAt })),
+      ...contributions.map((row) => ({ id: `parcel-${row.id}`, type: 'INCOME', amount: money(row.amount), description: `Setoran parcel - ${row.participant.name}`, category: row.participant.program?.name || 'Parcel', source: 'PARCEL', date: row.paidAt, paymentMethod: 'Setoran' })),
+      ...deposits.map((row) => ({ id: `saving-${row.id}`, type: 'EXPENSE', amount: money(row.amount), description: `Setoran tabungan - ${row.goal.name}`, category: 'Tabungan', source: 'TABUNGAN', date: row.depositDate, paymentMethod: 'Setoran' })),
+      ...netWorth.map((row) => ({ id: `networth-${row.id}`, type: row.item.kind === 'ASSET' ? 'ASSET' : 'LIABILITY', amount: money(row.amount), description: `Penambahan ${row.item.name}`, category: 'Aset & Liabilitas', source: 'NET WORTH', date: row.addedAt, paymentMethod: '-' })),
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('Unified finance history failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Riwayat keuangan gabungan tidak dapat diambil.' });
+  }
+});
+
 router.get('/cashflow', async (req, res) => {
   try {
     const period = ['daily', 'weekly', 'monthly'].includes(String(req.query.period)) ? String(req.query.period) : 'daily';

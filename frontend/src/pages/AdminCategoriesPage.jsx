@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminSidebar from '../components/AdminSidebar';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
+import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 
 const emptyForm = { name: '', description: '' };
@@ -99,6 +100,7 @@ export default function AdminCategoriesPage() {
     const count = results.filter((result) => result.status === 'fulfilled').length;
     setSelectedIds([]); setBulkDeleting(false); await loadCategories();
     setNotice(`${count} kategori berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
+    showNotice(`${count} kategori berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
   };
 
   return (

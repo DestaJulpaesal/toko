@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
+import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 
 const emptyForm = { name: '', code: '', type: 'Standard', price: '', originalPrice: '', status: 'Aktif', isManualPrice: false, items: [] };
@@ -54,10 +55,11 @@ export default function AdminParcelsPage() {
   const deleteSelected = async () => {
     if (!selectedIds.length || !await confirmAction(`Hapus ${selectedIds.length} parsel terpilih?`)) return;
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcels/${id}`, { method: 'DELETE' }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcels/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
     const count = results.filter((result) => result.status === 'fulfilled').length;
     setSelectedIds([]); setBulkDeleting(false); await loadParcels();
     setNotice(`${count} parsel berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
+    showNotice(`${count} parsel berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
   };
   const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const resetForm = () => { setForm(emptyForm); setEditingId(null); };

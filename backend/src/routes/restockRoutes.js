@@ -24,6 +24,7 @@ function serializeItem(item) {
     suggestedQty: item.suggestedQty,
     requestedQty: item.requestedQty,
     purchaseUnit: item.purchaseUnit || item.unit,
+    purchasePrice: item.purchasePrice == null ? null : Number(item.purchasePrice),
     status: item.status,
   };
 }
@@ -35,13 +36,12 @@ router.get('/', async (req, res) => {
       include: { product: { select: { name: true, sku: true, stockWarning: true, category: { select: { name: true } } } } },
       orderBy: [{ product: { name: 'asc' } }, { stockQty: 'asc' }],
     });
-    const lowStock = variants.filter((variant) => variant.stockQty <= variant.product.stockWarning);
     const latestList = await prisma.restockList.findFirst({
       where: { status: { not: 'CLOSED' } },
       orderBy: { createdAt: 'desc' },
       include: { items: true },
     });
-    const items = lowStock.map((variant) => {
+    const items = variants.map((variant) => {
       const saved = latestList?.items.find((item) => item.variantId === variant.id);
       return {
         id: saved?.id || null,
@@ -56,6 +56,7 @@ router.get('/', async (req, res) => {
         suggestedQty: Math.max(variant.product.stockWarning * 2 - variant.stockQty, 0),
         requestedQty: saved?.requestedQty || 0,
         purchaseUnit: saved?.purchaseUnit || variant.unit || 'unit',
+        purchasePrice: saved?.purchasePrice == null ? Number(variant.basePrice || 0) : Number(saved.purchasePrice),
         status: saved?.status || 'OPEN',
       };
     });
@@ -74,7 +75,7 @@ router.post('/', async (req, res) => {
       : (await prisma.productVariant.findMany({
         where: { isActive: true },
         include: { product: { include: { category: true } } },
-      })).filter((variant) => variant.stockQty <= variant.product.stockWarning);
+      }));
     if (!source.length) return res.status(400).json({ success: false, message: 'Tidak ada produk dengan stok menipis' });
     const list = await prisma.restockList.create({
       data: {
@@ -92,6 +93,7 @@ router.post('/', async (req, res) => {
           suggestedQty: Number(item.suggestedQty || 0),
           requestedQty: Number(item.requestedQty ?? 0),
             purchaseUnit: String(item.purchaseUnit || item.unit || 'unit'),
+            purchasePrice: item.purchasePrice == null ? null : Number(item.purchasePrice),
         })) },
       },
       include: { items: true },

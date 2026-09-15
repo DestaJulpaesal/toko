@@ -15,15 +15,22 @@ export default function AdminFinanceReportsPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [unifiedHistory, setUnifiedHistory] = useState([]);
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError('');
-    apiFetch(`/finance/reports/${tab === 'forecast' ? 'forecast?months=3' : tab === 'compare' ? 'compare?count=6' : tab === 'cashflow' ? 'cashflow-statement' : 'profit-loss'}`)
-      .then(async (response) => {
+    Promise.all([
+      apiFetch(`/finance/reports/${tab === 'forecast' ? 'forecast?months=3' : tab === 'compare' ? 'compare?count=6' : tab === 'cashflow' ? 'cashflow-statement' : 'profit-loss'}`),
+      apiFetch('/finance/unified-history'),
+    ]).then(async ([response, unifiedResponse]) => {
         const result = await response.json();
+        const unifiedResult = await unifiedResponse.json();
         if (!response.ok || !result.success) throw new Error(result.message || 'Laporan gagal dimuat.');
-        if (active) setData(result.data || []);
+        if (active) {
+          setData(result.data || []);
+          setUnifiedHistory(unifiedResult.success ? unifiedResult.data || [] : []);
+        }
       })
       .catch((reason) => {
         if (active) {
@@ -41,7 +48,19 @@ export default function AdminFinanceReportsPage() {
         { label: 'Laba bersih', income: data.totalIncome || 0, expense: data.totalExpense || 0, net: data.netProfit || 0 },
       ]
     : Array.isArray(data) ? data : [];
-  const chartRows = rows.map((row, index) => ({ ...row, chartLabel: row.period || row.label || row.category || `Periode ${index + 1}`, chartValue: Number(row.net ?? row.income ?? row.amount ?? 0) }));
+  const sourceRows = tab === 'profit-loss' && unifiedHistory.length
+    ? Object.values(unifiedHistory.reduce((groups, item) => {
+        const group = groups[item.source] || { label: item.source, income: 0, expense: 0, net: 0 };
+        const amount = Number(item.amount || 0);
+        if (item.type === 'INCOME') group.income += amount;
+        else group.expense += amount;
+        group.net = group.income - group.expense;
+        groups[item.source] = group;
+        return groups;
+      }, {}))
+    : rows;
+  const displayRows = sourceRows.length ? sourceRows : rows;
+  const chartRows = displayRows.map((row, index) => ({ ...row, chartLabel: row.period || row.label || row.category || `Periode ${index + 1}`, chartValue: Number(row.net ?? row.income ?? row.amount ?? 0) }));
   const chartTick = (value) => String(value).length > 18 ? `${String(value).slice(0, 16)}...` : value;
-  return <div className="admin-shell admin-crud-shell"><AdminSidebar active="Laporan Keuangan" /><main className="admin-main"><header className="admin-header"><div><p className="eyebrow light">Finance intelligence</p><h1>Laporan Keuangan</h1><p className="admin-subtitle">Laba rugi, arus kas, perbandingan, dan proyeksi.</p></div></header><div className="tab-strip">{[['profit-loss', 'Laba Rugi'], ['cashflow', 'Arus Kas'], ['compare', 'Perbandingan'], ['forecast', 'Proyeksi']].map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>{error && <div className="crud-notice" role="alert">{error}</div>}<section className="crud-table-panel">{loading ? <p>Memuat laporan dari database...</p> : <><div className="product-table-wrap"><table className="product-table"><thead><tr><th>Periode/Kategori</th><th>Pendapatan</th><th>Pengeluaran</th><th>Net</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.period || row.category || row.accountId || row.label || index}><td>{row.label || row.period || row.category || row.accountName || `Bulan ${row.month}`}</td><td>{money(row.income || row.amount)}</td><td>{money(row.expense || row.operatingExpense)}</td><td>{money(row.net ?? (row.income || 0) - (row.expense || row.operatingExpense || 0))}</td></tr>)}</tbody></table></div>{rows.length === 0 && <p>Belum ada data untuk periode ini.</p>}<div className="finance-investment-chart"><ResponsiveContainer><AreaChart data={chartRows} margin={{ top: 12, right: 12, left: 4, bottom: 8 }}><defs><linearGradient id="financeAreaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#168c5c" stopOpacity={0.35} /><stop offset="100%" stopColor="#168c5c" stopOpacity={0.02} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e8eee9" /><XAxis dataKey="chartLabel" tickFormatter={chartTick} tick={{ fill: '#87918a', fontSize: 11 }} axisLine={false} tickLine={false} /><YAxis tickFormatter={compactMoney} tick={{ fill: '#87918a', fontSize: 11 }} axisLine={false} tickLine={false} width={72} /><Tooltip formatter={(value) => money(value)} labelFormatter={(label) => `Periode: ${label}`} contentStyle={{ border: '1px solid #dce9df', borderRadius: 12, boxShadow: '0 8px 22px rgba(36,45,40,.1)' }} /><Area type="monotone" dataKey="chartValue" name="Nilai bersih" stroke="#168c5c" strokeWidth={3} fill="url(#financeAreaGradient)" dot={{ r: 4, fill: '#fff', stroke: '#168c5c', strokeWidth: 2 }} activeDot={{ r: 6 }} /></AreaChart></ResponsiveContainer></div></>}</section></main></div>;
+  return <div className="admin-shell admin-crud-shell"><AdminSidebar active="Laporan Keuangan" /><main className="admin-main"><header className="admin-header"><div><p className="eyebrow light">Finance intelligence</p><h1>Laporan Keuangan</h1><p className="admin-subtitle">Ringkasan kasir, pengeluaran, parcel, tabungan, aset, dan aktivitas keuangan lainnya.</p></div></header><div className="tab-strip">{[['profit-loss', 'Semua sumber'], ['cashflow', 'Arus Kas'], ['compare', 'Perbandingan'], ['forecast', 'Proyeksi']].map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>{error && <div className="crud-notice" role="alert">{error}</div>}<section className="crud-table-panel">{loading ? <p>Memuat laporan dari database...</p> : <><div className="product-table-wrap"><table className="product-table"><thead><tr><th>Sumber keuangan</th><th>Pendapatan</th><th>Pengeluaran</th><th>Net</th></tr></thead><tbody>{displayRows.map((row, index) => <tr key={row.period || row.category || row.accountId || row.label || index}><td>{row.label || row.period || row.category || row.accountName || `Bulan ${row.month}`}</td><td>{money(row.income || row.amount)}</td><td>{money(row.expense || row.operatingExpense)}</td><td>{money(row.net ?? (row.income || 0) - (row.expense || row.operatingExpense || 0))}</td></tr>)}</tbody></table></div>{displayRows.length === 0 && <p>Belum ada data untuk periode ini.</p>}<div className="finance-investment-chart"><ResponsiveContainer><AreaChart data={chartRows} margin={{ top: 12, right: 12, left: 4, bottom: 8 }}><defs><linearGradient id="financeAreaGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#168c5c" stopOpacity={0.35} /><stop offset="100%" stopColor="#168c5c" stopOpacity={0.02} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e8eee9" /><XAxis dataKey="chartLabel" tickFormatter={chartTick} tick={{ fill: '#87918a', fontSize: 11 }} axisLine={false} tickLine={false} /><YAxis tickFormatter={compactMoney} tick={{ fill: '#87918a', fontSize: 11 }} axisLine={false} tickLine={false} width={72} /><Tooltip formatter={(value) => money(value)} labelFormatter={(label) => `Periode: ${label}`} contentStyle={{ border: '1px solid #dce9df', borderRadius: 12, boxShadow: '0 8px 22px rgba(36,45,40,.1)' }} /><Area type="monotone" dataKey="chartValue" name="Nilai bersih" stroke="#168c5c" strokeWidth={3} fill="url(#financeAreaGradient)" dot={{ r: 4, fill: '#fff', stroke: '#168c5c', strokeWidth: 2 }} activeDot={{ r: 6 }} /></AreaChart></ResponsiveContainer></div></>}</section></main></div>;
 }

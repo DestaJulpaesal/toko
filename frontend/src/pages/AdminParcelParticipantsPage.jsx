@@ -4,6 +4,7 @@ import AdminSidebar from '../components/AdminSidebar';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
+import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 
 const emptyForm = {
@@ -144,10 +145,11 @@ export default function AdminParcelParticipantsPage() {
   const deleteSelected = async () => {
     if (!selectedIds.length || !await confirmAction(`Hapus ${selectedIds.length} peserta terpilih beserta riwayat setorannya?`)) return;
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcel-participants/${id}`, { method: 'DELETE' }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcel-participants/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
     const count = results.filter((result) => result.status === 'fulfilled').length;
     setSelectedIds([]); setBulkDeleting(false); await load();
     setNotice(`${count} peserta berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
+    showNotice(`${count} peserta berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
   };
 
   const submit = async (event) => {

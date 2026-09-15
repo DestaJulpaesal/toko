@@ -20,28 +20,39 @@ function formatPackage(item) {
 }
 
 router.get('/', async (req, res) => {
-  const packages = await prisma.eventPackage.findMany({
-    where: { isActive: true },
-    include: { items: { include: { variant: { include: { product: true } } } } },
-    orderBy: { createdAt: 'desc' },
-  });
-  res.json({ success: true, packages: packages.map(formatPackage) });
+  try {
+    const packages = await prisma.eventPackage.findMany({
+      where: { isActive: true },
+      include: { items: { include: { variant: { include: { product: true } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ success: true, packages: packages.map(formatPackage) });
+  } catch (error) {
+    console.error('Event package list failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Daftar paket acara belum dapat dimuat.' });
+  }
 });
 
 router.get('/:id', async (req, res) => {
-  const item = await prisma.eventPackage.findFirst({
-    where: { OR: [{ id: req.params.id }, { slug: req.params.id }], isActive: true },
-    include: { items: { include: { variant: { include: { product: true } } } } },
-  });
-  if (!item) return res.status(404).json({ success: false, message: 'Paket acara tidak ditemukan' });
-  return res.json({ success: true, package: formatPackage(item) });
+  try {
+    const item = await prisma.eventPackage.findFirst({
+      where: { OR: [{ id: req.params.id }, { slug: req.params.id }], isActive: true },
+      include: { items: { include: { variant: { include: { product: true } } } } },
+    });
+    if (!item) return res.status(404).json({ success: false, message: 'Paket acara tidak ditemukan' });
+    return res.json({ success: true, package: formatPackage(item) });
+  } catch (error) {
+    console.error('Event package detail failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Detail paket acara belum dapat dimuat.' });
+  }
 });
 
 async function createPackage(req, res, isCustom = false) {
-  const { name, description, imageUrl, isManualPrice = false, price, items = [] } = req.body || {};
-  if (!String(name || '').trim() || !Array.isArray(items) || !items.length) {
-    return res.status(400).json({ success: false, message: 'Nama dan minimal satu isi paket wajib diisi' });
-  }
+  try {
+    const { name, description, imageUrl, isManualPrice = false, price, items = [] } = req.body || {};
+    if (!String(name || '').trim() || !Array.isArray(items) || !items.length) {
+      return res.status(400).json({ success: false, message: 'Nama dan minimal satu isi paket wajib diisi' });
+    }
 
   const variantIds = items.map((item) => String(item.variantId || ''));
   const variants = await prisma.productVariant.findMany({ where: { id: { in: variantIds }, isActive: true } });
@@ -69,14 +80,19 @@ async function createPackage(req, res, isCustom = false) {
     },
     include: { items: { include: { variant: true } } },
   });
-  return res.status(201).json({ success: true, package: formatPackage(created) });
+    return res.status(201).json({ success: true, package: formatPackage(created) });
+  } catch (error) {
+    console.error('Event package create failed:', error.message);
+    return res.status(400).json({ success: false, message: error.message || 'Paket acara gagal disimpan.' });
+  }
 }
 
-router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), (req, res) => createPackage(req, res));
-router.post('/custom', authenticateToken, requireRole('OWNER', 'ADMIN'), (req, res) => createPackage(req, res, true));
+router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => createPackage(req, res));
+router.post('/custom', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => createPackage(req, res, true));
 
 router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
-  const { name, description, imageUrl, isManualPrice, price, items, isActive } = req.body || {};
+  try {
+    const { name, description, imageUrl, isManualPrice, price, items, isActive } = req.body || {};
   if (name !== undefined && !String(name).trim()) {
     return res.status(400).json({ success: false, message: 'Nama paket wajib diisi' });
   }
@@ -119,12 +135,21 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
     });
     return updated;
   });
-  return res.json({ success: true, package: formatPackage(item) });
+    return res.json({ success: true, package: formatPackage(item) });
+  } catch (error) {
+    console.error('Event package update failed:', error.message);
+    return res.status(400).json({ success: false, message: error.message || 'Paket acara gagal diperbarui.' });
+  }
 });
 
 router.delete('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
-  await prisma.eventPackage.update({ where: { id: req.params.id }, data: { isActive: false } });
-  return res.json({ success: true, message: 'Paket acara dinonaktifkan' });
+  try {
+    await prisma.eventPackage.update({ where: { id: req.params.id }, data: { isActive: false } });
+    return res.json({ success: true, message: 'Paket acara dinonaktifkan' });
+  } catch (error) {
+    console.error('Event package delete failed:', error.message);
+    return res.status(error.code === 'P2025' ? 404 : 400).json({ success: false, message: 'Paket acara gagal dinonaktifkan.' });
+  }
 });
 
 export default router;

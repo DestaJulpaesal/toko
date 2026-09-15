@@ -4,6 +4,7 @@ import AdminSidebar from '../components/AdminSidebar';
 import DebtModal from '../components/DebtModal';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
+import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 
 const emptyCustomer = {
@@ -89,12 +90,13 @@ export default function AdminCustomersPage() {
   const deleteSelectedCustomers = async () => {
     if (!selectedCustomerIds.length || !await confirmAction(`Hapus ${selectedCustomerIds.length} pelanggan terpilih? Data pelanggan akan dihapus dari database.`)) return;
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedCustomerIds.map((id) => apiFetch(`/customers/${id}`, { method: 'DELETE' }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+    const results = await Promise.allSettled(selectedCustomerIds.map((id) => apiFetch(`/customers/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
     const deletedIds = results.filter((result) => result.status === 'fulfilled').map((result) => result.value);
     setSelectedCustomerIds([]);
     setBulkDeleting(false);
     await loadCustomers();
     setNotice(`${deletedIds.length} pelanggan berhasil dihapus${deletedIds.length < results.length ? `, ${results.length - deletedIds.length} gagal` : ''}.`);
+    showNotice(`${deletedIds.length} pelanggan berhasil dihapus${deletedIds.length < results.length ? `, ${results.length - deletedIds.length} gagal` : ''}.`, deletedIds.length < results.length ? 'error' : 'success');
   };
 
   const handleChange = (e) => {

@@ -10,6 +10,7 @@ import StockReceiptImportModal from '../components/StockReceiptImportModal';
 import { generateAutoBarcode, playBeep } from '../utils/barcodeUtils';
 import CurrencyInput from '../components/CurrencyInput';
 import { confirmAction } from '../utils/confirmService';
+import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 import * as XLSX from 'xlsx';
 
@@ -123,13 +124,15 @@ export default function AdminProductsPage() {
     const token = localStorage.getItem('glosir_token');
     if (!token) { setNotice('Session login tidak ditemukan. Silakan login ulang.'); return; }
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedProductIds.map((id) => apiFetch(`/products/${id}`, { method: 'DELETE' }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+    const results = await Promise.allSettled(selectedProductIds.map((id) => apiFetch(`/products/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
     const deletedIds = results.filter((result) => result.status === 'fulfilled').map((result) => result.value);
     const failedMessages = results.filter((result) => result.status === 'rejected').map((result) => result.reason?.message).filter(Boolean);
     setSelectedProductIds([]);
     setBulkDeleting(false);
     await loadProducts();
-    setNotice(`${deletedIds.length} produk berhasil dihapus${deletedIds.length < results.length ? `, ${results.length - deletedIds.length} gagal: ${failedMessages[0] || 'periksa relasi data produk'}` : '.'}`);
+    const summary = `${deletedIds.length} produk berhasil dihapus${deletedIds.length < results.length ? `, ${results.length - deletedIds.length} gagal: ${failedMessages[0] || 'periksa relasi data produk'}` : '.'}`;
+    setNotice(summary);
+    showNotice(summary, deletedIds.length === results.length ? 'success' : 'error');
   };
 
   const normalizeBarcode = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -648,22 +651,19 @@ export default function AdminProductsPage() {
 
             <section className="product-packages-panel">
               <div className="panel-heading">
-                <div><span className="panel-kicker">Kemasan tambahan</span><h3>Pak / Dus / Slop</h3></div>
+                <div><span className="panel-kicker">Kemasan tambahan</span><h3>Atur ukuran jual selain eceran</h3><p className="product-package-help">Contoh: 1 dus berisi beberapa unit. Setiap kemasan dapat memiliki harga, barcode, dan stok sendiri.</p></div>
                 <button type="button" className="text-button" onClick={() => setForm((current) => ({ ...current, packages: [...(current.packages || []), { name: 'Dus', sku: '', barcode: '', price: '', wholesalePrice: '', purchasePrice: '', stock: '' }] }))}>+ Tambah kemasan</button>
               </div>
-              <small className="tool-empty">Satu produk bisa memiliki barcode, harga, dan stok berbeda untuk kemasan pak, dus, atau slop.</small>
+              <small className="tool-empty">Isi nama model kemasan, lalu bedakan harga jual, harga warung/grosir, modal beli, barcode, SKU, dan stoknya.</small>
               {(form.packages || []).map((packageForm, index) => (
                 <div className="product-package-row" key={packageForm.id || index}>
-                  {['name', 'sku', 'barcode', 'price', 'wholesalePrice', 'purchasePrice', 'stock'].map((field) => (
-                    <input
-                      key={field}
-                      type={['price', 'wholesalePrice', 'purchasePrice', 'stock'].includes(field) ? 'number' : 'text'}
-                      min={field === 'stock' ? 0 : undefined}
-                      placeholder={field === 'name' ? 'Nama satuan (Dus)' : field === 'price' ? 'Harga jual' : field === 'wholesalePrice' ? 'Harga warung' : field === 'purchasePrice' ? 'Modal' : field === 'stock' ? 'Stok' : field === 'sku' ? 'SKU kemasan' : 'Barcode kemasan'}
-                      value={packageForm[field] ?? ''}
-                      onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: event.target.value } : item) }))}
-                    />
-                  ))}
+                  <label><span>Model kemasan</span><input type="text" placeholder="Dus / Pak / Slop" value={packageForm.name ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item) }))} /></label>
+                  <label><span>SKU kemasan</span><input type="text" placeholder="Kode SKU khusus kemasan" value={packageForm.sku ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, sku: event.target.value } : item) }))} /></label>
+                  <label><span>Barcode kemasan</span><input type="text" placeholder="Barcode pada dus/pak" value={packageForm.barcode ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, barcode: event.target.value } : item) }))} /></label>
+                  <label><span>Harga jual pelanggan</span><CurrencyInput value={packageForm.price ?? ''} placeholder="Rp 0" onValueChange={(value) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, price: value } : item) }))} /></label>
+                  <label><span>Harga warung / grosir</span><CurrencyInput value={packageForm.wholesalePrice ?? ''} placeholder="Rp 0" onValueChange={(value) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, wholesalePrice: value } : item) }))} /></label>
+                  <label><span>Harga beli / modal</span><CurrencyInput value={packageForm.purchasePrice ?? ''} placeholder="Rp 0" onValueChange={(value) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, purchasePrice: value } : item) }))} /></label>
+                  <label><span>Stok kemasan</span><input type="number" min="0" placeholder="0" value={packageForm.stock ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, stock: event.target.value } : item) }))} /></label>
                   <button type="button" className="text-button" onClick={() => setForm((current) => ({ ...current, packages: current.packages.filter((_, itemIndex) => itemIndex !== index) }))}>Hapus</button>
                 </div>
               ))}

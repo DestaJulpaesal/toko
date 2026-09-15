@@ -1,15 +1,49 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Info, X } from 'lucide-react';
+import { CheckCircle2, XCircle, Info, X } from 'lucide-react';
 import { subscribeNotice } from '../utils/noticeService';
 
+const ICONS = {
+  success: CheckCircle2,
+  error: XCircle,
+  info: Info,
+};
+
 export default function NoticeToast() {
-  const [notice, setNotice] = useState(null);
-  useEffect(() => subscribeNotice(setNotice), []);
+  const [queue, setQueue] = useState([]);
+
+  useEffect(() => subscribeNotice((notice) => {
+    setQueue((current) => [...current, notice]);
+  }), []);
+
+  const current = queue[0];
+
   useEffect(() => {
-    if (!notice) return undefined;
-    const timer = window.setTimeout(() => setNotice(null), 3600);
+    if (!current) return undefined;
+    const duration = current.type === 'error' ? 4200 : 2800;
+    const timer = window.setTimeout(() => {
+      setQueue((q) => q.slice(1));
+    }, duration);
     return () => window.clearTimeout(timer);
-  }, [notice]);
-  if (!notice) return null;
-  return <div className="global-notice-toast" role="status"><span className="global-notice-icon">{notice.type === 'success' ? <CheckCircle2 size={17} /> : <Info size={17} />}</span><span>{notice.message}</span><button type="button" onClick={() => setNotice(null)} aria-label="Tutup pesan"><X size={15} /></button></div>;
+  }, [current]);
+
+  if (!current) return null;
+
+  const Icon = ICONS[current.type] || Info;
+
+  return (
+    <div className="global-notice-overlay" role="status" aria-live="polite">
+      <div className={`global-notice-toast global-notice-${current.type}`}>
+        <span className="global-notice-icon"><Icon size={18} /></span>
+        <span className="global-notice-message">{current.message}</span>
+        <button
+          type="button"
+          className="global-notice-close"
+          onClick={() => setQueue((q) => q.slice(1))}
+          aria-label="Tutup pesan"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  );
 }
