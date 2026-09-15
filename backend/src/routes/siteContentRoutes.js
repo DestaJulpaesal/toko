@@ -16,7 +16,7 @@ const TYPE_MAP = {
 
 const PUBLIC_TYPES = Object.keys(TYPE_MAP);
 
-const fallbackContent = [
+const defaultContent = [
   {
     id: 'fallback-terms',
     type: 'TERMS',
@@ -85,7 +85,7 @@ const fallbackContent = [
   },
 ];
 
-const defaultContentSeed = fallbackContent.map(({ id, ...rest }) => rest);
+const defaultContentSeed = defaultContent.map(({ id, ...rest }) => rest);
 
 function slugify(value) {
   return String(value || '')
@@ -112,23 +112,6 @@ function formatContent(item) {
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };
-}
-
-function makeFallbackFilter(type, publishedOnly) {
-  return fallbackContent.filter((item) => {
-    const matchesType = type ? item.type === type : true;
-    const matchesPublished = publishedOnly ? item.isPublished : true;
-    return matchesType && matchesPublished;
-  });
-}
-
-function fallbackReadAll({ type = null, publishedOnly = false } = {}) {
-  return makeFallbackFilter(type, publishedOnly).map((item) => ({ ...item, createdAt: new Date(item.createdAt), updatedAt: new Date(item.updatedAt) }));
-}
-
-function isPrismaUnavailableError(error) {
-  const message = error?.message || '';
-  return /Cannot read properties of undefined|does not exist|relation .* does not exist|Undefined column|P2021|P2022/i.test(message);
 }
 
 async function ensureSeedData() {
@@ -160,47 +143,22 @@ router.get('/public', async (req, res) => {
   try {
     await ensureSeedData();
     const requestedType = normalizeType(req.query.type || '');
-
-    try {
-      if (requestedType) {
-        const items = await prisma.siteContent.findMany({
-          where: { type: requestedType, isPublished: true },
-          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-        });
-
-        return res.json({
-          success: true,
-          data: {
-            type: requestedType,
-            items: items.map(formatContent),
-            item: items[0] ? formatContent(items[0]) : null,
-          },
-        });
-      }
-
-      const payload = {};
-      for (const key of PUBLIC_TYPES) {
-        const type = TYPE_MAP[key];
-        const items = await prisma.siteContent.findMany({
-          where: { type, isPublished: true },
-          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-        });
-        payload[key] = items.map(formatContent);
-      }
-
-      return res.json({ success: true, data: payload });
-    } catch (prismaError) {
-      if (!isPrismaUnavailableError(prismaError)) {
-        throw prismaError;
-      }
-
-      const items = fallbackReadAll({ type: requestedType, publishedOnly: true });
-      const item = requestedType ? items[0] || null : null;
-      return res.json({
-        success: true,
-        data: requestedType ? { type: requestedType, items: items.map(formatContent), item: item ? formatContent(item) : null } : Object.fromEntries(PUBLIC_TYPES.map((key) => [key, fallbackReadAll({ type: TYPE_MAP[key], publishedOnly: true }).map(formatContent)])),
+    if (requestedType) {
+      const items = await prisma.siteContent.findMany({
+        where: { type: requestedType, isPublished: true },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       });
+      return res.json({ success: true, data: { type: requestedType, items: items.map(formatContent), item: items[0] ? formatContent(items[0]) : null } });
     }
+    const payload = {};
+    for (const key of PUBLIC_TYPES) {
+      const items = await prisma.siteContent.findMany({
+        where: { type: TYPE_MAP[key], isPublished: true },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      });
+      payload[key] = items.map(formatContent);
+    }
+    return res.json({ success: true, data: payload });
   } catch (error) {
     console.error('Public site content load failed:', error.message);
     return res.status(500).json({ success: false, message: 'Konten publik gagal dimuat.' });
@@ -216,19 +174,11 @@ router.get('/', async (req, res) => {
       ...(publishedOnly === 'true' ? { isPublished: true } : {}),
     };
 
-    try {
-      const items = await prisma.siteContent.findMany({
-        where,
-        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-      });
-      return res.json({ success: true, items: items.map(formatContent) });
-    } catch (prismaError) {
-      if (!isPrismaUnavailableError(prismaError)) {
-        throw prismaError;
-      }
-
-      return res.json({ success: true, items: fallbackReadAll({ type: normalizedType, publishedOnly: publishedOnly === 'true' }).map(formatContent) });
-    }
+    const items = await prisma.siteContent.findMany({
+      where,
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    });
+    return res.json({ success: true, items: items.map(formatContent) });
   } catch (error) {
     console.error('Site content list failed:', error.message);
     return res.status(500).json({ success: false, message: 'Daftar konten gagal dimuat.' });
@@ -262,44 +212,19 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
       return res.status(400).json({ success: false, message: 'Judul dan isi konten wajib diisi.' });
     }
 
-    try {
-      const slugBase = slugify(trimmedTitle) || 'konten';
-      const existingSlug = await prisma.siteContent.findFirst({
-        where: { slug: slugBase },
-        select: { id: true },
-      });
-
-      const item = await prisma.siteContent.create({
-        data: {
-          type: normalizedType,
-          title: trimmedTitle,
-          slug: existingSlug ? `${slugBase}-${Date.now()}` : slugBase,
-          content: trimmedContent,
-          sortOrder: Number(sortOrder) || 0,
-          isPublished: Boolean(isPublished),
-        },
-      });
-
-      return res.status(201).json({ success: true, item: formatContent(item), message: 'Konten berhasil ditambahkan.' });
-    } catch (prismaError) {
-      if (!isPrismaUnavailableError(prismaError)) {
-        throw prismaError;
-      }
-
-      const item = {
-        id: `fallback-${Date.now()}`,
+    const slugBase = slugify(trimmedTitle) || 'konten';
+    const existingSlug = await prisma.siteContent.findFirst({ where: { slug: slugBase }, select: { id: true } });
+    const item = await prisma.siteContent.create({
+      data: {
         type: normalizedType,
         title: trimmedTitle,
-        slug: slugify(trimmedTitle) || 'konten',
+        slug: existingSlug ? `${slugBase}-${Date.now()}` : slugBase,
         content: trimmedContent,
         sortOrder: Number(sortOrder) || 0,
         isPublished: Boolean(isPublished),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      fallbackContent.push(item);
-      return res.status(201).json({ success: true, item: formatContent(item), message: 'Konten berhasil ditambahkan.' });
-    }
+      },
+    });
+    return res.status(201).json({ success: true, item: formatContent(item), message: 'Konten berhasil ditambahkan.' });
   } catch (error) {
     console.error('Site content create failed:', error.message);
     return res.status(400).json({ success: false, message: error.message || 'Konten gagal disimpan.' });
@@ -344,22 +269,8 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
       payload.isPublished = Boolean(isPublished);
     }
 
-    try {
-      const item = await prisma.siteContent.update({ where: { id: req.params.id }, data: payload });
-      return res.json({ success: true, item: formatContent(item), message: 'Konten berhasil diperbarui.' });
-    } catch (prismaError) {
-      if (!isPrismaUnavailableError(prismaError)) {
-        throw prismaError;
-      }
-
-      const index = fallbackContent.findIndex((item) => item.id === req.params.id);
-      if (index === -1) {
-        return res.status(404).json({ success: false, message: 'Konten tidak ditemukan.' });
-      }
-
-      fallbackContent[index] = { ...fallbackContent[index], ...payload, updatedAt: new Date() };
-      return res.json({ success: true, item: formatContent(fallbackContent[index]), message: 'Konten berhasil diperbarui.' });
-    }
+    const item = await prisma.siteContent.update({ where: { id: req.params.id }, data: payload });
+    return res.json({ success: true, item: formatContent(item), message: 'Konten berhasil diperbarui.' });
   } catch (error) {
     return res.status(error.code === 'P2025' ? 404 : 400).json({
       success: false,
@@ -370,22 +281,8 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
 
 router.delete('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
   try {
-    try {
-      await prisma.siteContent.delete({ where: { id: req.params.id } });
-      return res.json({ success: true, message: 'Konten berhasil dihapus.' });
-    } catch (prismaError) {
-      if (!isPrismaUnavailableError(prismaError)) {
-        throw prismaError;
-      }
-
-      const index = fallbackContent.findIndex((item) => item.id === req.params.id);
-      if (index === -1) {
-        return res.status(404).json({ success: false, message: 'Konten tidak ditemukan.' });
-      }
-
-      fallbackContent.splice(index, 1);
-      return res.json({ success: true, message: 'Konten berhasil dihapus.' });
-    }
+    await prisma.siteContent.delete({ where: { id: req.params.id } });
+    return res.json({ success: true, message: 'Konten berhasil dihapus.' });
   } catch (error) {
     return res.status(error.code === 'P2025' ? 404 : 500).json({
       success: false,

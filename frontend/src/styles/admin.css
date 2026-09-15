@@ -475,7 +475,18 @@
 .tool-table th { color: #8c857c; font-size: 0.67rem; letter-spacing: 0.08em; text-align: left; text-transform: uppercase; padding: 0 12px 12px; border-bottom: 1px solid #e8e2d9; }
 .tool-table td { padding: 14px 12px; border-bottom: 1px solid #f0ece5; color: #6f6860; white-space: nowrap; }
 .tool-table td strong { color: #2a2723; }
+.restock-panel-help { margin: 8px 0 0; color: #7a847d; font-size: .78rem; }
+.restock-summary { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; color: #718077; font-size: .75rem; }
+.restock-summary strong { color: #1f7a4a; font-size: 1.15rem; }
+.tool-page .tool-table td:nth-child(3),
+.tool-page .tool-table td:nth-child(4) { text-align: center; }
+.tool-page .tool-table td:nth-child(5),
+.tool-page .tool-table td:nth-child(8) { color: #1f7a4a; font-weight: 700; white-space: nowrap; }
 .tool-page .tool-panel { border: 1px solid #e8e1d7; box-shadow: 0 16px 36px rgba(45, 38, 29, .05); }
+.restock-filters { display: grid; grid-template-columns: minmax(220px, 1.5fr) minmax(150px, .7fr) minmax(180px, .8fr); gap: 12px; }
+.restock-filters .tool-field { display: flex; flex-direction: column; gap: 8px; color: #6f6860; font-size: .76rem; font-weight: 800; }
+.restock-filters input, .restock-filters select { width: 100%; height: 42px; padding: 0 12px; border: 1px solid #ded8ce; border-radius: 9px; background: #fff; color: #292621; font: inherit; font-size: .8rem; outline: none; }
+.restock-filters input:focus, .restock-filters select:focus { border-color: #1f7a4a; box-shadow: 0 0 0 3px rgba(31,122,74,.1); }
 .tool-page .tool-table { min-width: 900px; }
 .tool-page .tool-table thead th { background: #faf8f4; }
 .tool-page .tool-table tbody tr:hover { background: #fbfdfb; }
@@ -488,6 +499,7 @@
 .restock-unit-select { min-width: 105px; padding: 0 9px; }
 .restock-quantity-input:focus, .restock-unit-select:focus { border-color: #1f7a4a; box-shadow: 0 0 0 3px rgba(31,122,74,.1); }
 .printable-area { display: none; }
+@media (max-width: 760px) { .restock-filters { grid-template-columns: 1fr; } .restock-summary { align-items: flex-start; } }
 .difference-pill { display: inline-flex; min-width: 44px; justify-content: center; padding: 4px 8px; border-radius: 20px; background: #edf5ed; color: #1f7a4a; font-weight: 800; }
 .table-delete-action { padding: 5px 8px; border: 1px solid #f0c9c5; border-radius: 7px; background: #fff7f6; color: #b94338; font-size: .7rem; font-weight: 800; }
 .table-delete-action:hover { background: #b94338; color: #fff; }
@@ -557,18 +569,16 @@
 .product-packages-panel { display: grid; gap: 10px; margin: 16px 0; padding: 15px; border: 1px solid #dce9df; border-radius: 12px; background: #f8fcf8; }
 .product-packages-panel .panel-heading { margin-bottom: 0; align-items: center; flex-wrap: wrap; }
 .product-packages-panel h3 { margin: 3px 0 0; font-size: 1rem; }
+.product-package-help { max-width: 520px; margin: 5px 0 0; color: #7d887f; font-size: .78rem; line-height: 1.45; }
 .product-packages-panel .panel-heading .text-button { flex: 0 0 auto; }
 .product-package-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; align-items: center; padding: 12px; border: 1px solid #dce9df; border-radius: 10px; background: #fff; }
+.product-package-row label { display: grid; gap: 5px; min-width: 0; color: #68746b; font-size: .68rem; font-weight: 800; }
+.product-package-row label span { min-height: 2.1em; white-space: normal; line-height: 1.2; }
 .product-package-row input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid #dce4dc; border-radius: 7px; font: inherit; font-size: .76rem; }
-.product-package-row input:nth-child(1),
-.product-package-row input:nth-child(2),
-.product-package-row input:nth-child(3) { grid-column: span 2; }
+.product-package-row label:nth-child(1) { grid-column: span 2; }
 .product-package-row .text-button { grid-column: 1 / -1; justify-self: start; color: #b94338; }
 @media (min-width: 1100px) {
-  .product-package-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .product-package-row input:nth-child(1) { grid-column: span 2; }
-  .product-package-row input:nth-child(2),
-  .product-package-row input:nth-child(3) { grid-column: span 1; }
+  .product-package-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) { .product-package-row { grid-template-columns: 1fr; } .product-package-row input:nth-child(n) { grid-column: 1; } .product-package-row .text-button { grid-column: 1; } }
 .product-audit-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1008,7 +1018,7 @@
   .admin-sidebar.sidebar-collapsed nav { padding-top: 52px; }
   .admin-sidebar.sidebar-collapsed .reminder-bell { top: 70px; right: 0; width: 100%; display: flex; justify-content: center; }
   .admin-sidebar.sidebar-collapsed .reminder-bell > button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 9px; color: #168c5c; background: #edf7ef; }
-  .admin-sidebar.sidebar-collapsed .reminder-popover { left: calc(100% + 8px); right: auto; }
+  .admin-sidebar.sidebar-collapsed .reminder-popover { left: 50%; right: auto; }
   .admin-shell:has(.sidebar-collapsed) .admin-main { margin-left: 76px; }
 }
 
@@ -4117,12 +4127,22 @@
 .confirm-dialog-cancel { border: 1px solid #e0e7e1; color: #657268; background: #fff; }
 .confirm-dialog-submit { border: 1px solid #168c5c; color: #fff; background: #168c5c; }
 .confirm-dialog-actions button:hover { transform: translateY(-1px); }
-.global-notice-toast { position: fixed; right: 22px; bottom: 22px; z-index: 1000001; display: flex; align-items: center; gap: 9px; max-width: min(420px, calc(100vw - 30px)); padding: 12px 13px; border: 1px solid #cce5d2; border-radius: 10px; color: #256b40; background: #f2fbf3; box-shadow: 0 14px 38px rgba(18, 45, 27, 0.16); font-size: 0.76rem; font-weight: 700; animation: confirm-dialog-enter 0.2s ease both; }
-.global-notice-icon { display: inline-flex; color: #168c5c; }
-.global-notice-toast button { display: grid; place-items: center; width: 25px; height: 25px; margin-left: 4px; padding: 0; border: 0; color: #52745c; background: transparent; cursor: pointer; }
+.global-notice-overlay { position: fixed; inset: 0; z-index: 1000001; display: flex; align-items: center; justify-content: center; padding: 16px; pointer-events: none; }
+.global-notice-toast { pointer-events: auto; display: flex; align-items: center; gap: 8px; width: fit-content; max-width: min(360px, calc(100vw - 32px)); padding: 10px 12px; border-radius: 10px; box-shadow: 0 14px 34px rgba(18, 30, 20, 0.2); font-size: 0.8rem; font-weight: 700; line-height: 1.3; animation: notice-toast-enter 0.22s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.global-notice-success { color: #1b5e3a; background: #eefbf1; border: 1px solid #b9e6c6; }
+.global-notice-error { color: #7a1f24; background: #fdecec; border: 1px solid #f3b9bd; }
+.global-notice-info { color: #1c3d78; background: #eef4ff; border: 1px solid #bcd3fb; }
+.global-notice-icon { display: inline-flex; flex-shrink: 0; }
+.global-notice-success .global-notice-icon { color: #16a34a; }
+.global-notice-error .global-notice-icon { color: #dc2626; }
+.global-notice-info .global-notice-icon { color: #2457d6; }
+.global-notice-message { flex: 1; word-break: break-word; }
+.global-notice-close { display: grid; place-items: center; width: 22px; height: 22px; margin-left: 2px; padding: 0; border: 0; border-radius: 6px; color: inherit; opacity: 0.6; background: transparent; cursor: pointer; flex-shrink: 0; }
+.global-notice-close:hover { opacity: 1; background: rgba(0, 0, 0, 0.06); }
+@keyframes notice-toast-enter { from { opacity: 0; transform: translateY(-10px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes confirm-dialog-enter { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@media (max-width: 600px) { .confirm-dialog { padding: 16px; } .confirm-dialog-actions { flex-direction: column-reverse; } .confirm-dialog-actions button { width: 100%; } .global-notice-toast { right: 12px; bottom: 12px; left: 12px; max-width: none; } }
-.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}.calendar-cell{min-height:90px;padding:10px;background:#fff;border:1px solid #e7e9ef;border-radius:10px}.calendar-cell strong{display:block;margin-bottom:8px}.calendar-badge{display:block;padding:3px 5px;margin:3px 0;border-radius:4px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.calendar-badge.transaction{background:#e8f6ed;color:#18733b}.calendar-badge.debt_due,.calendar-badge.reminder{background:#fff1d9;color:#8a5700}.calendar-badge.recurring{background:#e8efff;color:#244e9b}.tab-strip{display:flex;gap:8px;margin-bottom:16px}.tab-strip button{border:1px solid #dfe3eb;background:#fff;padding:9px 14px;border-radius:8px;cursor:pointer}.tab-strip button.active{background:#2457d6;color:#fff}.reminder-bell{position:absolute;right:18px;top:18px;z-index:4}.reminder-bell>button{position:relative;border:0;background:transparent;cursor:pointer}.reminder-bell>button span{position:absolute;top:-7px;right:-8px;background:#dc3545;color:#fff;border-radius:10px;padding:1px 5px;font-size:10px}.reminder-popover{position:absolute;right:0;top:32px;width:280px;padding:8px;background:#fff;border:1px solid #e1e4ec;border-radius:10px;box-shadow:0 8px 24px #0002}.reminder-popover div{position:relative;padding:8px 22px 8px 4px;border-bottom:1px solid #eee}.reminder-popover strong,.reminder-popover small{display:block}.reminder-popover button{position:absolute;right:2px;top:8px;border:0;background:transparent;cursor:pointer}
+@media (max-width: 600px) { .confirm-dialog { padding: 16px; } .confirm-dialog-actions { flex-direction: column-reverse; } .confirm-dialog-actions button { width: 100%; } .global-notice-overlay { padding: 12px; } .global-notice-toast { max-width: calc(100vw - 24px); } }
+.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}.calendar-cell{min-height:90px;padding:10px;background:#fff;border:1px solid #e7e9ef;border-radius:10px}.calendar-cell strong{display:block;margin-bottom:8px}.calendar-badge{display:block;padding:3px 5px;margin:3px 0;border-radius:4px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.calendar-badge.transaction{background:#e8f6ed;color:#18733b}.calendar-badge.debt_due,.calendar-badge.reminder{background:#fff1d9;color:#8a5700}.calendar-badge.recurring{background:#e8efff;color:#244e9b}.tab-strip{display:flex;gap:8px;margin-bottom:16px}.tab-strip button{border:1px solid #dfe3eb;background:#fff;padding:9px 14px;border-radius:8px;cursor:pointer}.tab-strip button.active{background:#2457d6;color:#fff}.reminder-bell{position:absolute;right:18px;top:18px;z-index:4}.reminder-bell>button{position:relative;border:0;background:transparent;cursor:pointer}.reminder-bell>button span{position:absolute;top:-7px;right:-8px;background:#dc3545;color:#fff;border-radius:10px;padding:1px 5px;font-size:10px}.reminder-popover{position:fixed;top:88px;left:50%;z-index:1000000;width:min(300px,calc(100vw - 32px));padding:7px;transform:translateX(-50%);background:#fff;border:1px solid #e1e4ec;border-radius:10px;box-shadow:0 12px 30px #0002}.reminder-popover div{position:relative;padding:7px 22px 7px 4px;border-bottom:1px solid #eee}.reminder-popover div:last-child{border-bottom:0}.reminder-popover strong,.reminder-popover small{display:block}.reminder-popover strong{font-size:.8rem}.reminder-popover small{font-size:.7rem;color:#8b918d}.reminder-popover button{position:absolute;right:2px;top:7px;border:0;background:transparent;cursor:pointer}
 .dashboard-widget-picker{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}.dashboard-widget-picker button{border:1px solid #dfe3eb;background:#fff;border-radius:999px;padding:6px 10px;cursor:grab;text-transform:capitalize}
 
 /* Stable responsive sidebar: one compact header, one predictable drawer. */

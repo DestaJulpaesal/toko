@@ -1,3 +1,5 @@
+import { showSuccess, showError } from '../utils/noticeService';
+
 const configuredApiUrl = String(import.meta.env.VITE_API_URL || '').trim();
 let sessionExpiryTimer;
 
@@ -41,18 +43,62 @@ export function apiUrl(path = '') {
   return `${API_BASE_URL}/${String(path).replace(/^\//, '')}`;
 }
 
+const ACTION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// Endpoints that are noisy, read-like, or already show their own dedicated
+// feedback UI (e.g. login has its own inline form error). Keep this list
+// short — it's an opt-out, not an opt-in.
+const SILENT_PATH_PATTERNS = [/^auth\/login$/, /^auth\/refresh$/, /^whatsapp\/webhook/];
+
+function isSilentPath(cleanPath) {
+  return SILENT_PATH_PATTERNS.some((pattern) => pattern.test(cleanPath));
+}
+
+async function notifyActionResult(response) {
+  let data = null;
+  try {
+    data = await response.clone().json();
+  } catch {
+    data = null;
+  }
+
+  const ok = response.ok && data?.success !== false;
+  if (ok) {
+    const message = (data && typeof data.message === 'string' && data.message) || 'Aksi berhasil dilakukan.';
+    showSuccess(message);
+  } else {
+    const message = (data && typeof data.message === 'string' && data.message)
+      || (response.status >= 500 ? 'Terjadi kesalahan di server. Coba lagi sebentar.' : 'Aksi gagal dilakukan.');
+    showError(message);
+  }
+}
+
 export function apiFetch(path, options = {}) {
-  const headers = authHeaders(options.headers || {});
+  const { silentNotify, ...fetchOptions } = options;
+  const headers = authHeaders(fetchOptions.headers || {});
   const hasStoredToken = Boolean(localStorage.getItem('glosir_token'));
+  const cleanPath = String(path).replace(/^\//, '');
+  const method = String(fetchOptions.method || 'GET').toUpperCase();
+  const shouldNotify = ACTION_METHODS.has(method) && !isSilentPath(cleanPath) && !silentNotify;
 
-  return fetch(apiUrl(path), { ...options, headers }).then((response) => {
-    const isLoginRequest = String(path).replace(/^\//, '') === 'auth/login';
-    const sessionIsInvalid = hasStoredToken && (response.status === 401 || response.status === 403);
+  return fetch(apiUrl(path), { ...fetchOptions, headers })
+    .then((response) => {
+      const isLoginRequest = cleanPath === 'auth/login';
+      const sessionIsInvalid = hasStoredToken && (response.status === 401 || response.status === 403);
 
-    if (sessionIsInvalid && !isLoginRequest && window.location.pathname !== '/login') {
-      clearExpiredSession();
-    }
+      if (sessionIsInvalid && !isLoginRequest && window.location.pathname !== '/login') {
+        clearExpiredSession();
+      }
 
-    return response;
-  });
+      if (shouldNotify) {
+        notifyActionResult(response);
+      }
+
+      return response;
+    })
+    .catch((error) => {
+      if (shouldNotify) {
+        showError('Tidak bisa terhubung ke server. Periksa koneksi internet atau backend.');
+      }
+      throw error;
+    });
 }
