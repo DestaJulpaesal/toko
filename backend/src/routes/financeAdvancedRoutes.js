@@ -10,7 +10,19 @@ const router = express.Router();
 router.use(authenticateToken, requireRole('OWNER', 'ADMIN'));
 const uploadDir = path.resolve(process.cwd(), 'uploads', 'finance');
 fs.mkdirSync(uploadDir, { recursive: true });
-const upload = multer({ dest: uploadDir, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({
+  dest: uploadDir,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const isCsv = file.mimetype === 'text/csv'
+      || file.mimetype === 'application/vnd.ms-excel'
+      || file.originalname.toLowerCase().endsWith('.csv');
+    if (!isCsv) {
+      return cb(new Error('Hanya file CSV yang diperbolehkan.'));
+    }
+    return cb(null, true);
+  },
+});
 const decimal = (value) => Number(value || 0);
 const csvRows = (text) => {
   const lines = String(text || '').split(/\r?\n/).filter(Boolean);
