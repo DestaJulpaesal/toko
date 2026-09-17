@@ -70,6 +70,14 @@ Set `VITE_STORE_WHATSAPP_NUMBER` to the store's customer-order number in interna
 
 For the backend, set `DATABASE_URL`, `DIRECT_URL`, and a strong `JWT_SECRET`. `DATABASE_URL` should use the Supabase transaction pooler; `DIRECT_URL` should use the direct PostgreSQL connection for Prisma migrations. Never commit real `.env` files or service-role keys.
 
+### Catalog Images
+
+Create a public Supabase Storage bucket named `catalog-images`. The backend requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_ANON_KEY` when its Storage policy permits uploads); `SUPABASE_CATALOG_BUCKET` is optional and defaults to `catalog-images`. Owners and admins can upload JPG, PNG, or WebP files up to 5 MB from the product, parsel, and event-package forms. Files are placed under `products/`, `parcels/`, or `event-packages/`, and only the returned public URL is saved in the existing database record.
+
+### Catalog Images
+
+Create a public Supabase Storage bucket named `catalog-images`. The backend requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_ANON_KEY` when its Storage policy permits uploads); `SUPABASE_CATALOG_BUCKET` is optional and defaults to `catalog-images`. Owners and admins can upload JPG, PNG, or WebP files up to 5 MB from the product, parsel, and event-package forms. Files are placed under `products/`, `parcels/`, or `event-packages/`, and only the returned public URL is saved in the existing database record.
+
 ## Implemented Controls
 
 - JWT sessions expire after 8 hours and automatically redirect to login when expired or rejected.

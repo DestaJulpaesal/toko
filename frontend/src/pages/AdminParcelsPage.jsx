@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import AdminSidebar from '../components/AdminSidebar';
 import { Link } from 'react-router-dom';
 import CurrencyInput from '../components/CurrencyInput';
+import CatalogImageField from '../components/CatalogImageField';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 
-const emptyForm = { name: '', code: '', type: 'Standard', price: '', originalPrice: '', status: 'Aktif', isManualPrice: false, items: [] };
+const emptyForm = { name: '', code: '', type: 'Standard', price: '', originalPrice: '', status: 'Aktif', isManualPrice: false, imageUrl: '', items: [] };
 
 export default function AdminParcelsPage() {
   const [parcels, setParcels] = useState([]);
@@ -76,6 +77,7 @@ export default function AdminParcelsPage() {
       isActive: form.status === 'Aktif',
       isManualPrice: form.isManualPrice,
       price: form.isManualPrice ? Number(form.price) : autoPrice,
+      imageUrl: form.imageUrl || null,
       items: form.items,
     };
 
@@ -126,6 +128,7 @@ export default function AdminParcelsPage() {
             </div>
             <label>Nama parsel<input name="name" value={form.name} onChange={updateField} placeholder="Contoh: Parcel Keluarga" /></label>
             <label>Kode parsel<input name="code" value={form.code} onChange={updateField} placeholder="PRC-KEL-001" /></label>
+            <CatalogImageField value={form.imageUrl || ''} onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))} group="parcels" label="Foto parsel" />
             <div className="form-two-columns">
               <label>Tipe
                 <select name="type" value={form.type} onChange={updateField}>

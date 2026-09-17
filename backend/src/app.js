@@ -39,6 +39,8 @@ import auditLogRoutes from './routes/auditLogRoutes.js';
 import eventPackageRoutes from './routes/eventPackageRoutes.js';
 import whatsappWebhookRoutes from './routes/whatsappWebhookRoutes.js';
 import restockRoutes from './routes/restockRoutes.js';
+import mediaRoutes from './routes/mediaRoutes.js';
+import backupRoutes from './routes/backupRoutes.js';
 
 dotenv.config();
 
@@ -99,9 +101,11 @@ app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/event-packages', eventPackageRoutes);
 app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
 app.use('/api/restock', restockRoutes);
+app.use('/api/media', mediaRoutes);
+app.use('/api/backup', backupRoutes);
 
 app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError || /Hanya file CSV/.test(err?.message || '')) {
+  if (err instanceof multer.MulterError || /Hanya file CSV|Gunakan gambar/.test(err?.message || '')) {
     return res.status(400).json({ success: false, message: err.message || 'File yang diunggah tidak valid.' });
   }
   console.error(err.stack);

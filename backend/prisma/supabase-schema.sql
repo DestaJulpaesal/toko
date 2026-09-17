@@ -257,3 +257,29 @@ create trigger parcel_updated_at before update on "Parcel" for each row execute 
 create trigger order_updated_at before update on "Order" for each row execute function set_updated_at();
 create trigger promo_campaign_updated_at before update on "PromoCampaign" for each row execute function set_updated_at();
 create trigger debt_record_updated_at before update on "DebtRecord" for each row execute function set_updated_at();
+
+-- Storage bucket configuration for catalog images (products, parcels, event packages)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('catalog-images', 'catalog-images', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+-- Storage object policies for catalog-images
+create policy "Catalog images public read"
+on storage.objects for select
+using (bucket_id = 'catalog-images');
+
+create policy "Catalog images uploads"
+on storage.objects for insert
+with check (bucket_id = 'catalog-images');
+
+create policy "Catalog images updates"
+on storage.objects for update
+using (bucket_id = 'catalog-images');
+
+create policy "Catalog images deletes"
+on storage.objects for delete
+using (bucket_id = 'catalog-images');
+

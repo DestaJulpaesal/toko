@@ -33,6 +33,7 @@ function formatProduct(product) {
     originalPrice,
     discountPercent,
     isQuickAccess: Boolean(product.isQuickAccess),
+    imageUrl: product.imageUrl || null,
     stock,
     variants: (product.variants || []).map((item) => ({
       id: item.id,
@@ -88,7 +89,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(productCreateSchema), async (req, res) => {
   try {
-    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, status = 'Aktif', isQuickAccess = false } = req.body || {};
+    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, status = 'Aktif', isQuickAccess = false, imageUrl } = req.body || {};
 
     const categoryRecord = await findCategory(category);
     if (!categoryRecord) return res.status(400).json({ success: false, message: `Kategori ${category} belum tersedia` });
@@ -104,6 +105,7 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
         status: statusToDb[status] || 'ACTIVE',
         stockWarning: 5,
         isQuickAccess: Boolean(isQuickAccess),
+        imageUrl: imageUrl ? String(imageUrl).trim() : null,
         variants: { create: { name: 'Kemasan utama', sku: `${internalSku}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null, basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), unit: 'unit', isDefault: true } },
       },
       include: { category: true, variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } } },
@@ -200,7 +202,7 @@ router.get('/restock-suggestions', authenticateToken, async (req, res) => {
 
 router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(productUpdateSchema), async (req, res) => {
   try {
-    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, status = 'Aktif', isQuickAccess = false } = req.body || {};
+    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, status = 'Aktif', isQuickAccess = false, imageUrl } = req.body || {};
     const [categoryRecord, existing] = await Promise.all([
       findCategory(category),
       prisma.product.findUnique({ where: { id: req.params.id }, include: { category: true, variants: { where: { isDefault: true }, take: 1 } } }),
@@ -217,7 +219,7 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
     const updatePromise = prisma.product.update({
       where: { id: req.params.id },
       data: {
-        name: String(name).trim(), sku: String(sku).trim(), categoryId: categoryRecord.id, status: statusToDb[status] || 'ACTIVE', isQuickAccess: Boolean(isQuickAccess),
+        name: String(name).trim(), sku: String(sku).trim(), categoryId: categoryRecord.id, status: statusToDb[status] || 'ACTIVE', isQuickAccess: Boolean(isQuickAccess), imageUrl: imageUrl ? String(imageUrl).trim() : null,
         variants: variant ? { update: { where: { id: variant.id }, data: { basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), sku: `${String(sku).trim()}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null } } } : { create: { name: 'Kemasan utama', sku: `${String(sku).trim()}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null, basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), unit: 'unit', isDefault: true } },
       },
       include: { category: true, variants: { where: { isDefault: true }, take: 1 } },
