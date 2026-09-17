@@ -5,6 +5,7 @@ import { useFavorites } from '../context/FavoritesContext';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
+import CatalogImage from '../components/CatalogImage';
 
 export default function ProductPage() {
   const { addItem, totalItems } = useCart();
@@ -42,6 +43,7 @@ export default function ProductPage() {
           description: parcel.description || 'Paket siap berbagi dari Glosir.',
           items: parcel.items || [],
           detailPath: '/parsel',
+          imageUrl: parcel.imageUrl || null,
         })) : [];
         const catalogEvents = eventData.success && Array.isArray(eventData.packages) ? eventData.packages.map((item) => ({
           id: `event-${item.id}`,
@@ -56,6 +58,7 @@ export default function ProductPage() {
           description: item.description || 'Paket kebutuhan acara pilihan Glosir.',
           items: (item.items || []).map((entry) => ({ id: entry.id, quantity: entry.quantity, productName: entry.variant?.product?.name, variantName: entry.variant?.name })),
           detailPath: '/paket-acara',
+          imageUrl: item.imageUrl || null,
         })) : [];
         const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
         setProducts(merged);
@@ -115,8 +118,9 @@ export default function ProductPage() {
             <article key={product.id} className="catalog-card">
               <button className={`favorite-button ${isFavorite(product.id) ? 'active' : ''}`} onClick={() => toggleFavorite(product)} aria-label="Simpan produk">{isFavorite(product.id) ? '★' : '☆'}</button>
               <Link to={product.detailPath || `/products/${product.id}`} className="catalog-image product-art-link">
-                <span className="product-art-label">{product.name.split(' ').slice(0, 2).join(' ')}</span>
-                <small>{product.category}</small>
+                <CatalogImage src={product.imageUrl} alt={`Foto ${product.name}`}>
+                  <><span className="product-art-label">{product.name.split(' ').slice(0, 2).join(' ')}</span><small>{product.category}</small></>
+                </CatalogImage>
               </Link>
               <div className="catalog-badges-wrap">
                 <span className="catalog-badge">{product.badge}</span>

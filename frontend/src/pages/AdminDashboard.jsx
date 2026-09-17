@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '../services/api';
 import AdminSidebar from '../components/AdminSidebar';
+import DatabaseBackupIndicator from '../components/DatabaseBackupIndicator';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value || 0);
@@ -124,8 +125,11 @@ export default function AdminDashboard() {
             <h1>Ringkasan bisnis</h1>
             <p className="admin-subtitle">Pantau arus uang dan aktivitas toko dalam satu ruang kerja.</p>
           </div>
-          <div className="admin-header-actions"><span className="live-status"><i /> {loading ? 'Memuat data...' : 'Terhubung database'}</span><button type="button" className="btn btn-light" onClick={downloadBackup} disabled={backupLoading}>{backupLoading ? 'Menyiapkan...' : 'Backup data'}</button><Link to="/admin/products" className="btn btn-primary">+ Kelola Produk</Link></div>
+          <div className="admin-header-actions"><span className="live-status"><i /> {loading ? 'Memuat data...' : 'Terhubung database'}</span><Link to="/admin/products" className="btn btn-primary">+ Kelola Produk</Link></div>
         </header>
+
+        {/* Indikator & Kontrol Backup Database Otomatis */}
+        <DatabaseBackupIndicator />
 
         <div className="dashboard-toolbar"><span className="toolbar-label">Periode</span>{['Hari ini', '7 hari', 'Bulan ini'].map((option) => <button key={option} className={period === option ? 'selected' : ''} onClick={() => setPeriod(option)}>{option}</button>)}</div>
         <section className="dashboard-widget-picker" aria-label="Widget dashboard"><strong>Widget cepat</strong>{widgets.map((widget) => <button key={widget} draggable onDragStart={() => setDraggedWidget(widget)} onDragOver={(event) => event.preventDefault()} onDrop={() => { if (!draggedWidget || draggedWidget === widget) return; const next = [...widgets]; const from = next.indexOf(draggedWidget); const to = next.indexOf(widget); next.splice(from, 1); next.splice(to, 0, draggedWidget); saveWidgets(next); }} title="Tarik untuk mengatur urutan">{widget}</button>)}</section>

@@ -9,12 +9,13 @@ import BarcodePrintModal from '../components/BarcodePrintModal';
 import StockReceiptImportModal from '../components/StockReceiptImportModal';
 import { generateAutoBarcode, playBeep } from '../utils/barcodeUtils';
 import CurrencyInput from '../components/CurrencyInput';
+import CatalogImageField from '../components/CatalogImageField';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 import * as XLSX from 'xlsx';
 
-const emptyForm = { name: '', sku: '', barcode: '', category: '', price: '', wholesalePrice: '', purchasePrice: '', originalPrice: '', stock: '', status: 'Aktif', isQuickAccess: false, packages: [] };
+const emptyForm = { name: '', sku: '', barcode: '', category: '', price: '', wholesalePrice: '', purchasePrice: '', originalPrice: '', stock: '', status: 'Aktif', isQuickAccess: false, imageUrl: '', packages: [] };
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
@@ -151,6 +152,7 @@ export default function AdminProductsPage() {
       originalPrice: product.originalPrice ?? '',
       stock: product.stock ?? '',
       status: product.status || 'Aktif',
+      imageUrl: product.imageUrl || '',
     });
     setNotice(`✓ ${product.name} terdeteksi. Nama produk otomatis dimasukkan.`);
   };
@@ -619,6 +621,8 @@ export default function AdminProductsPage() {
                 </select>
               </label>
             </div>
+
+            <CatalogImageField value={form.imageUrl || ''} onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))} group="products" label="Foto produk" />
 
             <div className="form-two-columns">
               <label>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import AdminSidebar from '../components/AdminSidebar';
 import CurrencyInput from '../components/CurrencyInput';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
+import CashierHelpModal from '../components/CashierHelpModal';
 import { playBeep } from '../utils/barcodeUtils';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
@@ -56,6 +57,11 @@ export default function CashierPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
+
+  // Mode Kasir Layar Penuh & Bantuan
+  const [fullscreenMode, setFullscreenMode] = useState(false);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   // Completed receipt modal
   const [completedOrder, setCompletedOrder] = useState(null);
@@ -116,7 +122,57 @@ export default function CashierPage() {
 
   useEffect(() => {
     scanInputRef.current?.focus();
-  }, []);
+  }, [fullscreenMode]);
+
+  useEffect(() => {
+    if (!fullscreenMode) return undefined;
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [fullscreenMode]);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!fullscreenMode) {
+        if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen().catch(() => {});
+        }
+        setFullscreenMode(true);
+      } else {
+        if (document.exitFullscreen && document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        }
+        setFullscreenMode(false);
+      }
+    } catch (err) {
+      console.warn('Fullscreen toggle failed:', err.message);
+      setFullscreenMode((prev) => !prev);
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && fullscreenMode) {
+        setFullscreenMode(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setHelpModalOpen((prev) => !prev);
+      } else if (e.key === 'Escape' && fullscreenMode) {
+        if (!scannerOpen && !completedOrder && !helpModalOpen) {
+          toggleFullscreen();
+        }
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [fullscreenMode, scannerOpen, completedOrder, helpModalOpen]);
 
   useEffect(() => {
     if (loading || scannerOpen || completedOrder) return undefined;
@@ -380,7 +436,7 @@ export default function CashierPage() {
   };
 
   // Complete Transaction
-  const completeTransaction = async () => {
+  const completeTransaction = async ({ autoPrint = false } = {}) => {
     if (!items.length) {
       setNotice('Keranjang belanja masih kosong.');
       return;
@@ -467,6 +523,16 @@ export default function CashierPage() {
 
       setCompletedOrder(receipt);
 
+      if (autoPrint) {
+        setTimeout(() => {
+          try {
+            printReceipt('printable-receipt');
+          } catch (printErr) {
+            console.warn('Auto print failed:', printErr.message);
+          }
+        }, 400);
+      }
+
       // Update customer list points locally
       // Decrement stock
       setProducts((current) =>
@@ -501,6 +567,18 @@ export default function CashierPage() {
         currentPoints: currentCustomerPoints,
         createdAt: new Date().toISOString(),
       };
+
+      setCompletedOrder(receipt);
+
+      if (autoPrint) {
+        setTimeout(() => {
+          try {
+            printReceipt('printable-receipt');
+          } catch (printErr) {
+            console.warn('Auto print failed:', printErr.message);
+          }
+        }, 400);
+      }
 
       setCompletedOrder(receipt);
     } finally {
@@ -580,6 +658,424 @@ export default function CashierPage() {
     window.open(url, '_blank');
   };
 
+  const renderReceiptModal = () => {
+    if (!completedOrder) return null;
+    return (
+      <div className="receipt-modal-backdrop" onClick={handleResetForNewOrder}>
+        <div className="receipt-modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="receipt-modal-header no-print">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="badge-success-tick">✓</span>
+              <h3>{completedOrder.paymentMethod === 'DEBT' ? 'Transaksi Bon Berhasil' : 'Transaksi Tunai Berhasil'}</h3>
+            </div>
+            <button className="receipt-close-btn" onClick={handleResetForNewOrder}>
+              ×
+            </button>
+          </div>
+
+          {/* Thermal Paper Receipt */}
+          <div className="receipt-paper" id="printable-receipt">
+            <div className="receipt-shop-head">
+              <h2>GLOSIR</h2>
+              <p>Grosir & Sembako Modern</p>
+              <small>Jl. Raya Glosir No. 88, Jawa Barat</small>
+              <small>WhatsApp: 0812-3456-7890</small>
+            </div>
+
+            <div className="receipt-divider-dash" />
+
+            <div className="receipt-meta">
+              <div>
+                <span>No. Faktur:</span>
+                <strong>{completedOrder.orderNumber}</strong>
+              </div>
+              <div>
+                <span>Waktu:</span>
+                <span>{new Date(completedOrder.createdAt).toLocaleString('id-ID')}</span>
+              </div>
+              <div>
+                <span>Kasir:</span>
+                <span>{completedOrder.cashierName || 'Kasir Glosir'}</span>
+              </div>
+              {completedOrder.customer?.name && (
+                <div>
+                  <span>Pelanggan:</span>
+                  <strong>{completedOrder.customer.name}</strong>
+                </div>
+              )}
+            </div>
+
+            <div className="receipt-divider-dash" />
+
+            <div className="receipt-items-list">
+              {completedOrder.items.map((it, idx) => (
+                <div key={idx} className="receipt-item-row">
+                  <div className="receipt-item-title">
+                    <strong>{it.name}</strong>
+                    <span>
+                      {it.qty || it.quantity} × {formatMoney(it.price || it.unitPrice)}
+                    </span>
+                  </div>
+                  <div className="receipt-item-total">
+                    <strong>
+                      {formatMoney((it.price || it.unitPrice) * (it.qty || it.quantity))}
+                    </strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="receipt-divider-dash" />
+
+            <div className="receipt-summary">
+              <div className="receipt-sum-row">
+                <span>Subtotal</span>
+                <span>{formatMoney(completedOrder.subtotal || completedOrder.total)}</span>
+              </div>
+
+              {completedOrder.promoDiscount > 0 && (
+                <div className="receipt-sum-row" style={{ color: '#c73d3d' }}>
+                  <span>Diskon Promo ({completedOrder.promoName})</span>
+                  <span>-{formatMoney(completedOrder.promoDiscount)}</span>
+                </div>
+              )}
+
+              {completedOrder.pointDiscount > 0 && (
+                <div className="receipt-sum-row" style={{ color: '#c73d3d' }}>
+                  <span>Diskon Poin ({completedOrder.redeemedPoints} Pts)</span>
+                  <span>-{formatMoney(completedOrder.pointDiscount)}</span>
+                </div>
+              )}
+
+              <div className="receipt-sum-row total-row">
+                <strong>TOTAL BELANJA</strong>
+                <strong>{formatMoney(completedOrder.total)}</strong>
+              </div>
+
+              {completedOrder.paymentMethod === 'CASH' && (
+                <>
+                  <div className="receipt-sum-row">
+                    <span>Uang Diterima</span>
+                    <span>{formatMoney(completedOrder.paidAmount)}</span>
+                  </div>
+                  <div className="receipt-sum-row">
+                    <span>Kembalian</span>
+                    <span>{formatMoney(completedOrder.change)}</span>
+                  </div>
+                </>
+              )}
+
+              {completedOrder.paymentReference && (
+                <div className="receipt-sum-row">
+                  <span>Keterangan</span>
+                  <span style={{ fontSize: '0.7rem' }}>{completedOrder.paymentReference}</span>
+                </div>
+              )}
+
+              <div className="receipt-sum-row">
+                <span>Status</span>
+                <strong style={{ color: completedOrder.paymentStatus === 'PAID' ? '#177d47' : '#b45309' }}>
+                  {completedOrder.paymentStatus === 'PAID' ? 'LUNAS' : completedOrder.paymentStatus === 'PARTIAL' ? 'DIBAYAR SEBAGIAN' : 'BELUM LUNAS'}
+                </strong>
+              </div>
+            </div>
+
+            <div className="receipt-divider-dash" />
+
+            <div className="receipt-footer">
+              <p>*** TERIMA KASIH ATAS KUNJUNGAN ANDA ***</p>
+              <small>
+                Barang yang sudah dibeli tidak dapat ditukar atau dikembalikan kecuali ada perjanjian.
+              </small>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="receipt-modal-actions no-print">
+            <button className="btn btn-primary" onClick={handlePrint}>
+              🖨️ Cetak Struk
+            </button>
+            <button
+              className="btn btn-light"
+              onClick={() => handleShareWhatsApp(completedOrder)}
+            >
+              💬 Kirim Struk WA
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={handleResetForNewOrder}
+              style={{ marginLeft: 'auto' }}
+            >
+              + Transaksi Baru
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (fullscreenMode) {
+    return (
+      <div className="pos-fullscreen-kiosk">
+        {/* Barcode Camera Scanner Modal */}
+        <BarcodeScannerModal
+          isOpen={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          onDetected={handleBarcodeScanned}
+        />
+
+        {/* Bantuan Kasir Modal */}
+        <CashierHelpModal
+          isOpen={helpModalOpen}
+          onClose={() => setHelpModalOpen(false)}
+        />
+
+        {/* Kiosk Header */}
+        <header className="kiosk-topbar">
+          <div className="kiosk-brand">
+            <span className="kiosk-logo-badge">🏪 GLOSIR POS</span>
+            <div className="kiosk-title-box">
+              <h2>Mode Kasir Layar Penuh</h2>
+              <span className="kiosk-clock">
+                🕒 {currentTime.toLocaleTimeString('id-ID')} • {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+            </div>
+          </div>
+
+          <div className="kiosk-top-actions">
+            <button
+              type="button"
+              className="btn-pos-help-large"
+              onClick={() => setHelpModalOpen(true)}
+              title="Buka panduan langkah kasir (F2)"
+            >
+              <span className="btn-help-icon">💡</span>
+              <span className="btn-help-text">Bantuan Kasir</span>
+              <kbd className="btn-help-kbd">F2</kbd>
+            </button>
+            <button
+              type="button"
+              className="btn-kiosk-exit"
+              onClick={toggleFullscreen}
+              title="Keluar dari layar penuh (Esc)"
+            >
+              <span>✕</span> Keluar Layar Penuh
+            </button>
+          </div>
+        </header>
+
+        {notice && (
+          <div className="kiosk-notice-banner" role="status">
+            <span>{notice}</span>
+            <button onClick={() => setNotice('')}>×</button>
+          </div>
+        )}
+
+        {/* Kiosk Main Grid */}
+        <div className="kiosk-main-grid">
+          {/* Kolom Kiri: Scan & Daftar Belanja */}
+          <section className="kiosk-left-panel">
+            {/* 1. Scan Barang */}
+            <div className="kiosk-scan-box">
+              <label className="kiosk-scan-label" htmlFor="kiosk-scan-input">
+                <span>📦 Scan / Cari Barang:</span>
+                <small>Arahkan scanner ke barcode atau ketik nama/SKU lalu Enter</small>
+              </label>
+              <div className="kiosk-scan-input-wrap">
+                <span className="kiosk-scan-icon">🔍</span>
+                <input
+                  id="kiosk-scan-input"
+                  ref={scanInputRef}
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Scan barcode produk di sini atau ketik nama/SKU..."
+                />
+                {search && (
+                  <button className="kiosk-clear-search-btn" onClick={() => setSearch('')}>
+                    ×
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="kiosk-cam-scan-btn"
+                  onClick={() => setScannerOpen(true)}
+                  title="Scan dengan kamera"
+                >
+                  📷 Scan Kamera
+                </button>
+              </div>
+            </div>
+
+            {/* 2. Daftar Belanja */}
+            <div className="kiosk-cart-box">
+              <div className="kiosk-cart-header">
+                <div>
+                  <h3>🛒 Daftar Belanja</h3>
+                  <span className="kiosk-cart-sub">{items.length} macam ({items.reduce((s, i) => s + (i.qty || 1), 0)} pcs)</span>
+                </div>
+                {items.length > 0 && (
+                  <button className="kiosk-btn-clear-cart" onClick={clearCart}>
+                    🗑️ Kosongkan Keranjang
+                  </button>
+                )}
+              </div>
+
+              <div className="kiosk-cart-list">
+                {items.length > 0 ? (
+                  <table className="kiosk-cart-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '40px' }}>No</th>
+                        <th>Barang</th>
+                        <th style={{ width: '130px' }}>Harga Satuan</th>
+                        <th style={{ width: '150px', textAlign: 'center' }}>Jumlah</th>
+                        <th style={{ width: '140px', textAlign: 'right' }}>Subtotal</th>
+                        <th style={{ width: '45px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, idx) => (
+                        <tr key={item.id}>
+                          <td className="col-idx">{idx + 1}</td>
+                          <td className="col-name">
+                            <strong>{item.name}</strong>
+                            <small>{item.sku || item.barcode || ''}</small>
+                          </td>
+                          <td className="col-price">{formatMoney(item.price)}</td>
+                          <td className="col-qty">
+                            <div className="kiosk-qty-control">
+                              <button onClick={() => changeQty(item.id, item.qty - 1)}>-</button>
+                              <span>{item.qty}</span>
+                              <button onClick={() => changeQty(item.id, item.qty + 1)}>+</button>
+                            </div>
+                          </td>
+                          <td className="col-subtotal">{formatMoney(item.price * item.qty)}</td>
+                          <td className="col-action">
+                            <button
+                              className="kiosk-btn-del-item"
+                              onClick={() => removeItem(item.id)}
+                              title="Hapus barang"
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="kiosk-cart-empty-state">
+                    <span className="kiosk-empty-icon">🛒</span>
+                    <h4>Daftar Belanja Masih Kosong</h4>
+                    <p>Arahkan barcode scanner fisik ke kemasan barang, atau ketik nama produk di kolom scan di atas.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* Kolom Kanan: Ringkasan Tagihan, Nominal Bayar & Tombol Bayar & Cetak */}
+          <section className="kiosk-right-panel">
+            <div className="kiosk-pay-card">
+              {/* Total Tagihan */}
+              <div className="kiosk-total-banner">
+                <span className="kiosk-total-label">TOTAL BELANJA:</span>
+                <h1 className="kiosk-total-number">{formatMoney(finalTotal)}</h1>
+                <span className="kiosk-items-summary">
+                  {items.length} macam barang • {items.reduce((s, i) => s + (i.qty || 1), 0)} pcs total
+                </span>
+              </div>
+
+              {/* Input Nominal Bayar */}
+              <div className="kiosk-nominal-section">
+                <label className="kiosk-nominal-label">
+                  <span>💵 Nominal Bayar (Uang Diterima):</span>
+                  <CurrencyInput
+                    value={paidAmount}
+                    onValueChange={setPaidAmount}
+                    placeholder="Contoh: Rp 100.000"
+                  />
+                </label>
+
+                {/* Quick Cash Chips */}
+                <div className="kiosk-quick-cash">
+                  <button
+                    type="button"
+                    className="kiosk-chip-exact"
+                    onClick={() => setQuickCash(finalTotal)}
+                    disabled={finalTotal <= 0}
+                  >
+                    Uang Pas
+                  </button>
+                  {[10000, 20000, 50000, 100000, 200000, 500000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setQuickCash(amt)}
+                      disabled={amt < finalTotal}
+                    >
+                      {amt >= 1000 ? `${amt / 1000}rb` : amt}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Kembalian */}
+                <div className={`kiosk-change-display ${change >= 0 ? 'is-valid' : 'is-less'}`}>
+                  <span className="kiosk-change-title">Kembalian:</span>
+                  <strong className="kiosk-change-value">
+                    {effectivePaid === 0 && finalTotal > 0
+                      ? 'Masukkan nominal uang'
+                      : change >= 0
+                        ? formatMoney(change)
+                        : `Uang Kurang ${formatMoney(Math.abs(change))}`}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Tombol Utama: Bayar & Cetak */}
+              <div className="kiosk-action-buttons">
+                <button
+                  type="button"
+                  className="kiosk-btn-pay-and-print"
+                  disabled={saving || !items.length || effectivePaid < finalTotal}
+                  onClick={() => completeTransaction({ autoPrint: true })}
+                >
+                  <span className="kiosk-btn-icon">🖨️</span>
+                  <div className="kiosk-btn-copy">
+                    <strong>{saving ? 'Memproses Transaksi...' : 'Bayar & Cetak'}</strong>
+                    <small>Simpan transaksi & langsung cetak struk</small>
+                  </div>
+                </button>
+
+                <div className="kiosk-secondary-actions">
+                  <button
+                    type="button"
+                    className="kiosk-btn-secondary"
+                    disabled={saving || !items.length || effectivePaid < finalTotal}
+                    onClick={() => completeTransaction({ autoPrint: false })}
+                  >
+                    💵 Bayar Saja
+                  </button>
+                  <button
+                    type="button"
+                    className="kiosk-btn-secondary"
+                    onClick={() => setHelpModalOpen(true)}
+                  >
+                    💡 Bantuan (F2)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {renderReceiptModal()}
+      </div>
+    );
+  }
+
   return (
     <div className="admin-shell admin-crud-shell">
       <AdminSidebar active="Kasir" />
@@ -589,6 +1085,12 @@ export default function CashierPage() {
         isOpen={scannerOpen}
         onClose={() => setScannerOpen(false)}
         onDetected={handleBarcodeScanned}
+      />
+
+      {/* Bantuan Kasir Modal */}
+      <CashierHelpModal
+        isOpen={helpModalOpen}
+        onClose={() => setHelpModalOpen(false)}
       />
 
       <main className="admin-main cashier-main-clean">
@@ -606,6 +1108,22 @@ export default function CashierPage() {
           </div>
 
           <div className="pos-header-actions">
+            <button
+              type="button"
+              className="btn-pos-fullscreen"
+              onClick={() => setFullscreenMode(true)}
+              title="Aktifkan Mode Kasir Layar Penuh (Kiosk POS)"
+            >
+              📺 Mode Layar Penuh
+            </button>
+            <button
+              type="button"
+              className="btn-pos-help"
+              onClick={() => setHelpModalOpen(true)}
+              title="Panduan Langkah Kasir (F2)"
+            >
+              💡 Bantuan (F2)
+            </button>
             <Link to="/kasir/riwayat" className="btn-pos-history">
               <span>📋</span> Riwayat Transaksi
             </Link>
@@ -882,10 +1400,19 @@ export default function CashierPage() {
 
                     <button
                       className="btn-finish-pay btn-cash-pay"
+                      style={{ background: '#059669', marginBottom: '8px' }}
                       disabled={saving || effectivePaid < finalTotal}
-                      onClick={completeTransaction}
+                      onClick={() => completeTransaction({ autoPrint: true })}
                     >
-                      {saving ? 'Menyimpan Transaksi...' : `Bayar Tunai ${formatMoney(finalTotal)}`}
+                      {saving ? 'Menyimpan Transaksi...' : `🖨️ Bayar & Cetak (${formatMoney(finalTotal)})`}
+                    </button>
+                    <button
+                      className="btn-finish-pay btn-cash-pay"
+                      style={{ background: '#475569' }}
+                      disabled={saving || effectivePaid < finalTotal}
+                      onClick={() => completeTransaction({ autoPrint: false })}
+                    >
+                      {saving ? 'Menyimpan Transaksi...' : `💵 Bayar Saja (${formatMoney(finalTotal)})`}
                     </button>
                   </div>
                 )}
@@ -904,9 +1431,9 @@ export default function CashierPage() {
                     <button
                       className="btn-finish-pay btn-cash-pay"
                       disabled={saving || !selectedCustomerId || selectedCustomerId === 'NEW'}
-                      onClick={completeTransaction}
+                      onClick={() => completeTransaction({ autoPrint: true })}
                     >
-                      {saving ? 'Menyimpan Transaksi...' : `Simpan Bon ${formatMoney(finalTotal)}`}
+                      {saving ? 'Menyimpan Transaksi...' : `Simpan Bon & Cetak (${formatMoney(finalTotal)})`}
                     </button>
                   </div>
                 )}
@@ -916,199 +1443,7 @@ export default function CashierPage() {
           </aside>
         </section>
 
-        {/* MODAL STRUK DENGAN PROMO */}
-        {completedOrder && (
-          <div className="receipt-modal-backdrop" onClick={handleResetForNewOrder}>
-            <div className="receipt-modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="receipt-modal-header no-print">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="badge-success-tick">✓</span>
-                  <h3>{completedOrder.paymentMethod === 'DEBT' ? 'Transaksi Bon Berhasil' : 'Transaksi Tunai Berhasil'}</h3>
-                </div>
-                <button className="receipt-close-btn" onClick={handleResetForNewOrder}>
-                  ×
-                </button>
-              </div>
-
-              {/* Thermal Paper Receipt */}
-              <div className="receipt-paper" id="printable-receipt">
-                <div className="receipt-shop-head">
-                  <h2>GLOSIR</h2>
-                  <p>Grosir & Sembako Modern</p>
-                  <small>Jl. Raya Glosir No. 88, Jawa Barat</small>
-                  <small>WhatsApp: 0812-3456-7890</small>
-                </div>
-
-                <div className="receipt-divider-dash" />
-
-                <div className="receipt-meta">
-                  <div>
-                    <span>No. Faktur:</span>
-                    <strong>{completedOrder.orderNumber}</strong>
-                  </div>
-                  <div>
-                    <span>Waktu:</span>
-                    <span>{new Date(completedOrder.createdAt).toLocaleString('id-ID')}</span>
-                  </div>
-                  <div>
-                    <span>Kasir:</span>
-                    <span>{completedOrder.cashierName || 'Kasir Glosir'}</span>
-                  </div>
-                  {completedOrder.customer?.name && (
-                    <div>
-                      <span>Pelanggan:</span>
-                      <strong>{completedOrder.customer.name}</strong>
-                    </div>
-                  )}
-                </div>
-
-                <div className="receipt-divider-dash" />
-
-                <div className="receipt-items-list">
-                  {completedOrder.items.map((it, idx) => (
-                    <div key={idx} className="receipt-item-row">
-                      <div className="receipt-item-title">
-                        <strong>{it.name}</strong>
-                        <span>
-                          {it.qty || it.quantity} × {formatMoney(it.price || it.unitPrice)}
-                        </span>
-                      </div>
-                      <div className="receipt-item-total">
-                        <strong>
-                          {formatMoney((it.price || it.unitPrice) * (it.qty || it.quantity))}
-                        </strong>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="receipt-divider-dash" />
-
-                <div className="receipt-summary">
-                  <div className="receipt-sum-row">
-                    <span>Subtotal</span>
-                    <span>{formatMoney(completedOrder.subtotal || completedOrder.total)}</span>
-                  </div>
-
-                  {completedOrder.promoDiscount > 0 && (
-                    <div className="receipt-sum-row" style={{ color: '#c73d3d' }}>
-                      <span>Diskon Promo ({completedOrder.promoName})</span>
-                      <span>-{formatMoney(completedOrder.promoDiscount)}</span>
-                    </div>
-                  )}
-
-                  {completedOrder.pointDiscount > 0 && (
-                    <div className="receipt-sum-row" style={{ color: '#c73d3d' }}>
-                      <span>Diskon Poin ({completedOrder.redeemedPoints} Pts)</span>
-                      <span>-{formatMoney(completedOrder.pointDiscount)}</span>
-                    </div>
-                  )}
-
-                  <div className="receipt-sum-row total-row">
-                    <strong>TOTAL BELANJA</strong>
-                    <strong>{formatMoney(completedOrder.total)}</strong>
-                  </div>
-
-                  {completedOrder.paymentMethod === 'CASH' && (
-                    <>
-                      <div className="receipt-sum-row">
-                        <span>Uang Diterima</span>
-                        <span>{formatMoney(completedOrder.paidAmount)}</span>
-                      </div>
-                      <div className="receipt-sum-row">
-                        <span>Kembalian</span>
-                        <span>{formatMoney(completedOrder.change)}</span>
-                      </div>
-                    </>
-                  )}
-
-                  {completedOrder.paymentReference && (
-                    <div className="receipt-sum-row">
-                      <span>Keterangan</span>
-                      <span style={{ fontSize: '0.7rem' }}>{completedOrder.paymentReference}</span>
-                    </div>
-                  )}
-
-                  <div className="receipt-sum-row">
-                    <span>Status</span>
-                    <strong style={{ color: completedOrder.paymentStatus === 'PAID' ? '#177d47' : '#b45309' }}>
-                      {completedOrder.paymentStatus === 'PAID' ? 'LUNAS' : completedOrder.paymentStatus === 'PARTIAL' ? 'DIBAYAR SEBAGIAN' : 'BELUM LUNAS'}
-                    </strong>
-                  </div>
-                </div>
-
-                {completedOrder.customer?.name && <>{/* BAGIAN RINCIAN POIN MEMBER DI STRUK (ELEGAN & MENARIK) */}
-                <div className="receipt-divider-dash" /></>}
-
-                {false && <div className="receipt-point-summary-box">
-                  <div className="receipt-point-header">
-                    <span>★ PROGRAM LOYALITAS MEMBER ★</span>
-                  </div>
-
-                  <div className="receipt-sum-row">
-                    <span>Nama Member:</span>
-                    <strong>{completedOrder.customer?.name || 'Pelanggan Umum'}</strong>
-                  </div>
-                  <div className="receipt-sum-row">
-                    <span>Poin Sebelumnya:</span>
-                    <span>{completedOrder.previousPoints || 0} Poin</span>
-                  </div>
-                  {completedOrder.redeemedPoints > 0 && (
-                    <div className="receipt-sum-row" style={{ color: '#c73d3d' }}>
-                      <span>Poin Ditukar:</span>
-                      <span>-{completedOrder.redeemedPoints} Poin</span>
-                    </div>
-                  )}
-                  <div className="receipt-sum-row" style={{ color: '#15803d', fontWeight: 'bold' }}>
-                    <span>Poin Transaksi Ini:</span>
-                    <span>+{completedOrder.earnedPoints} Poin</span>
-                  </div>
-
-                  <div className="receipt-sum-row total-points-highlight">
-                    <strong>TOTAL SALDO POIN ANDA:</strong>
-                    <strong>⭐ {completedOrder.currentPoints} POIN ⭐</strong>
-                  </div>
-
-                  <div className="receipt-point-tips">
-                    <p>💡 TIPS HEMAT MEMBER:</p>
-                    <small>• Belanja ≥ 100rb = 10 Poin | ≥ 50rb = 2 Poin</small>
-                    <small>• Tukarkan 10 Poin = Potongan Rp 5.000 di kasir</small>
-                    <small>Terima kasih telah setia berbelanja di Glosir!</small>
-                  </div>
-                </div>}
-
-                <div className="receipt-divider-dash" />
-
-                <div className="receipt-footer">
-                  <p>*** TERIMA KASIH ATAS KUNJUNGAN ANDA ***</p>
-                  <small>
-                    Barang yang sudah dibeli tidak dapat ditukar atau dikembalikan kecuali ada perjanjian.
-                  </small>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="receipt-modal-actions no-print">
-                <button className="btn btn-primary" onClick={handlePrint}>
-                  🖨️ Cetak Struk
-                </button>
-                <button
-                  className="btn btn-light"
-                  onClick={() => handleShareWhatsApp(completedOrder)}
-                >
-                  💬 Kirim Struk WA
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={handleResetForNewOrder}
-                  style={{ marginLeft: 'auto' }}
-                >
-                  + Transaksi Baru
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {renderReceiptModal()}
       </main>
     </div>
   );

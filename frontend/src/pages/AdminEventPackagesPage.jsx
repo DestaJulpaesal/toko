@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import AdminSidebar from '../components/AdminSidebar';
 import { apiFetch } from '../services/api';
 import CurrencyInput from '../components/CurrencyInput';
+import CatalogImageField from '../components/CatalogImageField';
 
 export default function AdminEventPackagesPage() {
   const [products, setProducts] = useState([]);
   const [packages, setPackages] = useState([]);
-  const [form, setForm] = useState({ name: '', description: '', isManualPrice: false, price: '', items: [] });
+  const [form, setForm] = useState({ name: '', description: '', imageUrl: '', isManualPrice: false, price: '', items: [] });
   const [notice, setNotice] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +46,7 @@ export default function AdminEventPackagesPage() {
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Paket gagal disimpan');
       setNotice(editingId ? 'Paket acara berhasil diperbarui.' : 'Paket acara berhasil dibuat.');
-      setForm({ name: '', description: '', isManualPrice: false, price: '', items: [] });
+      setForm({ name: '', description: '', imageUrl: '', isManualPrice: false, price: '', items: [] });
       setEditingId(null);
       await load();
     } finally {
@@ -58,6 +59,7 @@ export default function AdminEventPackagesPage() {
     setForm({
       name: item.name || '',
       description: item.description || '',
+      imageUrl: item.imageUrl || '',
       isManualPrice: Boolean(item.isManualPrice),
       price: item.isManualPrice ? String(item.price) : '',
       items: (item.items || []).map((entry) => ({ variantId: entry.variantId, quantity: entry.quantity })),
@@ -73,7 +75,7 @@ export default function AdminEventPackagesPage() {
     setNotice('Paket acara berhasil dihapus.');
     if (editingId === item.id) {
       setEditingId(null);
-      setForm({ name: '', description: '', isManualPrice: false, price: '', items: [] });
+      setForm({ name: '', description: '', imageUrl: '', isManualPrice: false, price: '', items: [] });
     }
     await load();
   };
@@ -86,9 +88,10 @@ export default function AdminEventPackagesPage() {
         {notice && <p className="notice-banner tool-notice">{notice}</p>}
         <section className="tool-panel"><div className="tool-panel-heading"><div><span className="panel-kicker">Buat katalog baru</span><h2>Rancang paket</h2></div><span className="tool-step">01 / 02</span></div><form onSubmit={(event) => submit(event).catch((error) => setNotice(error.message))}>
           <div className="tool-form-grid"><label className="tool-field">Nama paket<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Contoh: Paket Sembako Hajatan 50 Porsi" required /></label><label className="tool-field">Deskripsi<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Jelaskan isi dan cocoknya untuk acara apa" /></label></div>
+          <CatalogImageField value={form.imageUrl || ''} onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))} group="event-packages" label="Foto paket acara" />
           <fieldset className="package-picker"><legend>Pilih isi paket <small>{form.items.length} barang dipilih</small></legend><div className="picker-toolbar"><span>Pilih barang penyusun paket</span><input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Cari nama, SKU, barcode..." /></div><div className="package-options">{filteredProducts.map((product) => { const selectedItem = form.items.find((item) => item.variantId === product.variantId); return <div key={product.variantId} className={`package-option${selectedItem ? ' selected' : ''}`}><input type="checkbox" checked={Boolean(selectedItem)} onChange={() => toggleItem(product.variantId)} /><button type="button" className="package-option-copy" onClick={() => toggleItem(product.variantId)}><strong>{product.name}</strong><small>Rp {Number(product.price).toLocaleString('id-ID')} · stok {product.stock}</small></button>{selectedItem && <input className="quantity-input" aria-label={`Jumlah ${product.name}`} type="text" inputMode="numeric" pattern="[0-9]*" value={selectedItem.quantity} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onChange={(event) => updateQuantity(product.variantId, event.target.value)} />}</div>; })}{!filteredProducts.length && <div className="picker-empty">Barang tidak ditemukan.</div>}</div></fieldset>
           <div className="tool-price-row"><label className="toggle-field"><input type="checkbox" checked={form.isManualPrice} onChange={(event) => setForm({ ...form, isManualPrice: event.target.checked })} /><span><strong>Harga manual</strong><small>Gunakan harga nego khusus</small></span></label>{form.isManualPrice ? <label className="tool-field compact-field">Harga paket<CurrencyInput value={form.price} onValueChange={(value) => setForm({ ...form, price: value })} placeholder="Rp 5.000.000" required /></label> : <div className="tool-price-preview"><small>Harga otomatis</small><strong>Rp {autoPrice.toLocaleString('id-ID')}</strong></div>}</div>
-          <div className="tool-form-actions"><button className="btn btn-primary tool-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Menyimpan...' : editingId ? 'Perbarui paket' : 'Simpan paket'} <span>→</span></button>{editingId && <button className="btn btn-secondary" type="button" onClick={() => { setEditingId(null); setForm({ name: '', description: '', isManualPrice: false, price: '', items: [] }); }}>Batal edit</button>}</div>
+          <div className="tool-form-actions"><button className="btn btn-primary tool-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Menyimpan...' : editingId ? 'Perbarui paket' : 'Simpan paket'} <span>→</span></button>{editingId && <button className="btn btn-secondary" type="button" onClick={() => { setEditingId(null); setForm({ name: '', description: '', imageUrl: '', isManualPrice: false, price: '', items: [] }); }}>Batal edit</button>}</div>
         </form></section>
         <section className="tool-panel"><div className="tool-panel-heading"><div><span className="panel-kicker">Katalog aktif</span><h2>Paket yang sudah dibuat</h2></div><span className="tool-count">{packages.length} paket</span></div><div className="package-list">{packages.map((item) => <div className="package-list-item" key={item.id}><span className="package-list-icon">PA</span><div><strong>{item.name}</strong><small>{item.items?.length || 0} komponen paket</small></div><b>Rp {Number(item.price).toLocaleString('id-ID')}</b><div className="package-list-actions"><button type="button" className="btn btn-secondary small" onClick={() => editPackage(item)}>Edit</button><button type="button" className="btn btn-danger small" onClick={() => deletePackage(item).catch((error) => setNotice(error.message))}>Hapus</button></div></div>)}{!packages.length && <div className="tool-empty">Belum ada paket aktif. Paket pertama yang dibuat akan muncul di sini.</div>}</div></section>
       </main>

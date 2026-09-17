@@ -4,6 +4,7 @@ import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import { useCart } from '../context/CartContext';
+import CatalogImage from '../components/CatalogImage';
 
 export default function ParcelPage() {
   const { addItem, totalItems } = useCart();
@@ -30,6 +31,7 @@ export default function ParcelPage() {
               text: parcel.description || 'Paket yang dibuat sesuai kebutuhan pelanggan.',
               tag: parcel.type === 'CUSTOM' ? 'Custom Acara' : 'Best Seller',
               artClass: parcel.type === 'CUSTOM' ? 'purple' : 'warm',
+              imageUrl: parcel.imageUrl || null,
               items: parcel.items || [],
             }))
           );
@@ -94,15 +96,9 @@ export default function ParcelPage() {
             return (
               <article key={item.id} className="parcel-feature-card">
                 <div className={`parcel-art parcel-art-${item.artClass}`}>
-                  <div className="parcel-art-content">
-                    <span>GLOSIR</span>
-                    <small>{item.tag}</small>
-                  </div>
-                  {item.discountPercent > 0 && (
-                    <div className="parcel-art-discount-badge">
-                      -{item.discountPercent}%
-                    </div>
-                  )}
+                  <CatalogImage src={item.imageUrl} alt={`Foto ${item.name}`}>
+                    <><div className="parcel-art-content"><span>GLOSIR</span><small>{item.tag}</small></div>{item.discountPercent > 0 && <div className="parcel-art-discount-badge">-{item.discountPercent}%</div>}</>
+                  </CatalogImage>
                 </div>
 
                 <div className="catalog-badges-wrap">
