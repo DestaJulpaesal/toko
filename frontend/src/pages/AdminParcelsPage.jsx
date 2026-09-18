@@ -19,6 +19,8 @@ export default function AdminParcelsPage() {
   const [notice, setNotice] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [productSearch, setProductSearch] = useState('');
 
   const loadParcels = async () => {
@@ -54,19 +56,23 @@ export default function AdminParcelsPage() {
   const visibleParcels = parcels.filter((parcel) => `${parcel.name} ${parcel.code} ${parcel.type}`.toLowerCase().includes(search.toLowerCase()));
   const allSelected = visibleParcels.length > 0 && visibleParcels.every((parcel) => selectedIds.includes(parcel.id));
   const deleteSelected = async () => {
+    if (bulkDeleting) return;
     if (!selectedIds.length || !await confirmAction(`Hapus ${selectedIds.length} parsel terpilih?`)) return;
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcels/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
-    const count = results.filter((result) => result.status === 'fulfilled').length;
-    setSelectedIds([]); setBulkDeleting(false); await loadParcels();
-    setNotice(`${count} parsel berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
-    showNotice(`${count} parsel berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
+    try {
+      const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcels/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+      const count = results.filter((result) => result.status === 'fulfilled').length;
+      setSelectedIds([]); await loadParcels();
+      setNotice(`${count} parsel berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
+      showNotice(`${count} parsel berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
+    } finally { setBulkDeleting(false); }
   };
   const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const resetForm = () => { setForm(emptyForm); setEditingId(null); };
 
   const submitForm = async (event) => {
     event.preventDefault();
+    if (saving) return;
     if (!form.name.trim() || !form.code.trim() || !form.items.length || form.items.some((item) => !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) || (form.isManualPrice && !form.price)) { setNotice('Lengkapi nama, kode, isi parsel, dan jumlah barang minimal 1.'); return; }
     if (!await confirmAction(`Yakin ingin ${editingId ? 'memperbarui parsel ini' : 'menambahkan parsel baru'}?`)) return;
 
@@ -81,6 +87,7 @@ export default function AdminParcelsPage() {
       items: form.items,
     };
 
+    setSaving(true);
     try {
       const response = await apiFetch(editingId ? `/parcels/${editingId}` : '/parcels', {
         method: editingId ? 'PATCH' : 'POST',
@@ -94,6 +101,8 @@ export default function AdminParcelsPage() {
       await loadParcels();
     } catch (error) {
       setNotice(error.message || 'Parcel gagal disimpan');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -124,7 +133,7 @@ export default function AdminParcelsPage() {
                 <span className="panel-kicker">{editingId ? 'Edit parsel' : 'Parsel baru'}</span>
                 <h2>{editingId ? 'Perbarui informasi' : 'Tambah parsel'}</h2>
               </div>
-              {editingId && <button type="button" className="text-button" onClick={resetForm}>Batal</button>}
+              {editingId && <button type="button" className="text-button" onClick={resetForm} disabled={saving}>Batal</button>}
             </div>
             <label>Nama parsel<input name="name" value={form.name} onChange={updateField} placeholder="Contoh: Parcel Keluarga" /></label>
             <label>Kode parsel<input name="code" value={form.code} onChange={updateField} placeholder="PRC-KEL-001" /></label>
@@ -154,7 +163,7 @@ export default function AdminParcelsPage() {
                 <CurrencyInput name="originalPrice" value={form.originalPrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, originalPrice: value }))} placeholder="Rp 150.000" />
               </label>
             </div>
-            <button className="btn btn-primary full" type="submit">{editingId ? 'Simpan perubahan' : 'Tambah parsel'}</button>
+            <button className="btn btn-primary full" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah parsel'}</button>
           </form>
 
           <section className="crud-table-panel">
@@ -198,7 +207,9 @@ export default function AdminParcelsPage() {
                         <div className="row-actions">
                           <button onClick={() => { setEditingId(parcel.id); setForm({ ...parcel, items: parcel.items || [], isManualPrice: true }); }}>Edit</button>
                           <button onClick={async () => {
+                            if (deletingId) return;
                             if (!await confirmAction(`Hapus parsel "${parcel.name}"?`)) return;
+                            setDeletingId(parcel.id);
                             try {
                               const response = await apiFetch(`/parcels/${parcel.id}`, { method: 'DELETE' });
                               const data = await response.json();
@@ -207,8 +218,10 @@ export default function AdminParcelsPage() {
                               await loadParcels();
                             } catch (error) {
                               setNotice(error.message || 'Hapus parcel gagal');
+                            } finally {
+                              setDeletingId(null);
                             }
-                          }}>Hapus</button>
+                          }} disabled={deletingId === parcel.id}>{deletingId === parcel.id ? 'Menghapus...' : 'Hapus'}</button>
                         </div>
                       </td>
                     </tr>

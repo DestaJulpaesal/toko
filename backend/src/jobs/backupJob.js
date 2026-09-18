@@ -25,6 +25,11 @@ export function startBackupJob() {
     { timezone }
   );
 
+  if (process.env.ENABLE_BOOTSTRAP_BACKUP !== 'true') {
+    console.log('[BackupJob] Bootstrap backup disabled. Use the manual backup action or enable ENABLE_BOOTSTRAP_BACKUP=true.');
+    return task;
+  }
+
   // Periksa apakah sudah pernah ada backup. Jika belum pernah sama sekali, buat backup awal setelah server stabil
   setTimeout(async () => {
     try {

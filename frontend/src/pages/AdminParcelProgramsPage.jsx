@@ -23,6 +23,8 @@ export default function AdminParcelProgramsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +51,7 @@ export default function AdminParcelProgramsPage() {
 
   const submit = async (event) => {
     event.preventDefault();
+    if (saving) return;
     if (!form.name.trim() || Number(form.year) < 2000 || Number(form.targetAmount) <= 0) {
       setNotice('Nama program, tahun, dan target wajib diisi.');
       return;
@@ -56,6 +59,7 @@ export default function AdminParcelProgramsPage() {
     const action = editingId ? 'Simpan perubahan program' : 'Tambah program';
     if (!await confirmAction(`${action} "${form.name}"?`)) return;
 
+    setSaving(true);
     try {
       const response = await apiFetch(
         editingId
@@ -78,6 +82,8 @@ export default function AdminParcelProgramsPage() {
       await load();
     } catch (error) {
       setNotice(error.message || 'Program gagal disimpan.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -92,11 +98,13 @@ export default function AdminParcelProgramsPage() {
   };
 
   const remove = async (program) => {
+    if (deletingId) return;
     if (program.participantCount > 0) {
       setNotice('Program yang sudah memiliki peserta tidak dapat dihapus.');
       return;
     }
     if (!await confirmAction(`Hapus program "${program.name}"?`)) return;
+    setDeletingId(program.id);
     try {
       const response = await apiFetch(`/parcel-programs/${program.id}`, {
         method: 'DELETE',
@@ -107,19 +115,24 @@ export default function AdminParcelProgramsPage() {
       await load();
     } catch (error) {
       setNotice(error.message || 'Program gagal dihapus.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const eligiblePrograms = programs.filter((program) => program.participantCount === 0);
   const allSelected = eligiblePrograms.length > 0 && eligiblePrograms.every((program) => selectedIds.includes(program.id));
   const deleteSelected = async () => {
+    if (bulkDeleting) return;
     if (!selectedIds.length || !await confirmAction(`Hapus ${selectedIds.length} program terpilih yang belum memiliki peserta?`)) return;
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcel-programs/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
-    const count = results.filter((result) => result.status === 'fulfilled').length;
-    setSelectedIds([]); setBulkDeleting(false); await load();
-    setNotice(`${count} program berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
-    showNotice(`${count} program berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
+    try {
+      const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcel-programs/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+      const count = results.filter((result) => result.status === 'fulfilled').length;
+      setSelectedIds([]); await load();
+      setNotice(`${count} program berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
+      showNotice(`${count} program berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
+    } finally { setBulkDeleting(false); }
   };
 
   return (
@@ -149,7 +162,7 @@ export default function AdminParcelProgramsPage() {
                 <h2>{editingId ? 'Perbarui program' : 'Tambah program'}</h2>
               </div>
               {editingId && (
-                <button type="button" className="text-button" onClick={reset}>
+                <button type="button" className="text-button" onClick={reset} disabled={saving}>
                   Batal
                 </button>
               )}
@@ -189,8 +202,8 @@ export default function AdminParcelProgramsPage() {
                 placeholder="Catatan program (opsional)"
               />
             </label>
-            <button className="btn btn-primary full" type="submit">
-              {editingId ? 'Simpan perubahan' : 'Simpan program'}
+            <button className="btn btn-primary full" type="submit" disabled={saving}>
+              {saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Simpan program'}
             </button>
           </form>
 
@@ -221,7 +234,7 @@ export default function AdminParcelProgramsPage() {
                       <td>
                         <div className="row-actions">
                           <button type="button" onClick={() => edit(program)}>Edit</button>
-                          <button type="button" onClick={() => remove(program)}>Hapus</button>
+                          <button type="button" onClick={() => remove(program)} disabled={deletingId === program.id}>{deletingId === program.id ? 'Menghapus...' : 'Hapus'}</button>
                         </div>
                       </td>
                     </tr>

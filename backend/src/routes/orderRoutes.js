@@ -2,7 +2,7 @@ import express from 'express';
 import prisma from '../config/db.js';
 import { updateCustomerPoints } from './customerRoutes.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
-import { checkoutLimiter, checkoutSchema, onlineOrderSchema, validateBody } from '../middleware/security.js';
+import { checkoutLimiter, checkoutSchema, holdCartSchema, onlineOrderSchema, validateBody } from '../middleware/security.js';
 import { sendWhatsappMessage } from '../services/whatsappService.js';
 
 const router = express.Router();
@@ -17,6 +17,46 @@ export function calculateEarnedPoints(amount) {
   const sisa = num % 100000;
   const bonusSisa = sisa >= 50000 ? 2 : 0;
   return (ratusan * 10) + bonusSisa;
+}
+
+function readHoldMetadata(notes) {
+  if (!String(notes || '').startsWith('HOLD_CART:')) return {};
+  try {
+    return JSON.parse(String(notes).slice('HOLD_CART:'.length));
+  } catch {
+    return {};
+  }
+}
+
+function formatHold(order) {
+  const metadata = readHoldMetadata(order.notes);
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    customer: order.customer ? { id: order.customer.id, name: order.customer.name, phone: order.customer.phone } : null,
+    customerName: metadata.customerName || null,
+    customerType: metadata.customerType || 'RETAIL',
+    promoId: metadata.promoId || 'none',
+    note: metadata.note || '',
+    subtotal: Number(order.subtotal),
+    discount: Number(order.discount || 0),
+    total: Number(order.total),
+    itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
+    items: order.items.map((item) => ({
+      id: item.id,
+      variantId: item.variantId,
+      productId: item.productId,
+      parcelId: item.parcelId,
+      eventPackageId: item.eventPackageId,
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: Number(item.unitPrice),
+      total: Number(item.total),
+    })),
+    cashierName: order.user?.name || 'Kasir Glosir',
+    createdAt: order.createdAt,
+  };
 }
 
 
@@ -108,9 +148,14 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
 });
 
 router.get('/average-transaction', authenticateToken, async (req, res) => {
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const result = await prisma.order.aggregate({ where: { type: 'STORE', status: 'COMPLETED', createdAt: { gte: since } }, _avg: { total: true }, _count: { _all: true } });
-  return res.json({ success: true, average: Number(result._avg.total || 0), count: result._count._all });
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const result = await prisma.order.aggregate({ where: { type: 'STORE', status: 'COMPLETED', createdAt: { gte: since } }, _avg: { total: true }, _count: { _all: true } });
+    return res.json({ success: true, average: Number(result._avg.total || 0), count: result._count._all });
+  } catch (error) {
+    console.error('Average transaction lookup failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Rata-rata transaksi sementara tidak tersedia.' });
+  }
 });
 
 router.post('/online', checkoutLimiter, validateBody(onlineOrderSchema), async (req, res) => {
@@ -153,10 +198,180 @@ router.post('/online', checkoutLimiter, validateBody(onlineOrderSchema), async (
     const customer = existingCustomer
       ? await prisma.customer.update({ where: { id: existingCustomer.id }, data: { name: customerName, address } })
       : await prisma.customer.create({ data: { name: customerName, phone: normalizedPhone, address } });
-    const order = await prisma.order.create({ data: { orderNumber, type: 'ONLINE', status: 'PENDING', customerId: customer.id, subtotal, discount: promoDiscount, shippingCost: Number(shippingCost || 0), total, notes: note || null, whatsappLink, items: { create: lines.map((line) => ({ productId: line.productId, variantId: line.variantId, parcelId: line.parcelId, eventPackageId: line.eventPackageId, name: line.name, quantity: line.quantity, unitPrice: line.unitPrice, total: line.total })) } } });
+    const order = await prisma.order.create({ data: { orderNumber, type: 'ONLINE', status: 'PENDING', customer: { connect: { id: customer.id } }, subtotal, discount: promoDiscount, shippingCost: Number(shippingCost || 0), total, notes: note || null, whatsappLink, items: { create: lines.map((line) => ({ product: line.productId ? { connect: { id: line.productId } } : undefined, variant: line.variantId ? { connect: { id: line.variantId } } : undefined, parcel: line.parcelId ? { connect: { id: line.parcelId } } : undefined, eventPackage: line.eventPackageId ? { connect: { id: line.eventPackageId } } : undefined, name: line.name, quantity: line.quantity, unitPrice: line.unitPrice, total: line.total })) } } });
     return res.status(201).json({ success: true, order: { id: order.id, orderNumber, whatsappLink } });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Pesanan online gagal dibuat' });
+  }
+});
+
+// POST /api/orders/hold - Save the current POS cart without reserving stock.
+router.post('/hold', checkoutLimiter, authenticateToken, validateBody(holdCartSchema), async (req, res) => {
+  const {
+    items,
+    customerId = null,
+    customerName = null,
+    customerType = 'RETAIL',
+    discount = 0,
+    promoId = 'none',
+    note = '',
+  } = req.body || {};
+
+  try {
+    const orderNumber = `HOLD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const hold = await prisma.$transaction(async (transaction) => {
+      if (customerId) {
+        const customer = await transaction.customer.findUnique({ where: { id: customerId } });
+        if (!customer) throw Object.assign(new Error('Pelanggan tidak ditemukan'), { statusCode: 400 });
+      }
+
+      const packageIds = items.filter((item) => item.eventPackageId).map((item) => item.eventPackageId);
+      const parcelIds = items.filter((item) => item.parcelId).map((item) => item.parcelId);
+      const variants = await Promise.all(items.map((item) => (
+        item.variantId
+          ? transaction.productVariant.findUnique({ where: { id: item.variantId }, include: { product: true } })
+          : null
+      )));
+      const [eventPackages, parcels] = await Promise.all([
+        transaction.eventPackage.findMany({
+          where: { id: { in: packageIds }, isActive: true },
+          include: { items: { include: { variant: { include: { product: true } } } } },
+        }),
+        transaction.parcel.findMany({
+          where: { id: { in: parcelIds }, isActive: true },
+          include: { items: { include: { variant: { include: { product: true } } } } },
+        }),
+      ]);
+
+      const lines = items.map((item, index) => {
+        const quantity = Number(item.quantity);
+        if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Jumlah barang tidak valid');
+        if (item.eventPackageId) {
+          const eventPackage = eventPackages.find((candidate) => candidate.id === item.eventPackageId);
+          if (!eventPackage) throw new Error('Paket acara pada keranjang sudah tidak tersedia');
+          return { eventPackage, quantity, unitPrice: Number(eventPackage.price), total: Number(eventPackage.price) * quantity };
+        }
+        if (item.parcelId) {
+          const parcel = parcels.find((candidate) => candidate.id === item.parcelId);
+          if (!parcel) throw new Error('Parsel pada keranjang sudah tidak tersedia');
+          return { parcel, quantity, unitPrice: Number(parcel.price), total: Number(parcel.price) * quantity };
+        }
+        const variant = variants[index];
+        if (!variant || !variant.isActive) throw new Error('Produk pada keranjang sudah tidak tersedia');
+        const unitPrice = customerType === 'WHOLESALE' && variant.wholesalePrice != null
+          ? Number(variant.wholesalePrice)
+          : Number(variant.sellPrice);
+        return { variant, quantity, unitPrice, total: unitPrice * quantity };
+      });
+
+      const subtotal = lines.reduce((sum, line) => sum + line.total, 0);
+      const discountAmount = Math.min(Number(discount) || 0, subtotal);
+      const total = Math.max(subtotal - discountAmount, 0);
+      const metadata = JSON.stringify({
+        customerName: customerName || null,
+        customerType,
+        promoId,
+        note: String(note || '').trim(),
+      });
+
+      return transaction.order.create({
+        data: {
+          orderNumber,
+          type: 'STORE',
+          status: 'HOLD',
+          user: { connect: { id: req.user.id } },
+          customer: customerId ? { connect: { id: customerId } } : undefined,
+          subtotal,
+          discount: discountAmount,
+          total,
+          paymentMethod: 'CASH',
+          paymentStatus: 'HOLD',
+          paidAmount: 0,
+          notes: `HOLD_CART:${metadata}`,
+          items: {
+            create: lines.map((line) => ({
+              product: line.variant ? { connect: { id: line.variant.productId } } : undefined,
+              variant: line.variant ? { connect: { id: line.variant.id } } : undefined,
+              eventPackage: line.eventPackage ? { connect: { id: line.eventPackage.id } } : undefined,
+              parcel: line.parcel ? { connect: { id: line.parcel.id } } : undefined,
+              name: line.variant?.product.name || line.eventPackage?.name || line.parcel.name,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              total: line.total,
+            })),
+          },
+        },
+        include: {
+          customer: true,
+          items: true,
+          user: { select: { name: true } },
+        },
+      });
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Belanjaan berhasil ditahan.',
+      hold: formatHold(hold),
+    });
+  } catch (error) {
+    console.error('Hold cart failed:', error.message);
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      message: error.message || 'Belanjaan gagal ditahan.',
+    });
+  }
+});
+
+// GET /api/orders/holds - List active carts waiting to be resumed.
+router.get('/holds', authenticateToken, async (req, res) => {
+  try {
+    const holds = await prisma.order.findMany({
+      where: { type: 'STORE', status: 'HOLD' },
+      include: {
+        customer: true,
+        items: true,
+        user: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    });
+    return res.json({ success: true, holds: holds.map(formatHold) });
+  } catch (error) {
+    console.error('Hold cart list failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Daftar belanja tertahan tidak dapat diambil.' });
+  }
+});
+
+router.get('/holds/:id', authenticateToken, async (req, res) => {
+  try {
+    const hold = await prisma.order.findFirst({
+      where: { id: req.params.id, type: 'STORE', status: 'HOLD' },
+      include: {
+        customer: true,
+        items: true,
+        user: { select: { name: true } },
+      },
+    });
+    if (!hold) return res.status(404).json({ success: false, message: 'Belanjaan tertahan tidak ditemukan.' });
+    return res.json({ success: true, hold: formatHold(hold) });
+  } catch (error) {
+    console.error('Hold cart lookup failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Belanjaan tertahan tidak dapat diambil.' });
+  }
+});
+
+router.delete('/holds/:id', authenticateToken, async (req, res) => {
+  try {
+    const result = await prisma.order.updateMany({
+      where: { id: req.params.id, type: 'STORE', status: 'HOLD' },
+      data: { status: 'CANCELLED', notes: 'HOLD_CART:CANCELLED' },
+    });
+    if (!result.count) return res.status(404).json({ success: false, message: 'Belanjaan tertahan tidak ditemukan.' });
+    return res.json({ success: true, message: 'Belanjaan tertahan dibatalkan.' });
+  } catch (error) {
+    console.error('Hold cart cancellation failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Belanjaan tertahan gagal dibatalkan.' });
   }
 });
 
@@ -270,10 +485,10 @@ router.patch('/:id/void', authenticateToken, requireRole('OWNER', 'ADMIN'), asyn
 });
 
 // POST /api/orders/checkout - Process POS checkout with Points, Cash, QRIS, or Bank Transfer
-router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (req, res) => {
+router.post('/checkout', authenticateToken, checkoutLimiter, validateBody(checkoutSchema), async (req, res) => {
   try {
     const {
-      items,
+      items: submittedItems,
       paidAmount,
       paymentMethod = 'CASH',
       paymentReference = null,
@@ -283,16 +498,30 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
       cashierName = 'Kasir Glosir',
       redeemedPoints = 0,
       discount = 0,
+      holdOrderId = null,
     } = req.body || {};
 
-    if (!Array.isArray(items) || !items.length) {
+    if (!Array.isArray(submittedItems) || !submittedItems.length) {
       return res.status(400).json({ success: false, message: 'Keranjang belanja masih kosong' });
     }
 
     const orderNumber = `POS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     try {
+      let items = submittedItems;
+      let effectiveCustomerId = customerId;
+      let effectiveCustomerName = customerName;
+      let effectiveCustomerType = customerType;
+      let effectiveDiscount = discount;
+      let sourceHold = null;
       const result = await prisma.$transaction(async (transaction) => {
+        if (holdOrderId) {
+          sourceHold = await transaction.order.findFirst({
+            where: { id: holdOrderId, type: 'STORE', status: 'HOLD' },
+            include: { items: true },
+          });
+          if (!sourceHold) throw Object.assign(new Error('Belanjaan tertahan sudah dipakai atau tidak ditemukan'), { statusCode: 404 });
+        }
         const packageIds = items.filter((item) => item.eventPackageId).map((item) => item.eventPackageId);
         const parcelIds = items.filter((item) => item.parcelId).map((item) => item.parcelId);
         const eventPackages = await transaction.eventPackage.findMany({
@@ -303,14 +532,15 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
           where: { id: { in: parcelIds }, isActive: true },
           include: { items: { include: { variant: { include: { product: { include: { category: true } } } } } } },
         });
-        const variants = await Promise.all(
-          items.map((item) =>
-            item.variantId ? transaction.productVariant.findUnique({
-              where: { id: item.variantId },
-              include: { product: { include: { category: true } } },
-            }) : null
-          )
-        );
+        // Batch-fetch every variant in one query instead of one findUnique per
+        // cart line — same connection, so N sequential reads become 1.
+        const variantIds = [...new Set(items.filter((item) => item.variantId).map((item) => item.variantId))];
+        const variantRecords = variantIds.length ? await transaction.productVariant.findMany({
+          where: { id: { in: variantIds } },
+          include: { product: { include: { category: true } } },
+        }) : [];
+        const variantById = new Map(variantRecords.map((variant) => [variant.id, variant]));
+        const variants = items.map((item) => (item.variantId ? variantById.get(item.variantId) || null : null));
 
         const lines = items.map((item, index) => {
           if (item.eventPackageId) {
@@ -322,7 +552,9 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
                 throw new Error(`Stok produk ${packageItem.variant.product.name} tidak mencukupi untuk paket ${eventPackage.name}`);
               }
             }
-            return { eventPackage, quantity, unitPrice: Number(eventPackage.price), total: Number(eventPackage.price) * quantity };
+            const submittedPrice = Number(item.unitPrice ?? item.price);
+            const unitPrice = holdOrderId && Number.isFinite(submittedPrice) ? submittedPrice : Number(eventPackage.price);
+            return { eventPackage, quantity, unitPrice, total: unitPrice * quantity };
           }
           if (item.parcelId) {
             const parcel = parcels.find((candidate) => candidate.id === item.parcelId);
@@ -333,7 +565,9 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
                 throw new Error(`Stok produk ${parcelItem.variant.product.name} tidak mencukupi untuk parsel ${parcel.name}`);
               }
             }
-            return { parcel, quantity, unitPrice: Number(parcel.price), total: Number(parcel.price) * quantity };
+            const submittedPrice = Number(item.unitPrice ?? item.price);
+            const unitPrice = holdOrderId && Number.isFinite(submittedPrice) ? submittedPrice : Number(parcel.price);
+            return { parcel, quantity, unitPrice, total: unitPrice * quantity };
           }
           const variant = variants[index];
           const quantity = Number(item.quantity);
@@ -343,12 +577,18 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
           if (!variant.isActive || variant.stockQty < quantity) {
             throw new Error(`Stok produk ${variant.product.name} tidak mencukupi`);
           }
-          const unitPrice = customerType === 'WHOLESALE' && variant.wholesalePrice != null ? Number(variant.wholesalePrice) : Number(variant.sellPrice);
+          const submittedPrice = Number(item.unitPrice ?? item.price);
+          const unitPrice = holdOrderId && Number.isFinite(submittedPrice)
+            ? submittedPrice
+            : effectiveCustomerType === 'WHOLESALE' && variant.wholesalePrice != null
+              ? Number(variant.wholesalePrice)
+              : Number(variant.sellPrice);
+          if (!Number.isFinite(unitPrice)) throw new Error(`Harga produk ${variant.product.name} tidak valid`);
           return { variant, quantity, unitPrice, total: unitPrice * quantity };
         });
 
         const subtotal = lines.reduce((sum, line) => sum + line.total, 0);
-        const discountAmount = Math.min(Number(discount) || 0, subtotal);
+        const discountAmount = Math.min(Number(effectiveDiscount) || 0, subtotal);
         const total = Math.max(subtotal - discountAmount, 0);
         const saleCategories = [...new Set(lines.flatMap((line) => {
           if (line.variant) return [line.variant.product.category?.name];
@@ -361,22 +601,27 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
           paid = total;
         }
 
-        if (paymentMethod === 'DEBT' && !customerId) {
+        // Bon boleh dibuat untuk nama pembeli baru; simpan sebagai pelanggan
+        // agar tagihan tetap punya pemilik yang bisa dicari dan dibayar nanti.
+        let linkedCustomerId = effectiveCustomerId;
+        if (!linkedCustomerId && effectiveCustomerName && effectiveCustomerName !== 'Pelanggan Umum') {
+          const existingCust = await transaction.customer.findFirst({
+            where: { name: { equals: effectiveCustomerName, mode: 'insensitive' } },
+          });
+          linkedCustomerId = existingCust?.id;
+          if (!linkedCustomerId && paymentMethod === 'DEBT') {
+            const newCustomer = await transaction.customer.create({ data: { name: effectiveCustomerName } });
+            linkedCustomerId = newCustomer.id;
+          }
+        }
+
+        if (paymentMethod === 'DEBT' && !linkedCustomerId) {
           throw new Error('Pelanggan wajib dipilih untuk transaksi bon/utang');
         }
         if (paymentMethod !== 'DEBT' && (!Number.isFinite(paid) || paid < total)) {
           throw new Error('Uang dibayar kurang dari total belanja');
         }
         if (paymentMethod === 'DEBT') paid = 0;
-
-        // Customer linking
-        let linkedCustomerId = customerId;
-        if (!linkedCustomerId && customerName && customerName !== 'Pelanggan Umum') {
-          const existingCust = await transaction.customer.findFirst({
-            where: { name: { equals: customerName, mode: 'insensitive' } },
-          });
-          if (existingCust) linkedCustomerId = existingCust.id;
-        }
 
         // Calculate points
         const earnedPoints = calculateEarnedPoints(total);
@@ -387,7 +632,8 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
             orderNumber,
             type: 'STORE',
             status: 'COMPLETED',
-            customerId: linkedCustomerId || undefined,
+            user: { connect: { id: req.user.id } },
+            customer: linkedCustomerId ? { connect: { id: linkedCustomerId } } : undefined,
             subtotal,
             discount: discountAmount,
             total,
@@ -397,10 +643,10 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
             notes: `Points: +${earnedPoints} / -${redeemedPoints}`,
             items: {
               create: lines.map((line) => ({
-                productId: line.variant?.productId,
-                variantId: line.variant?.id,
-                eventPackageId: line.eventPackage?.id,
-                parcelId: line.parcel?.id,
+                product: line.variant ? { connect: { id: line.variant.productId } } : undefined,
+                variant: line.variant ? { connect: { id: line.variant.id } } : undefined,
+                eventPackage: line.eventPackage ? { connect: { id: line.eventPackage.id } } : undefined,
+                parcel: line.parcel ? { connect: { id: line.parcel.id } } : undefined,
                 name: line.variant?.product.name || line.eventPackage?.name || line.parcel.name,
                 quantity: line.quantity,
                 unitPrice: line.unitPrice,
@@ -411,52 +657,73 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
           include: { customer: true },
         });
 
+        if (sourceHold) {
+          await transaction.order.update({
+            where: { id: sourceHold.id },
+            data: { status: 'CANCELLED', notes: 'HOLD_CART:RESUMED' },
+          });
+        }
+
+        // Track quantity AND productId per variant so we don't need to
+        // re-fetch the variant again just to log the stock movement.
         const stockDeductions = new Map();
+        const addDeduction = (variantId, productId, quantity) => {
+          const current = stockDeductions.get(variantId) || { quantity: 0, productId };
+          current.quantity += quantity;
+          stockDeductions.set(variantId, current);
+        };
         for (const line of lines) {
           if (line.variant) {
-            stockDeductions.set(line.variant.id, (stockDeductions.get(line.variant.id) || 0) + line.quantity);
+            addDeduction(line.variant.id, line.variant.productId, line.quantity);
           } else if (line.eventPackage) {
             for (const packageItem of line.eventPackage.items) {
-              stockDeductions.set(packageItem.variant.id, (stockDeductions.get(packageItem.variant.id) || 0) + packageItem.quantity * line.quantity);
+              addDeduction(packageItem.variant.id, packageItem.variant.productId, packageItem.quantity * line.quantity);
             }
           } else {
             for (const parcelItem of line.parcel.items) {
-              stockDeductions.set(parcelItem.variant.id, (stockDeductions.get(parcelItem.variant.id) || 0) + parcelItem.quantity * line.quantity);
+              addDeduction(parcelItem.variant.id, parcelItem.variant.productId, parcelItem.quantity * line.quantity);
             }
           }
         }
-        for (const [variantId, quantity] of stockDeductions) {
-          const variant = await transaction.productVariant.findUnique({ where: { id: variantId } });
-          if (!variant || variant.stockQty < quantity) throw new Error('Stok berubah. Silakan ulangi checkout.');
-          await transaction.productVariant.update({
-            where: { id: variantId },
+        // updateMany with a stockQty >= quantity guard makes the check and the
+        // decrement ATOMIC in one query, instead of a separate read (which
+        // could be stale) followed by an unconditional write. This also cuts
+        // the round trips per item from 3 down to 1.
+        const stockMovements = [];
+        for (const [variantId, { quantity, productId }] of stockDeductions) {
+          const updateResult = await transaction.productVariant.updateMany({
+            where: { id: variantId, stockQty: { gte: quantity } },
             data: { stockQty: { decrement: quantity } },
           });
-          await transaction.stockMovement.create({
-            data: {
-              productId: variant.productId,
-              variantId,
-              type: 'OUT',
-              quantity,
-              note: 'Penjualan kasir POS',
-              reference: orderNumber,
-            },
+          if (updateResult.count === 0) throw new Error('Stok berubah. Silakan ulangi checkout.');
+          stockMovements.push({
+            productId,
+            variantId,
+            type: 'OUT',
+            quantity,
+            note: 'Penjualan kasir POS',
+            reference: orderNumber,
           });
+        }
+        if (stockMovements.length) {
+          await transaction.stockMovement.createMany({ data: stockMovements });
         }
 
         const financeDesc = paymentReference
           ? `Penjualan kasir ${orderNumber} (${paymentMethod}) Ref: ${paymentReference}`
           : `Penjualan kasir ${orderNumber} (${paymentMethod})`;
-        const defaultAccount = await transaction.financeAccount.upsert({
-          where: { id: 'finance-default-cash' },
-          create: { id: 'finance-default-cash', name: 'Kas Toko', type: 'CASH', startBalance: 0 },
-          update: {},
-        });
-        const salesCategory = await transaction.financeCategory.upsert({
-          where: { name_type: { name: 'Penjualan', type: 'INCOME' } },
-          create: { name: 'Penjualan', type: 'INCOME', isDefault: true },
-          update: {},
-        });
+        const [defaultAccount, salesCategory] = await Promise.all([
+          transaction.financeAccount.upsert({
+            where: { id: 'finance-default-cash' },
+            create: { id: 'finance-default-cash', name: 'Kas Toko', type: 'CASH', startBalance: 0 },
+            update: {},
+          }),
+          transaction.financeCategory.upsert({
+            where: { name_type: { name: 'Penjualan', type: 'INCOME' } },
+            create: { name: 'Penjualan', type: 'INCOME', isDefault: true },
+            update: {},
+          }),
+        ]);
 
         if (paymentMethod !== 'DEBT') {
           await transaction.financeTransaction.create({
@@ -476,8 +743,8 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
         if (paymentMethod === 'DEBT') {
           await transaction.debtRecord.create({
             data: {
-              orderId: order.id,
-              customerId: linkedCustomerId,
+              order: { connect: { id: order.id } },
+              customer: { connect: { id: linkedCustomerId } },
               amount: total,
               paidAmount: 0,
               status: 'OPEN',
@@ -510,7 +777,7 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
           paymentStatus: order.paymentStatus,
           remainingAmount: Math.max(total - paid, 0),
           paymentReference,
-          customer: order.customer ? { id: order.customer.id, name: order.customer.name, phone: order.customer.phone } : customerName ? { name: customerName } : null,
+          customer: order.customer ? { id: order.customer.id, name: order.customer.name, phone: order.customer.phone } : effectiveCustomerName ? { name: effectiveCustomerName } : null,
           cashierName,
           earnedPoints,
           redeemedPoints: Number(redeemedPoints) || 0,
@@ -526,14 +793,19 @@ router.post('/checkout', checkoutLimiter, validateBody(checkoutSchema), async (r
         };
 
         return orderDetail;
-      });
+      }, { maxWait: 10000, timeout: 30000 });
 
       return res.status(201).json({ success: true, ...result });
     } catch (dbError) {
-      console.error('Database checkout failed:', dbError.message);
-      return res.status(503).json({
+      console.error('Database checkout failed:', dbError.code || 'UNKNOWN', dbError.message);
+      const isDatabaseError = Boolean(dbError.code && /^P\d{4}$/.test(dbError.code));
+      return res.status(dbError.statusCode || (isDatabaseError ? 503 : 400)).json({
         success: false,
-        message: 'Database transaksi tidak tersedia. Sinkronisasi DB perlu dijalankan terlebih dahulu.',
+        message: dbError.statusCode
+          ? dbError.message
+          : isDatabaseError
+            ? 'Database transaksi sedang bermasalah. Coba ulangi beberapa detik lagi.'
+            : dbError.message || 'Transaksi gagal disimpan.',
       });
     }
   } catch (error) {

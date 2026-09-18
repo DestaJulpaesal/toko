@@ -133,6 +133,7 @@ export default function CashierHelpModal({ isOpen, onClose }) {
             <span className="shortcut-title">⌨️ Tips Pintasan Cepat:</span>
             <div className="shortcut-chips">
               <span><kbd>Enter</kbd> Masukkan scan / Selesaikan bayar</span>
+              <span><kbd>F4</kbd> Tahan belanjaan dan layani pembeli berikutnya</span>
               <span><kbd>F11</kbd> Mode Layar Penuh</span>
               <span><kbd>Esc</kbd> Keluar layar penuh / Tutup modal</span>
             </div>

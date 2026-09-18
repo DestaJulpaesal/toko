@@ -9,6 +9,8 @@ export default function AdminStockOpnamePage() {
   const [form, setForm] = useState({ variantId: '', physicalQty: '', note: '' });
   const [notice, setNotice] = useState('');
   const [productSearch, setProductSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const load = async () => {
     const [productsResponse, recordsResponse] = await Promise.all([
@@ -30,20 +32,28 @@ export default function AdminStockOpnamePage() {
 
   const submit = async (event) => {
     event.preventDefault();
-    const response = await apiFetch('/stock-opnames', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    const data = await response.json();
-    if (!response.ok || !data.success) throw new Error(data.message || 'Opname gagal disimpan');
-    setNotice('Stok opname berhasil disimpan.');
-    setForm((current) => ({ ...current, physicalQty: '', note: '' }));
-    await load();
+    if (saving) return;
+    setSaving(true);
+    try {
+      const response = await apiFetch('/stock-opnames', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Opname gagal disimpan');
+      setNotice('Stok opname berhasil disimpan.');
+      setForm((current) => ({ ...current, physicalQty: '', note: '' }));
+      await load();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const deleteRecord = async (record) => {
+    if (deletingId) return;
     if (!await confirmAction(`Hapus catatan opname untuk "${record.variant?.product?.name || 'produk ini'}"? Stok sistem tidak akan berubah.`)) return;
+    setDeletingId(record.id);
     try {
       const response = await apiFetch(`/stock-opnames/${record.id}`, { method: 'DELETE' });
       const data = await response.json();
@@ -52,6 +62,8 @@ export default function AdminStockOpnamePage() {
       await load();
     } catch (error) {
       setNotice(error.message || 'Catatan opname gagal dihapus');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -70,10 +82,10 @@ export default function AdminStockOpnamePage() {
             </select></label>
             <label className="tool-field">Jumlah fisik<input type="number" min="0" value={form.physicalQty} onChange={(event) => setForm({ ...form, physicalQty: event.target.value })} required /></label>
             <label className="tool-field">Catatan<input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Opsional" /></label>
-            <div className="tool-summary"><span>Selisih stok</span><strong className={difference < 0 ? 'negative' : difference > 0 ? 'positive' : ''}>{difference > 0 ? '+' : ''}{difference}</strong><button className="btn btn-primary" type="submit">Simpan opname <span>→</span></button></div>
+            <div className="tool-summary"><span>Selisih stok</span><strong className={difference < 0 ? 'negative' : difference > 0 ? 'positive' : ''}>{difference > 0 ? '+' : ''}{difference}</strong><button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan opname'} <span>→</span></button></div>
           </form>
         </section>
-        <section className="tool-panel"><div className="tool-panel-heading"><div><span className="panel-kicker">Catatan kontrol</span><h2>Riwayat opname</h2></div><span className="tool-count">{records.length} pemeriksaan</span></div><div className="tool-table-wrap"><table className="tool-table"><thead><tr><th>Produk</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Waktu</th><th>Aksi</th></tr></thead><tbody>{records.map((record) => <tr key={record.id}><td><strong>{record.variant?.product?.name || record.variantId}</strong></td><td>{record.systemQty}</td><td>{record.physicalQty}</td><td><span className={`difference-pill ${record.difference < 0 ? 'negative' : record.difference > 0 ? 'positive' : ''}`}>{record.difference > 0 ? '+' : ''}{record.difference}</span></td><td>{new Date(record.createdAt).toLocaleString('id-ID')}</td><td><button type="button" className="table-delete-action" onClick={() => deleteRecord(record)}>Hapus</button></td></tr>)}</tbody></table>{!records.length && <div className="tool-empty">Belum ada hasil opname yang tersimpan.</div>}</div></section>
+        <section className="tool-panel"><div className="tool-panel-heading"><div><span className="panel-kicker">Catatan kontrol</span><h2>Riwayat opname</h2></div><span className="tool-count">{records.length} pemeriksaan</span></div><div className="tool-table-wrap"><table className="tool-table"><thead><tr><th>Produk</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Waktu</th><th>Aksi</th></tr></thead><tbody>{records.map((record) => <tr key={record.id}><td><strong>{record.variant?.product?.name || record.variantId}</strong></td><td>{record.systemQty}</td><td>{record.physicalQty}</td><td><span className={`difference-pill ${record.difference < 0 ? 'negative' : record.difference > 0 ? 'positive' : ''}`}>{record.difference > 0 ? '+' : ''}{record.difference}</span></td><td>{new Date(record.createdAt).toLocaleString('id-ID')}</td><td><button type="button" className="table-delete-action" disabled={deletingId === record.id} onClick={() => deleteRecord(record)}>{deletingId === record.id ? 'Menghapus...' : 'Hapus'}</button></td></tr>)}</tbody></table>{!records.length && <div className="tool-empty">Belum ada hasil opname yang tersimpan.</div>}</div></section>
       </main>
     </div>
   );

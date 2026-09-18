@@ -8,6 +8,8 @@ export default function AdminApprovalsPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
+  const [approvingId, setApprovingId] = useState(null);
+  const [rejectingId, setRejectingId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -24,17 +26,26 @@ export default function AdminApprovalsPage() {
   useEffect(() => { load().catch((error) => setNotice(error.message)); }, []);
 
   const decide = async (id, action) => {
+    const isRejecting = action === 'reject';
+    const activeId = isRejecting ? rejectingId : approvingId;
+    if (activeId) return;
     const reason = action === 'reject' ? window.prompt('Alasan penolakan wajib diisi') : '';
     if (action === 'reject' && !reason) return;
-    const response = await apiFetch(`/finance/approvals/${id}/${action}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason }),
-    });
-    const result = await response.json();
-    if (!response.ok || !result.success) throw new Error(result.message || 'Approval gagal diproses');
-    setNotice(action === 'approve' ? 'Pengeluaran berhasil disetujui.' : 'Pengeluaran ditolak.');
-    await load();
+    const setActiveId = isRejecting ? setRejectingId : setApprovingId;
+    setActiveId(id);
+    try {
+      const response = await apiFetch(`/finance/approvals/${id}/${action}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Approval gagal diproses');
+      setNotice(action === 'approve' ? 'Pengeluaran berhasil disetujui.' : 'Pengeluaran ditolak.');
+      await load();
+    } finally {
+      setActiveId(null);
+    }
   };
 
   return (
@@ -62,7 +73,7 @@ export default function AdminApprovalsPage() {
           </div>
           {loading ? <div className="finance-empty"><span className="finance-empty-icon">…</span><strong>Memuat pengajuan</strong><p>Sebentar, kami mengambil data approval terbaru.</p></div>
             : !rows.length ? <div className="finance-empty"><span className="finance-empty-icon">✓</span><strong>Semua sudah beres</strong><p>Tidak ada pengeluaran yang menunggu persetujuan.</p></div>
-              : <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Pengajuan</th><th>Pengaju</th><th>Nominal</th><th>Waktu</th><th>Aksi</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.description}</strong><small>{row.reason || 'Pengeluaran operasional'}</small></td><td>{row.requestedBy?.name || '—'}</td><td><strong className="finance-amount">{money(row.amount)}</strong></td><td>{row.createdAt ? new Date(row.createdAt).toLocaleDateString('id-ID') : '—'}</td><td><div className="finance-action-group"><button type="button" className="btn btn-primary small" onClick={() => decide(row.id, 'approve').catch((error) => setNotice(error.message))}>Setujui</button><button type="button" className="btn btn-danger small" onClick={() => decide(row.id, 'reject').catch((error) => setNotice(error.message))}>Tolak</button></div></td></tr>)}</tbody></table></div>}
+              : <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Pengajuan</th><th>Pengaju</th><th>Nominal</th><th>Waktu</th><th>Aksi</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.description}</strong><small>{row.reason || 'Pengeluaran operasional'}</small></td><td>{row.requestedBy?.name || '—'}</td><td><strong className="finance-amount">{money(row.amount)}</strong></td><td>{row.createdAt ? new Date(row.createdAt).toLocaleDateString('id-ID') : '—'}</td><td><div className="finance-action-group"><button type="button" className="btn btn-primary small" disabled={Boolean(approvingId || rejectingId)} onClick={() => decide(row.id, 'approve').catch((error) => setNotice(error.message))}>{approvingId === row.id ? 'Menyetujui...' : 'Setujui'}</button><button type="button" className="btn btn-danger small" disabled={Boolean(approvingId || rejectingId)} onClick={() => decide(row.id, 'reject').catch((error) => setNotice(error.message))}>{rejectingId === row.id ? 'Menolak...' : 'Tolak'}</button></div></td></tr>)}</tbody></table></div>}
         </section>
       </main>
     </div>

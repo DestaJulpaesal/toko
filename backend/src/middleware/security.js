@@ -46,6 +46,22 @@ export const checkoutSchema = z.object({
   cashierName: z.string().optional(),
   redeemedPoints: z.coerce.number().int().nonnegative().default(0),
   discount: z.coerce.number().nonnegative().default(0),
+  holdOrderId: z.string().min(1).nullable().optional(),
+}).passthrough();
+
+export const holdCartSchema = z.object({
+  items: z.array(z.object({
+    variantId: z.string().min(1).optional(),
+    eventPackageId: z.string().min(1).optional(),
+    parcelId: z.string().min(1).optional(),
+    quantity: z.coerce.number().int().positive(),
+  }).refine((item) => item.variantId || item.eventPackageId || item.parcelId, 'Item harus memiliki produk atau paket')).min(1, 'Keranjang belanja masih kosong'),
+  customerId: z.string().nullable().optional(),
+  customerName: z.string().trim().nullable().optional(),
+  customerType: z.enum(['RETAIL', 'WHOLESALE']).default('RETAIL'),
+  discount: z.coerce.number().nonnegative().default(0),
+  promoId: z.string().optional().default('none'),
+  note: z.string().trim().max(500).optional().default(''),
 }).passthrough();
 
 export const onlineOrderSchema = z.object({

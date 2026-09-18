@@ -2,28 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../services/api';
 import ReminderBell from './ReminderBell';
-import { Archive, CalendarRange, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
+import { Archive, CalendarRange, Check, ChevronDown, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
 
-const ownerGroups = [
-  { label: 'Ringkasan', links: [['01', 'Dashboard', '/admin']] },
-  {
-    label: 'Penjualan',
-    links: [['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Data Pelanggan', '/admin/customers']],
-  },
-  {
-    label: 'Katalog',
-    links: [['05', 'Produk', '/admin/products'], ['06', 'Kategori', '/admin/categories'], ['07', 'Promo', '/admin/promos']],
-  },
-  {
-    label: 'Parsel',
-    links: [['08', 'Parsel', '/admin/parcels'], ['09', 'Peserta Parsel', '/admin/parcel-participants'], ['10', 'Penagihan Wilayah', '/admin/parcel-collections'], ['11', 'Program Parsel', '/admin/parcel-programs'], ['12', 'Wilayah Parsel', '/admin/parcel-regions']],
-  },
-  {
-    label: 'Keuangan',
-    links: [['11', 'Keuangan', '/admin/finance'], ['12', 'Piutang', '/admin/debts'], ['13', 'Catatan Pribadi', '/admin/personal-finance'], ['14', 'Laporan Keuangan', '/admin/finance/reports'], ['15', 'Kalender Keuangan', '/admin/finance/calendar'], ['16', 'Net Worth', '/admin/finance/networth'], ['17', 'Approval Keuangan', '/admin/finance/approvals'], ['18', 'Audit Keuangan', '/admin/finance/audit']],
-  },
-  { label: 'Website', links: [['13', 'Konten Publik', '/admin/content'], ['14', 'Profil', '/admin/profile']] },
-  { label: 'Kontrol', links: [['15', 'Stok Opname', '/admin/stock-opname'], ['16', 'Restock', '/admin/restock'], ['17', 'Paket Acara', '/admin/event-packages']] },
+const ownerPrimaryGroups = [
+  { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Penagihan Wilayah', '/admin/parcel-collections'], ['06', 'Keuangan', '/admin/finance'], ['07', 'Piutang', '/admin/debts'], ['08', 'Restock', '/admin/restock']] },
+];
+
+const ownerSecondaryGroups = [
+  { label: 'Katalog', links: [['09', 'Kategori', '/admin/categories'], ['10', 'Promo', '/admin/promos']] },
+  { label: 'Parsel', links: [['11', 'Parsel', '/admin/parcels'], ['12', 'Peserta Parsel', '/admin/parcel-participants'], ['13', 'Program Parsel', '/admin/parcel-programs'], ['14', 'Wilayah Parsel', '/admin/parcel-regions']] },
+  { label: 'Keuangan Lanjutan', links: [['15', 'Catatan Pribadi', '/admin/personal-finance'], ['16', 'Laporan Keuangan', '/admin/finance/reports'], ['17', 'Kalender Keuangan', '/admin/finance/calendar'], ['18', 'Net Worth', '/admin/finance/networth'], ['19', 'Approval Keuangan', '/admin/finance/approvals'], ['20', 'Audit Keuangan', '/admin/finance/audit']] },
+  { label: 'Website & Kontrol', links: [['21', 'Konten Publik', '/admin/content'], ['22', 'Profil', '/admin/profile'], ['23', 'Stok Opname', '/admin/stock-opname'], ['24', 'Paket Acara', '/admin/event-packages']] },
 ];
 
 const cashierGroups = [
@@ -40,6 +29,7 @@ export default function AdminSidebar({ active = '' }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState('');
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
   const [pendingOrderCount, setPendingOrderCount] = useState(0);
   const [largeText, setLargeText] = useState(() => localStorage.getItem('glosir_large_text') === 'true');
 
@@ -106,10 +96,14 @@ export default function AdminSidebar({ active = '' }) {
 
   const isCashier = currentUser?.role === 'CASHIER';
   const isParcelManager = currentUser?.role === 'PARCEL_MANAGER';
-  const visibleGroups = (isParcelManager ? parcelManagerGroups : isCashier ? cashierGroups : ownerGroups).map((group) => ({
+  const filterGroups = (groups) => groups.map((group) => ({
     ...group,
     links: group.links.filter(([, label]) => label.toLowerCase().includes(sidebarSearch.toLowerCase().trim())),
   })).filter((group) => group.links.length > 0);
+  const isOwner = !isCashier && !isParcelManager;
+  const visibleGroups = filterGroups(isParcelManager ? parcelManagerGroups : isCashier ? cashierGroups : ownerPrimaryGroups);
+  const visibleSecondaryGroups = isOwner ? filterGroups(ownerSecondaryGroups) : [];
+  const hasSecondarySearch = sidebarSearch.trim() && visibleSecondaryGroups.length > 0;
 
   return (
     <aside className={`admin-sidebar${collapsed ? ' sidebar-collapsed' : ''}`}>
@@ -132,7 +126,7 @@ export default function AdminSidebar({ active = '' }) {
       <button type="button" className="admin-mobile-menu-button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={menuOpen ? 'Tutup menu' : 'Buka menu'}>
         <span /><span /><span />
       </button>
-      <ReminderBell />
+      {currentUser && ['OWNER', 'ADMIN'].includes(currentUser.role) && <ReminderBell />}
 
       <nav ref={navRef} className={menuOpen ? 'admin-nav-open' : ''} onClick={() => setMenuOpen(false)}>
         <label className="sidebar-search" onClick={(event) => event.stopPropagation()}>
@@ -150,12 +144,37 @@ export default function AdminSidebar({ active = '' }) {
             ))}
           </div>
         ))}
+        {isOwner && visibleSecondaryGroups.length > 0 && (
+          <div className={`sidebar-secondary-section${secondaryOpen || hasSecondarySearch ? ' is-open' : ''}`}>
+            <button type="button" className="sidebar-layer-toggle" onClick={(event) => { event.stopPropagation(); setSecondaryOpen((open) => !open); }} aria-expanded={secondaryOpen || Boolean(hasSecondarySearch)}>
+              <span><span className="sidebar-layer-mark"><Check size={13} /></span> Menu Lainnya</span>
+              <ChevronDown size={15} aria-hidden="true" />
+            </button>
+            {(secondaryOpen || hasSecondarySearch) && visibleSecondaryGroups.map((group) => (
+              <div className="sidebar-nav-group sidebar-secondary-group" key={group.label}>
+                <span className="nav-label">{group.label}</span>
+                {group.links.map(([number, label, to]) => (
+                  <Link key={to} title={label} className={active === label ? 'active' : ''} to={to} onClick={() => setMenuOpen(false)}>
+                    <span className="sidebar-icon" aria-hidden="true">{getSidebarIcon(label, number)}</span>
+                    <span className="sidebar-link-label">{label}</span>
+                  </Link>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
       </nav>
 
       <div className="sidebar-upgrade">
-        <strong>{isParcelManager ? 'Wilayah Parsel' : isCashier ? 'Workspace Kasir' : 'Glosir Pro'} <span aria-hidden="true">✦</span></strong>
-        <small>{isParcelManager ? 'Pantau peserta wilayah' : isCashier ? 'Operasional siap digunakan' : 'Kelola toko lebih mudah'}</small>
-        <Link to={isParcelManager ? '/parcel-manager' : isCashier ? '/kasir' : '/admin/finance'}>{isParcelManager ? 'Buka wilayah' : isCashier ? 'Buka kasir' : 'Lihat insight'} <span aria-hidden="true">→</span></Link>
+        <strong>{isParcelManager ? 'Wilayah Parsel' : isCashier ? 'Workspace Kasir' : 'Menu Lainnya'} <span aria-hidden="true">✦</span></strong>
+        <small>{isParcelManager ? 'Pantau peserta wilayah' : isCashier ? 'Operasional siap digunakan' : 'Akses fitur lanjutan toko'}</small>
+        {isOwner ? (
+          <button type="button" onClick={() => setSecondaryOpen(true)} aria-expanded={secondaryOpen}>
+            {secondaryOpen ? 'Menu terbuka' : 'Buka menu'} <span aria-hidden="true">→</span>
+          </button>
+        ) : (
+          <Link to={isParcelManager ? '/parcel-manager' : '/kasir'}>{isParcelManager ? 'Buka wilayah' : 'Buka kasir'} <span aria-hidden="true">→</span></Link>
+        )}
       </div>
 
       <div className="sidebar-profile">

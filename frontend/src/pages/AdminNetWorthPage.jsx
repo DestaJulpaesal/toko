@@ -13,6 +13,8 @@ export default function AdminNetWorthPage() {
   const [editingId, setEditingId] = useState(null);
   const [notice, setNotice] = useState('');
   const [historyItemId, setHistoryItemId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const load = async () => {
     const response = await apiFetch(`/finance/networth?refresh=${Date.now()}`, { cache: 'no-store' });
@@ -25,6 +27,8 @@ export default function AdminNetWorthPage() {
 
   const save = async (event) => {
     event.preventDefault();
+    if (saving) return;
+    setSaving(true);
     try {
       const response = await apiFetch(editingId ? `/finance/networth/items/${editingId}` : '/finance/networth/items', {
         method: editingId ? 'PATCH' : 'POST',
@@ -39,16 +43,24 @@ export default function AdminNetWorthPage() {
       await load();
     } catch (error) {
       setNotice(error.message || 'Item gagal disimpan ke database.');
+    } finally {
+      setSaving(false);
     }
   };
 
   const remove = async (item) => {
+    if (deletingId) return;
     if (!window.confirm(`Arsipkan "${item.name}"?`)) return;
-    const response = await apiFetch(`/finance/networth/items/${item.id}`, { method: 'DELETE' });
-    const result = await response.json();
-    if (!response.ok || !result.success) throw new Error(result.message || 'Item gagal dihapus');
-    setNotice('Item berhasil diarsipkan.');
-    await load();
+    setDeletingId(item.id);
+    try {
+      const response = await apiFetch(`/finance/networth/items/${item.id}`, { method: 'DELETE' });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Item gagal dihapus');
+      setNotice('Item berhasil diarsipkan.');
+      await load();
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -72,7 +84,7 @@ export default function AdminNetWorthPage() {
               <label>Nama item<input list="networth-item-names" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Pilih atau ketik nama item" required /><datalist id="networth-item-names">{[...new Set(items.map((item) => item.name))].map((name) => <option key={name} value={name} />)}</datalist><small className="finance-field-help">Jika nama dan jenis sama, nominal baru akan ditambahkan ke item yang sudah ada.</small></label>
               <label>Jenis<select value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })}><option value="ASSET">Aset</option><option value="LIABILITY">Liabilitas</option></select></label>
               <label>Nilai<CurrencyInput value={form.value} onValueChange={(value) => setForm({ ...form, value })} placeholder="Rp 0" required /></label>
-              <div className="finance-form-actions"><button className="btn btn-primary" type="submit">{editingId ? 'Simpan perubahan' : 'Tambah item'}</button>{editingId && <button className="btn btn-secondary" type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }}>Batal</button>}</div>
+              <div className="finance-form-actions"><button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah item'}</button>{editingId && <button className="btn btn-secondary" type="button" disabled={saving} onClick={() => { setEditingId(null); setForm(emptyForm); }}>Batal</button>}</div>
             </form>
           </section>
           <section className="finance-panel finance-tip-panel"><span className="finance-tip-icon">i</span><h2>Tips pencatatan</h2><p>Masukkan nilai terbaru untuk aset fisik, saldo kas, kendaraan, atau kewajiban di luar piutang toko.</p><div className="finance-tip-line"><span>Item tercatat</span><strong>{items.length}</strong></div></section>

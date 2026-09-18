@@ -21,7 +21,7 @@ export function printReceipt(elementId) {
         <title>Struk Glosir</title>
         ${styles}
         <style>
-          @page { margin: 12mm; size: A4 portrait; }
+          @page { margin: 0; size: 58mm auto; }
           html, body {
             margin: 0;
             padding: 0;
@@ -37,13 +37,13 @@ export function printReceipt(elementId) {
             font-family: Arial, sans-serif !important;
           }
           #printable-receipt {
-            width: 180mm !important;
-            max-width: 180mm !important;
+            width: 48mm !important;
+            max-width: 48mm !important;
             min-height: 0 !important;
             height: auto !important;
             max-height: none !important;
             margin: 0 auto;
-            padding: 8mm !important;
+            padding: 3mm !important;
             border: 1px solid #000 !important;
             box-shadow: none !important;
             color: #000 !important;
@@ -53,8 +53,8 @@ export function printReceipt(elementId) {
             break-inside: auto !important;
             page-break-inside: auto !important;
             font-family: "Courier New", monospace !important;
-            font-size: 11px !important;
-            line-height: 1.35 !important;
+            font-size: 14px !important;
+            line-height: 1.4 !important;
           }
           #printable-receipt,
           #printable-receipt * {
@@ -68,7 +68,7 @@ export function printReceipt(elementId) {
             height: auto !important;
             overflow: visible !important;
           }
-          .receipt-shop-head h2 { font-size: 22px !important; }
+          .receipt-shop-head h2 { font-size: 26px !important; }
           .receipt-shop-head p,
           .receipt-shop-head small,
           .receipt-meta,
@@ -76,8 +76,8 @@ export function printReceipt(elementId) {
           .receipt-summary,
           .receipt-footer { overflow: visible !important; }
           .receipt-shop-head p,
-          .receipt-shop-head small { font-size: 10px !important; }
-          .receipt-meta { gap: 3px !important; font-size: 10px !important; }
+          .receipt-shop-head small { font-size: 12px !important; }
+          .receipt-meta { gap: 4px !important; font-size: 12px !important; }
           .receipt-meta div,
           .receipt-sum-row { display: grid !important; grid-template-columns: 1fr auto; gap: 4px; }
           .receipt-item-row {
@@ -87,12 +87,12 @@ export function printReceipt(elementId) {
             break-inside: avoid-page;
             page-break-inside: avoid;
           }
-          .receipt-item-title strong { font-size: 11px !important; }
+          .receipt-item-title strong { font-size: 13px !important; }
           .receipt-item-title span,
-          .receipt-summary { font-size: 10px !important; }
+          .receipt-summary { font-size: 12px !important; }
           .receipt-items-list { gap: 4px !important; }
           .receipt-summary { gap: 2px !important; }
-          .receipt-sum-row.total-row { font-size: 13px !important; }
+          .receipt-sum-row.total-row { font-size: 15px !important; }
           .receipt-point-summary,
           .receipt-point-summary-box,
           .receipt-footer small { display: none !important; }
