@@ -17,6 +17,8 @@ export default function AdminPromosPage() {
   const [notice, setNotice] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const loadPromos = async () => {
     try {
@@ -45,13 +47,16 @@ export default function AdminPromosPage() {
   const visiblePromos = promos.filter((promo) => `${promo.name} ${promo.code}`.toLowerCase().includes(search.toLowerCase()));
   const allSelected = visiblePromos.length > 0 && visiblePromos.every((promo) => selectedIds.includes(promo.id));
   const deleteSelected = async () => {
+    if (bulkDeleting) return;
     if (!selectedIds.length || !await confirmAction(`Hapus ${selectedIds.length} promo terpilih?`)) return;
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/promos/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
-    const count = results.filter((result) => result.status === 'fulfilled').length;
-    setSelectedIds([]); setBulkDeleting(false); await loadPromos();
-    setNotice(`${count} promo berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
-    showNotice(`${count} promo berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
+    try {
+      const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/promos/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+      const count = results.filter((result) => result.status === 'fulfilled').length;
+      setSelectedIds([]); await loadPromos();
+      setNotice(`${count} promo berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
+      showNotice(`${count} promo berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
+    } finally { setBulkDeleting(false); }
   };
 
   const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
@@ -60,6 +65,7 @@ export default function AdminPromosPage() {
 
   const submitForm = async (event) => {
     event.preventDefault();
+    if (saving) return;
     if (!form.name.trim() || !form.code.trim() || !form.value) {
       setNotice('Lengkapi nama, kode, dan nilai promo.');
       return;
@@ -74,6 +80,7 @@ export default function AdminPromosPage() {
       isActive: form.status === 'Aktif',
     };
 
+    setSaving(true);
     try {
       const response = await apiFetch(editingId ? `/promos/${editingId}` : '/promos', {
         method: editingId ? 'PATCH' : 'POST',
@@ -87,12 +94,15 @@ export default function AdminPromosPage() {
       await loadPromos();
     } catch (error) {
       setNotice(error.message || 'Promo gagal disimpan');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async (promo) => {
+    if (deletingId) return;
     if (!await confirmAction(`Hapus promo "${promo.name}"?`)) return;
-
+    setDeletingId(promo.id);
     try {
       const response = await apiFetch(`/promos/${promo.id}`, { method: 'DELETE' });
       const data = await response.json();
@@ -101,6 +111,8 @@ export default function AdminPromosPage() {
       await loadPromos();
     } catch (error) {
       setNotice(error.message || 'Promo gagal dihapus');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -131,7 +143,7 @@ export default function AdminPromosPage() {
                 <span className="panel-kicker">{editingId ? 'Edit promo' : 'Promo baru'}</span>
                 <h2>{editingId ? 'Perbarui campaign' : 'Tambah promo'}</h2>
               </div>
-              {editingId && <button type="button" className="text-button" onClick={resetForm}>Batal</button>}
+              {editingId && <button type="button" className="text-button" onClick={resetForm} disabled={saving}>Batal</button>}
             </div>
 
             <label>Nama promo<input name="name" value={form.name} onChange={updateField} placeholder="Contoh: Promo Lebaran" /></label>
@@ -155,7 +167,7 @@ export default function AdminPromosPage() {
             </div>
 
             <label>{form.type === 'Potongan tetap' ? 'Nominal potongan (Rupiah)' : 'Besar diskon (Persen)'}{form.type === 'Potongan tetap' ? <CurrencyInput name="value" value={form.value} onValueChange={(value) => setForm((current) => ({ ...current, value }))} placeholder="Rp 25.000" /> : <input name="value" value={form.value} onChange={updateField} type="number" min="0" max="100" placeholder="15" />}<small className="field-help">{form.type === 'Potongan tetap' ? 'Contoh: ketik 25000 untuk menjadi Rp 25.000.' : 'Contoh: ketik 15 untuk diskon 15%.'}</small></label>
-            <button className="btn btn-primary full" type="submit">{editingId ? 'Simpan perubahan' : 'Tambah promo'}</button>
+            <button className="btn btn-primary full" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah promo'}</button>
           </form>
 
           <section className="crud-table-panel">
@@ -192,7 +204,7 @@ export default function AdminPromosPage() {
                             setEditingId(promo.id);
                             setForm({ name: promo.name, code: promo.code, type: promo.type, value: promo.value, status: promo.status });
                           }}>Edit</button>
-                          <button onClick={() => handleDelete(promo)}>Hapus</button>
+                          <button onClick={() => handleDelete(promo)} disabled={deletingId === promo.id}>{deletingId === promo.id ? 'Menghapus...' : 'Hapus'}</button>
                         </div>
                       </td>
                     </tr>

@@ -14,8 +14,13 @@ const reminderSchema = z.object({
 const router = express.Router();
 router.use(authenticateToken);
 router.get('/', async (req, res) => {
-  const rows = await prisma.financeReminder.findMany({ where: { ...(req.query.status ? { status: String(req.query.status) } : {}) }, orderBy: { dueDate: 'asc' }, take: 100 });
-  return res.json({ success: true, data: rows });
+  try {
+    const rows = await prisma.financeReminder.findMany({ where: { ...(req.query.status ? { status: String(req.query.status) } : {}) }, orderBy: { dueDate: 'asc' }, take: 100 });
+    return res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Finance reminders unavailable:', error.message);
+    return res.status(503).json({ success: false, message: 'Reminder keuangan sementara tidak tersedia.' });
+  }
 });
 router.post('/', requireRole('OWNER', 'ADMIN'), validateBody(reminderSchema), async (req, res) => {
   const row = await prisma.financeReminder.create({ data: { ...req.body, dueDate: new Date(req.body.dueDate) } });

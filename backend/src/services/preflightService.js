@@ -183,7 +183,7 @@ export async function runDailyPreflightCheck() {
         createdIds.financeTransactionIds.push(fin.id);
 
         return { ord, updatedVariant, fin };
-      });
+      }, { maxWait: 10000, timeout: 30000 });
 
       const actualChange = cashPaid - cashTotal;
       const pass = actualChange === expectedChange && Number(cashOrder.ord.total) === cashTotal;
@@ -302,7 +302,7 @@ export async function runDailyPreflightCheck() {
           },
         });
         createdIds.debtRecordIds.push(debt.id);
-      });
+      }, { maxWait: 10000, timeout: 30000 });
 
       const recordedDebt = await prisma.debtRecord.findFirst({
         where: { customerId: testCustomer.id, status: 'OPEN' },

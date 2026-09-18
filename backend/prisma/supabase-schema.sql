@@ -7,7 +7,7 @@ create type "Role" as enum ('OWNER', 'ADMIN', 'CASHIER');
 create type "ProductStatus" as enum ('ACTIVE', 'DRAFT', 'HIDDEN', 'OUT_OF_STOCK');
 create type "TransactionType" as enum ('INCOME', 'EXPENSE', 'TRANSFER', 'DEBT');
 create type "OrderType" as enum ('STORE', 'ONLINE', 'WHATSAPP');
-create type "OrderStatus" as enum ('PENDING', 'CONFIRMED', 'PROCESSING', 'READY', 'COMPLETED', 'CANCELLED');
+create type "OrderStatus" as enum ('PENDING', 'CONFIRMED', 'PROCESSING', 'READY', 'HOLD', 'COMPLETED', 'CANCELLED');
 create type "ParcelType" as enum ('STANDARD', 'CUSTOM');
 
 create table "User" (
@@ -282,4 +282,3 @@ using (bucket_id = 'catalog-images');
 create policy "Catalog images deletes"
 on storage.objects for delete
 using (bucket_id = 'catalog-images');
-

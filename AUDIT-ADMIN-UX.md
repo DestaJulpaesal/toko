@@ -99,6 +99,62 @@ disediakan: create, update, dan nonaktifkan.
    tanpa membuka menu admin.
 5. Sediakan shortcut “Tambah transaksi cepat” dari header dashboard.
 
+## Keputusan Arsitektur
+
+Folder `backend/src/controllers/`, `frontend/src/hooks/`, dan
+`frontend/src/features/` sengaja belum diisi. Saat ini struktur yang paling
+rapi untuk ukuran aplikasi ini adalah:
+
+```text
+Route -> validasi + autentikasi -> Prisma/service khusus -> database
+Page -> komponen/context -> api service -> API
+```
+
+Memaksa semua route dipindahkan ke controller sekarang hanya akan menambah
+file dan lapisan tanpa mengurangi kompleksitas. Controller baru layak dibuat
+ketika satu domain sudah memiliki banyak handler atau perlu diuji terpisah.
+
+Rencana pemakaian folder ke depan:
+
+- `controllers/`: dipakai bertahap untuk domain besar seperti order, finance,
+  dan parcel jika route mulai sulit dirawat; satu migrasi domain per tahap.
+- `hooks/`: dipakai untuk logika UI yang berulang, misalnya `useApiList`,
+  `useDebouncedSearch`, dan `usePersistedTableFilters`.
+- `features/`: dipakai bila satu fitur sudah memiliki page, komponen, service,
+  dan test sendiri. Kandidat pertama adalah `features/cashier` dan
+  `features/finance`.
+
+Untuk sekarang, folder kosong tersebut tidak perlu dihapus atau dipaksa diisi.
+Yang penting adalah aturan kontribusi: logika database tidak masuk komponen
+React, dan logika UI berulang baru dipindahkan ke hook setelah muncul di dua
+atau lebih halaman.
+
+## Implementasi Prioritas September 2026
+
+Sudah diterapkan:
+
+1. Dashboard owner sederhana menjadi halaman awal dengan empat ringkasan utama
+   dan empat tombol kerja besar: Kasir, Catat Uang Keluar, Cek Stok, dan
+   Kelola Parsel.
+2. Ukuran teks dashboard tetap dapat diperbesar dari sidebar dan tombol utama
+   memenuhi target sentuh yang lebih nyaman.
+3. Prisma memakai pool koneksi kecil yang sesuai untuk Supabase pooler.
+4. Backup bootstrap saat server baru menyala dibuat opt-in melalui
+   `ENABLE_BOOTSTRAP_BACKUP=true`, agar server tidak langsung menghabiskan
+   koneksi database. Backup manual dan backup terjadwal tetap tersedia.
+5. Preflight operasional backend berhasil 4/4: koneksi database, transaksi
+   tunai, pemotongan stok, dan pencatatan piutang.
+
+Tahap berikutnya sebelum dipakai di toko:
+
+1. Uji langsung alur kasir dengan scanner dan printer yang akan dipakai.
+2. Buat akun owner dan kasir non-demo, lalu lakukan uji pemulihan password/
+   pergantian perangkat.
+3. Uji tutup kas harian dan rekonsiliasi dengan uang fisik.
+4. Tambahkan mode “Bantuan” berisi langkah bergambar untuk kasir baru.
+5. Lakukan uji penerimaan bersama orang tua menggunakan tugas nyata, bukan
+   hanya uji teknis halaman.
+
 ### Prioritas lanjutan
 
 1. Tambahkan mode ukuran teks besar untuk layar kasir dan pengguna lanjut usia.

@@ -35,6 +35,9 @@ export default function CashierPage() {
   const [products, setProducts] = useState([]);
   const [databaseCategories, setDatabaseCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [heldCarts, setHeldCarts] = useState([]);
+  const [activeHoldId, setActiveHoldId] = useState(null);
+  const [holdsLoading, setHoldsLoading] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [customCustomerName, setCustomCustomerName] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
@@ -57,6 +60,17 @@ export default function CashierPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
+  const [averageTransaction, setAverageTransaction] = useState(0);
+
+  const refreshAverageTransaction = async () => {
+    try {
+      const response = await apiFetch('/orders/average-transaction', { silentNotify: true });
+      const data = await response.json().catch(() => ({}));
+      if (data.success && Number.isFinite(data.average)) setAverageTransaction(data.average);
+    } catch {
+      // Non-critical background refresh; keep whatever value we already have.
+    }
+  };
 
   // Mode Kasir Layar Penuh & Bantuan
   const [fullscreenMode, setFullscreenMode] = useState(false);
@@ -65,10 +79,26 @@ export default function CashierPage() {
 
   // Completed receipt modal
   const [completedOrder, setCompletedOrder] = useState(null);
+  const checkoutInFlightRef = useRef(false);
 
   // Barcode Scanner Modal State
   const [scannerOpen, setScannerOpen] = useState(false);
   const scanInputRef = useRef(null);
+
+  const loadHeldCarts = async () => {
+    setHoldsLoading(true);
+    try {
+      const response = await apiFetch('/orders/holds');
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.success && Array.isArray(data.holds)) {
+        setHeldCarts(data.holds);
+      }
+    } catch (error) {
+      console.warn('Failed to load held carts:', error.message);
+    } finally {
+      setHoldsLoading(false);
+    }
+  };
 
   // Load products & customers
   const loadData = async () => {
@@ -116,8 +146,61 @@ export default function CashierPage() {
     }
   };
 
+  const holdCurrentCart = async () => {
+    if (!items.length) {
+      setNotice('Keranjang belanja masih kosong.');
+      return;
+    }
+    if (activeHoldId) {
+      setNotice('Selesaikan atau batalkan cart yang sedang dilanjutkan sebelum menahan cart baru.');
+      return;
+    }
+
+    const label = window.prompt('Nama atau catatan pembeli untuk cart ini:', activeCustomer?.name || '');
+    if (label === null) return;
+
+    try {
+      const response = await apiFetch('/orders/hold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        silentNotify: true,
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            variantId: item.variantId || item.id,
+            eventPackageId: item.eventPackageId,
+            parcelId: item.parcelId,
+            quantity: item.qty,
+          })),
+          customerId: selectedCustomerId && selectedCustomerId !== 'NEW' ? selectedCustomerId : null,
+          customerName: activeCustomer?.name || (label.trim() || null),
+          customerType,
+          discount: totalDiscount,
+          promoId: activePromo.id,
+          note: label.trim(),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || 'Belanjaan gagal ditahan.');
+
+      setHeldCarts((current) => [data.hold, ...current]);
+      setItems([]);
+      setPaidAmount('');
+      setCustomerEnabled(false);
+      setSelectedCustomerId('');
+      setCustomCustomerName('');
+      setCustomerSearch('');
+      setSelectedPromoId('none');
+      setCustomerType('RETAIL');
+      setNotice(`Belanjaan ditahan${label.trim() ? ` dengan catatan "${label.trim()}"` : ''}.`);
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    refreshAverageTransaction();
+    loadHeldCarts();
   }, []);
 
   useEffect(() => {
@@ -159,6 +242,9 @@ export default function CashierPage() {
       if (e.key === 'F2') {
         e.preventDefault();
         setHelpModalOpen((prev) => !prev);
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        holdCurrentCart();
       } else if (e.key === 'Escape' && fullscreenMode) {
         if (!scannerOpen && !completedOrder && !helpModalOpen) {
           toggleFullscreen();
@@ -172,7 +258,7 @@ export default function CashierPage() {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [fullscreenMode, scannerOpen, completedOrder, helpModalOpen]);
+  }, [fullscreenMode, scannerOpen, completedOrder, helpModalOpen, holdCurrentCart]);
 
   useEffect(() => {
     if (loading || scannerOpen || completedOrder) return undefined;
@@ -368,6 +454,7 @@ export default function CashierPage() {
       addProduct(product);
       playBeep(1500, 0.12);
       setNotice(`✓ Berhasil scan ${product.name}! (+1 ke keranjang)`);
+      window.requestAnimationFrame(() => scanInputRef.current?.focus());
     } else {
       setNotice(`Barcode "${scannedCode}" tidak ditemukan di katalog produk.`);
     }
@@ -390,11 +477,13 @@ export default function CashierPage() {
         playBeep(1500, 0.1);
         setNotice(`✓ Berhasil scan ${exact.name}! (+1 ke keranjang)`);
         setSearch('');
+        window.requestAnimationFrame(() => scanInputRef.current?.focus());
       } else if (filteredProducts.length > 0) {
         addProduct(filteredProducts[0]);
         playBeep(1500, 0.1);
         setNotice(`✓ Menambahkan ${filteredProducts[0].name}!`);
         setSearch('');
+        window.requestAnimationFrame(() => scanInputRef.current?.focus());
       } else {
         setNotice(`Barang dengan barcode/nama "${search}" tidak ditemukan.`);
       }
@@ -431,12 +520,114 @@ export default function CashierPage() {
     setNotice('Keranjang berhasil dikosongkan.');
   };
 
+  const resumeHeldCart = async (hold) => {
+    if (items.length && !await confirmAction('Cart aktif akan diganti dengan belanjaan tertahan ini. Lanjutkan?')) return;
+
+    setItems(hold.items.map((heldItem) => {
+      const catalogItem = products.find((product) => product.id === heldItem.variantId) || {};
+      return {
+        ...catalogItem,
+        id: heldItem.variantId || heldItem.id,
+        variantId: heldItem.variantId || undefined,
+        productId: heldItem.productId || catalogItem.productId,
+        eventPackageId: heldItem.eventPackageId || undefined,
+        parcelId: heldItem.parcelId || undefined,
+        name: heldItem.name,
+        sku: catalogItem.sku || '',
+        price: heldItem.unitPrice,
+        qty: heldItem.quantity,
+        stock: catalogItem.stock,
+      };
+    }));
+    setActiveHoldId(hold.id);
+    setPaidAmount('');
+    setCustomerType(hold.customerType || 'RETAIL');
+    setSelectedPromoId(hold.promoId || 'none');
+    if (hold.customer?.id) {
+      setCustomerEnabled(true);
+      setSelectedCustomerId(hold.customer.id);
+      setCustomCustomerName('');
+    } else if (hold.customerName) {
+      setCustomerEnabled(true);
+      setSelectedCustomerId('NEW');
+      setCustomCustomerName(hold.customerName);
+    } else {
+      setCustomerEnabled(false);
+      setSelectedCustomerId('');
+      setCustomCustomerName('');
+    }
+    setNotice(`Melanjutkan ${hold.note || hold.customerName || hold.orderNumber}. Stok akan dicek saat checkout.`);
+  };
+
+  const cancelHeldCart = async (hold) => {
+    if (!await confirmAction(`Batalkan belanjaan tertahan "${hold.note || hold.orderNumber}"?`)) return;
+    try {
+      const response = await apiFetch(`/orders/holds/${hold.id}`, {
+        method: 'DELETE',
+        silentNotify: true,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) throw new Error(data.message || 'Belanjaan tertahan gagal dibatalkan.');
+      setHeldCarts((current) => current.filter((item) => item.id !== hold.id));
+      if (activeHoldId === hold.id) {
+        setActiveHoldId(null);
+        setItems([]);
+        setPaidAmount('');
+        setCustomerEnabled(false);
+        setSelectedCustomerId('');
+        setCustomCustomerName('');
+        setSelectedPromoId('none');
+        setCustomerType('RETAIL');
+      }
+      setNotice('Belanjaan tertahan dibatalkan.');
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
+  const renderHeldCarts = () => (
+    <section className="pos-held-carts">
+      <div className="pos-held-carts-header">
+        <div>
+          <span className="panel-kicker">Antrian tertunda</span>
+          <strong>⏸️ Belanjaan Ditahan ({heldCarts.length})</strong>
+          <small>Pilih Resume untuk melanjutkan tanpa scan ulang.</small>
+        </div>
+        <button type="button" className="pos-held-refresh" onClick={loadHeldCarts} disabled={holdsLoading}>
+          {holdsLoading ? 'Memuat...' : '↻ Muat ulang'}
+        </button>
+      </div>
+      {heldCarts.length > 0 && (
+        <div className="pos-held-carts-list">
+          {heldCarts.map((hold) => (
+            <article className={`pos-held-cart-card ${activeHoldId === hold.id ? 'active' : ''}`} key={hold.id}>
+              <div className="pos-held-cart-copy">
+                <strong>{hold.note || hold.customerName || hold.orderNumber}</strong>
+                <span>{hold.itemCount} barang • {formatMoney(hold.total)}</span>
+                <small>{new Date(hold.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</small>
+              </div>
+              <div className="pos-held-cart-actions">
+                <button type="button" className="pos-held-resume-btn" onClick={() => resumeHeldCart(hold)} disabled={activeHoldId && activeHoldId !== hold.id}>
+                  ▶ Lanjutkan
+                </button>
+                <button type="button" className="pos-held-cancel-btn" onClick={() => cancelHeldCart(hold)} aria-label={`Batalkan ${hold.orderNumber}`}>
+                  ×
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+
   const setQuickCash = (amount) => {
     setPaidAmount(String(amount));
   };
 
   // Complete Transaction
   const completeTransaction = async ({ autoPrint = false } = {}) => {
+    if (checkoutInFlightRef.current) return;
     if (!items.length) {
       setNotice('Keranjang belanja masih kosong.');
       return;
@@ -451,23 +642,25 @@ export default function CashierPage() {
       return;
     }
 
-    const averageResponse = await apiFetch('/orders/average-transaction');
-    const averageData = await averageResponse.json().catch(() => ({}));
-    if (averageData.success && averageData.average > 0 && finalTotal > averageData.average * 5) {
-      const proceed = await confirmAction(`Nominal ini jauh lebih besar dari biasanya. Rata-rata 30 hari: ${formatMoney(averageData.average)}. Tetap lanjutkan?`);
+    if (averageTransaction > 0 && finalTotal > averageTransaction * 5) {
+      const proceed = await confirmAction(`Nominal ini jauh lebih besar dari biasanya. Rata-rata 30 hari: ${formatMoney(averageTransaction)}. Tetap lanjutkan?`);
       if (!proceed) return;
     }
     if (!await confirmAction(`Yakin menyelesaikan transaksi sebesar ${formatMoney(finalTotal)}?`)) return;
 
     setSaving(true);
+    checkoutInFlightRef.current = true;
     setNotice('');
 
     const payload = {
       items: items.map((item) => ({
         variantId: item.variantId || item.id,
         productId: item.productId || item.id,
+        eventPackageId: item.eventPackageId,
+        parcelId: item.parcelId,
         name: item.name,
         price: item.price,
+        unitPrice: item.price,
         quantity: item.qty,
       })),
       paidAmount: paymentMethod === 'DEBT' ? 0 : effectivePaid,
@@ -480,6 +673,7 @@ export default function CashierPage() {
       discount: totalDiscount,
       promoName: activePromo.id !== 'none' ? activePromo.name : null,
       promoDiscount,
+      holdOrderId: activeHoldId,
     };
 
     try {
@@ -522,6 +716,11 @@ export default function CashierPage() {
       };
 
       setCompletedOrder(receipt);
+      refreshAverageTransaction();
+      if (activeHoldId) {
+        setHeldCarts((current) => current.filter((hold) => hold.id !== activeHoldId));
+        setActiveHoldId(null);
+      }
 
       if (autoPrint) {
         setTimeout(() => {
@@ -542,52 +741,16 @@ export default function CashierPage() {
         })
       );
     } catch (error) {
-      console.warn('Checkout offline, using simulated receipt:', error.message);
-
-      const previousCustomerPoints = 0;
-      const currentCustomerPoints = 0;
-
-      const receipt = {
-        orderNumber: `POS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
-        items: [...items],
-        subtotal,
-        promoName: activePromo.id !== 'none' ? activePromo.name : null,
-        promoDiscount,
-        pointDiscount: 0,
-        discount: totalDiscount,
-        total: finalTotal,
-        paidAmount: effectivePaid,
-        change: Math.max(effectivePaid - finalTotal, 0),
-        paymentMethod,
-        paymentReference: null,
-        customer: activeCustomer,
-        cashierName: 'Kasir Glosir',
-        earnedPoints,
-        previousPoints: previousCustomerPoints,
-        currentPoints: currentCustomerPoints,
-        createdAt: new Date().toISOString(),
-      };
-
-      setCompletedOrder(receipt);
-
-      if (autoPrint) {
-        setTimeout(() => {
-          try {
-            printReceipt('printable-receipt');
-          } catch (printErr) {
-            console.warn('Auto print failed:', printErr.message);
-          }
-        }, 400);
-      }
-
-      setCompletedOrder(receipt);
+      setNotice(error.message || 'Transaksi belum tersimpan. Periksa koneksi lalu coba lagi.');
     } finally {
+      checkoutInFlightRef.current = false;
       setSaving(false);
     }
   };
 
   const handleResetForNewOrder = () => {
     setItems([]);
+    setActiveHoldId(null);
     setPaidAmount('');
     setCustomerEnabled(false);
     setSelectedCustomerId('');
@@ -855,6 +1018,15 @@ export default function CashierPage() {
             </button>
             <button
               type="button"
+              className="btn-kiosk-hold"
+              onClick={holdCurrentCart}
+              disabled={!items.length || Boolean(activeHoldId)}
+              title="Tahan belanjaan saat ini (F4)"
+            >
+              ⏸️ Tahan Belanjaan <kbd>F4</kbd>
+            </button>
+            <button
+              type="button"
               className="btn-kiosk-exit"
               onClick={toggleFullscreen}
               title="Keluar dari layar penuh (Esc)"
@@ -870,6 +1042,8 @@ export default function CashierPage() {
             <button onClick={() => setNotice('')}>×</button>
           </div>
         )}
+
+        {renderHeldCarts()}
 
         {/* Kiosk Main Grid */}
         <div className="kiosk-main-grid">
@@ -1118,6 +1292,15 @@ export default function CashierPage() {
             </button>
             <button
               type="button"
+              className="btn-pos-hold"
+              onClick={holdCurrentCart}
+              disabled={!items.length || Boolean(activeHoldId)}
+              title="Tahan belanjaan saat ini (F4)"
+            >
+              ⏸️ Tahan (F4)
+            </button>
+            <button
+              type="button"
               className="btn-pos-help"
               onClick={() => setHelpModalOpen(true)}
               title="Panduan Langkah Kasir (F2)"
@@ -1136,6 +1319,8 @@ export default function CashierPage() {
             <button onClick={() => setNotice('')} aria-label="Tutup notifikasi">×</button>
           </div>
         )}
+
+        {renderHeldCarts()}
 
         {/* 2-Column POS Layout */}
         <section className="pos-grid-container">
@@ -1430,7 +1615,7 @@ export default function CashierPage() {
                     </div>
                     <button
                       className="btn-finish-pay btn-cash-pay"
-                      disabled={saving || !selectedCustomerId || selectedCustomerId === 'NEW'}
+                      disabled={saving || !selectedCustomerId || (selectedCustomerId === 'NEW' && !customCustomerName.trim())}
                       onClick={() => completeTransaction({ autoPrint: true })}
                     >
                       {saving ? 'Menyimpan Transaksi...' : `Simpan Bon & Cetak (${formatMoney(finalTotal)})`}

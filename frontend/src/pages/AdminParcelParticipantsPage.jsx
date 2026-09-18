@@ -38,6 +38,9 @@ export default function AdminParcelParticipantsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [recordingContribution, setRecordingContribution] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [collectionParticipant, setCollectionParticipant] = useState(null);
   const [collectionForm, setCollectionForm] = useState({ amount: '', paidAt: new Date().toISOString().slice(0, 10), note: '' });
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -143,22 +146,27 @@ export default function AdminParcelParticipantsPage() {
     completed: participants.filter((item) => item.collectionStatus === 'COMPLETED').length,
   }), [participants]);
   const deleteSelected = async () => {
+    if (bulkDeleting) return;
     if (!selectedIds.length || !await confirmAction(`Hapus ${selectedIds.length} peserta terpilih beserta riwayat setorannya?`)) return;
     setBulkDeleting(true);
-    const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcel-participants/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
-    const count = results.filter((result) => result.status === 'fulfilled').length;
-    setSelectedIds([]); setBulkDeleting(false); await load();
-    setNotice(`${count} peserta berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
-    showNotice(`${count} peserta berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
+    try {
+      const results = await Promise.allSettled(selectedIds.map((id) => apiFetch(`/parcel-participants/${id}`, { method: 'DELETE', silentNotify: true }).then(async (response) => { const data = await response.json(); if (!response.ok || !data.success) throw new Error(data.message || 'Gagal menghapus'); return id; })));
+      const count = results.filter((result) => result.status === 'fulfilled').length;
+      setSelectedIds([]); await load();
+      setNotice(`${count} peserta berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`);
+      showNotice(`${count} peserta berhasil dihapus${count < results.length ? `, ${results.length - count} gagal` : ''}.`, count < results.length ? 'error' : 'success');
+    } finally { setBulkDeleting(false); }
   };
 
   const submit = async (event) => {
     event.preventDefault();
+    if (saving) return;
     if (!form.participantName.trim() || !form.programId || Number(form.targetAmount) <= 0 || Number(form.contributionAmount) <= 0 || (!isParcelManager && !form.regionId)) {
       setNotice(isParcelManager ? 'Nama peserta, program, target, dan setoran wajib diisi.' : 'Nama peserta, wilayah, program, target, dan setoran wajib diisi.');
       return;
     }
     if (!await confirmAction(`${editingId ? 'Perbarui' : 'Daftarkan'} peserta parsel ini?`)) return;
+    setSaving(true);
     try {
       const response = await apiFetch(
         editingId ? `/parcel-participants/${editingId}` : '/parcel-participants',
@@ -175,6 +183,8 @@ export default function AdminParcelParticipantsPage() {
       await load();
     } catch (error) {
       setNotice(error.message || 'Peserta gagal disimpan.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -182,6 +192,8 @@ export default function AdminParcelParticipantsPage() {
     event.preventDefault();
     const participant = collectionParticipant;
     if (!participant || Number(collectionForm.amount) <= 0) return;
+    if (recordingContribution) return;
+    setRecordingContribution(true);
     try {
       const response = await apiFetch(`/parcel-participants/${participant.id}/contributions`, {
         method: 'POST',
@@ -195,6 +207,8 @@ export default function AdminParcelParticipantsPage() {
       await load();
     } catch (error) {
       setNotice(error.message || 'Setoran gagal dicatat.');
+    } finally {
+      setRecordingContribution(false);
     }
   };
 
@@ -221,7 +235,9 @@ export default function AdminParcelParticipantsPage() {
   };
 
   const remove = async (participant) => {
+    if (deletingId) return;
     if (!await confirmAction(`Hapus peserta "${participant.name}" beserta riwayat setorannya?`)) return;
+    setDeletingId(participant.id);
     try {
       const response = await apiFetch(`/parcel-participants/${participant.id}`, { method: 'DELETE' });
       const data = await response.json();
@@ -230,6 +246,8 @@ export default function AdminParcelParticipantsPage() {
       await load();
     } catch (error) {
       setNotice(error.message || 'Peserta gagal dihapus.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -272,7 +290,7 @@ export default function AdminParcelParticipantsPage() {
           <article className={summary.overdue ? 'is-warning' : ''}><span>Perlu ditagih</span><strong>{summary.overdue}</strong><small>Peserta melewati jadwal</small></article>
         </section>
 
-        {collectionParticipant && <div className="parcel-collection-modal"><form onSubmit={recordContribution} className="parcel-collection-card"><div className="panel-heading"><div><span className="panel-kicker">Penagihan keliling</span><h2>Catat cash: {collectionParticipant.name}</h2></div><button type="button" className="text-button" onClick={() => setCollectionParticipant(null)}>Tutup</button></div><label>Nominal diterima<CurrencyInput value={collectionForm.amount} onValueChange={(value) => setCollectionForm((current) => ({ ...current, amount: value }))} /></label><label>Tanggal<input type="date" value={collectionForm.paidAt} onChange={(event) => setCollectionForm((current) => ({ ...current, paidAt: event.target.value }))} /></label><label>Catatan<textarea rows="2" value={collectionForm.note} onChange={(event) => setCollectionForm((current) => ({ ...current, note: event.target.value }))} /></label><button className="btn btn-primary full" type="submit">Simpan setoran cash</button></form></div>}
+        {collectionParticipant && <div className="parcel-collection-modal"><form onSubmit={recordContribution} className="parcel-collection-card"><div className="panel-heading"><div><span className="panel-kicker">Penagihan keliling</span><h2>Catat cash: {collectionParticipant.name}</h2></div><button type="button" className="text-button" onClick={() => setCollectionParticipant(null)} disabled={recordingContribution}>Tutup</button></div><label>Nominal diterima<CurrencyInput value={collectionForm.amount} onValueChange={(value) => setCollectionForm((current) => ({ ...current, amount: value }))} /></label><label>Tanggal<input type="date" value={collectionForm.paidAt} onChange={(event) => setCollectionForm((current) => ({ ...current, paidAt: event.target.value }))} /></label><label>Catatan<textarea rows="2" value={collectionForm.note} onChange={(event) => setCollectionForm((current) => ({ ...current, note: event.target.value }))} /></label><button className="btn btn-primary full" type="submit" disabled={recordingContribution}>{recordingContribution ? 'Menyimpan...' : 'Simpan setoran cash'}</button></form></div>}
 
         {notice && (
           <div className="crud-notice" role="status">
@@ -289,7 +307,7 @@ export default function AdminParcelParticipantsPage() {
                 <h2>{editingId ? 'Perbarui peserta' : 'Daftarkan peserta'}</h2>
               </div>
               {editingId && (
-                <button type="button" className="text-button" onClick={reset}>
+                <button type="button" className="text-button" onClick={reset} disabled={saving}>
                   Batal
                 </button>
               )}
@@ -385,8 +403,8 @@ export default function AdminParcelParticipantsPage() {
               <textarea name="notes" rows="2" value={form.notes} onChange={update} placeholder="Catatan peserta" />
             </label>
 
-            <button className="btn btn-primary full" type="submit">
-              {editingId ? 'Simpan perubahan' : 'Tambah peserta'}
+            <button className="btn btn-primary full" type="submit" disabled={saving}>
+              {saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah peserta'}
             </button>
           </form>
 
@@ -443,7 +461,7 @@ export default function AdminParcelParticipantsPage() {
                           <button className="icon-action icon-action-debt" onClick={() => openCollection(item)} title="Catat setoran cash" aria-label="Catat setoran cash"><Check size={15} /></button>
                           <button className="icon-action" onClick={() => printReceipt(item)} title="Cetak bukti" aria-label="Cetak bukti"><Printer size={14} /></button>
                           <button className="icon-action" onClick={() => edit(item)} title="Edit peserta" aria-label="Edit peserta"><Pencil size={14} /></button>
-                          <button className="icon-action icon-action-danger" onClick={() => remove(item)} title="Hapus peserta" aria-label="Hapus peserta"><Trash2 size={14} /></button>
+                          <button className="icon-action icon-action-danger" onClick={() => remove(item)} disabled={deletingId === item.id} title="Hapus peserta" aria-label="Hapus peserta">{deletingId === item.id ? '...' : <Trash2 size={14} />}</button>
                         </div>
                       </td>
                     </tr>

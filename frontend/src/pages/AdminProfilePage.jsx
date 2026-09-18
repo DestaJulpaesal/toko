@@ -50,6 +50,7 @@ export default function AdminProfilePage() {
 
   const submitForm = async (event) => {
     event.preventDefault();
+    if (saving) return;
     if (!await confirmAction('Yakin ingin menyimpan perubahan profil publik?')) return;
     setSaving(true);
     try {

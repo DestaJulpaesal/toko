@@ -116,7 +116,7 @@ router.post('/:id/pay', requireRole('OWNER', 'ADMIN'), async (req, res) => {
         await tx.order.update({ where: { id: record.orderId }, data: { paidAmount, paymentStatus: status === 'PAID' ? 'PAID' : 'PARTIAL' } });
       }
       return updatedDebt;
-    });
+    }, { maxWait: 10000, timeout: 30000 });
     return res.json({ success: true, data: formatDebt(result), debt: formatDebt(result) });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Pembayaran piutang gagal.' });

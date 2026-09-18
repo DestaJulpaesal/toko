@@ -83,7 +83,7 @@ export function apiFetch(path, options = {}) {
   return fetch(apiUrl(path), { ...fetchOptions, headers })
     .then((response) => {
       const isLoginRequest = cleanPath === 'auth/login';
-      const sessionIsInvalid = hasStoredToken && (response.status === 401 || response.status === 403);
+      const sessionIsInvalid = hasStoredToken && response.status === 401;
 
       if (sessionIsInvalid && !isLoginRequest && window.location.pathname !== '/login') {
         clearExpiredSession();
