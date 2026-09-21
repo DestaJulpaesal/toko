@@ -70,6 +70,30 @@ Set `VITE_STORE_WHATSAPP_NUMBER` to the store's customer-order number in interna
 
 For the backend, set `DATABASE_URL`, `DIRECT_URL`, and a strong `JWT_SECRET`. `DATABASE_URL` should use the Supabase transaction pooler; `DIRECT_URL` should use the direct PostgreSQL connection for Prisma migrations. Never commit real `.env` files or service-role keys.
 
+Untuk menjalankan data demo, gunakan hanya database development dan set sesi
+PostgreSQL dengan `set_config('app.glossir_seed_environment', 'development', false)`
+atau jalankan `npm run seed:demo` dari folder `backend` setelah `NODE_ENV=development`
+dan koneksi database diisi. Seed akan menolak sesi yang tidak memiliki penanda
+tersebut. Untuk membuat paket rilis bersih, jalankan
+`npm run pack` dari folder utama project. Isi `.env`, `node_modules`, `dist`,
+backup JSON, dan uploads tidak dimasukkan.
+
+### Email Gmail
+
+Aktifkan verifikasi/reset password dengan menyalakan verifikasi 2 langkah pada
+akun Google, membuka halaman App Passwords, lalu membuat password khusus untuk
+aplikasi. Isi hasilnya ke `SMTP_PASS`; jangan gunakan password Gmail utama. Isi
+`SMTP_USER`, `EMAIL_FROM`, dan `APP_BASE_URL`, lalu set
+`ENABLE_EMAIL_NOTIFICATIONS=true` untuk ringkasan email harian.
+
+### Login Google
+
+Buat OAuth Client ID bertipe **Web application** di Google Cloud Console.
+Tambahkan origin frontend lokal/deployment pada Authorized JavaScript origins,
+lalu isi nilai yang sama pada `GOOGLE_CLIENT_ID` di backend dan
+`VITE_GOOGLE_CLIENT_ID` di frontend. Login Google hanya menerima email yang
+sudah terdaftar di Glosir; akun baru tidak otomatis dibuat.
+
 ### Catalog Images
 
 Create a public Supabase Storage bucket named `catalog-images`. The backend requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_ANON_KEY` when its Storage policy permits uploads); `SUPABASE_CATALOG_BUCKET` is optional and defaults to `catalog-images`. Owners and admins can upload JPG, PNG, or WebP files up to 5 MB from the product, parsel, and event-package forms. Files are placed under `products/`, `parcels/`, or `event-packages/`, and only the returned public URL is saved in the existing database record.

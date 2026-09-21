@@ -10,6 +10,8 @@ export default function AdminProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
+  const [notificationPreferences, setNotificationPreferences] = useState({});
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'CASHIER', phone: '' });
 
   const loadProfile = async () => {
     setLoading(true);
@@ -25,7 +27,12 @@ export default function AdminProfilePage() {
     }
   };
 
-  useEffect(() => { loadProfile(); }, []);
+  useEffect(() => {
+    loadProfile();
+    apiFetch('/auth/me/notification-preferences').then((response) => response.json()).then((data) => {
+      if (data.success) setNotificationPreferences(data.preferences);
+    }).catch(() => {});
+  }, []);
   const updateField = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
 
   const handlePhoto = (event) => {
@@ -66,6 +73,28 @@ export default function AdminProfilePage() {
     }
   };
 
+  const saveNotificationPreferences = async () => {
+    const response = await apiFetch('/auth/me/notification-preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(notificationPreferences),
+    });
+    const data = await response.json();
+    if (data.success) setNotificationPreferences(data.preferences);
+  };
+
+  const inviteEmployee = async (event) => {
+    event.preventDefault();
+    const response = await apiFetch('/auth/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inviteForm),
+    });
+    const data = await response.json();
+    setNotice(data.message || 'Undangan belum berhasil dikirim.');
+    if (data.success) setInviteForm({ name: '', email: '', role: 'CASHIER', phone: '' });
+  };
+
   return (
     <div className="admin-shell admin-crud-shell">
       <AdminSidebar active="Profil" />
@@ -81,6 +110,31 @@ export default function AdminProfilePage() {
           <label>Headline profil<input name="headline" value={form.headline} onChange={updateField} placeholder="Cerita singkat tentang usaha" required /></label>
           <label>Deskripsi usaha<textarea name="story" value={form.story} onChange={updateField} rows="6" placeholder="Ceritakan Glosir kepada pelanggan" required /></label>
           <button className="btn btn-primary" type="submit" disabled={loading || saving}>{saving ? 'Menyimpan...' : 'Simpan profil publik'}</button>
+        </form>
+        <section className="crud-form-panel profile-settings-form">
+          <div className="panel-heading"><div><span className="panel-kicker">Email</span><h2>Pilih notifikasi</h2></div></div>
+          {[
+            ['criticalStock', 'Stok kritis atau hampir habis'],
+            ['overdueDebt', 'Piutang jatuh tempo'],
+            ['newOnlineOrder', 'Pesanan online baru'],
+            ['onlinePayment', 'Pembayaran online berhasil atau gagal'],
+            ['dailySummary', 'Ringkasan omzet harian'],
+            ['backupFailure', 'Backup gagal'],
+            ['newDeviceLogin', 'Login dari perangkat baru'],
+          ].map(([key, label]) => <label key={key} className="login-remember"><input type="checkbox" checked={Boolean(notificationPreferences[key])} onChange={(event) => setNotificationPreferences((current) => ({ ...current, [key]: event.target.checked }))} /> {label}</label>)}
+          <button className="btn btn-primary" type="button" onClick={saveNotificationPreferences}>Simpan pilihan notifikasi</button>
+        </section>
+        <form className="crud-form-panel profile-settings-form" onSubmit={inviteEmployee}>
+          <div className="panel-heading"><div><span className="panel-kicker">Akun karyawan</span><h2>Undang karyawan</h2></div></div>
+          <div className="form-two-columns">
+            <label>Nama karyawan<input required value={inviteForm.name} onChange={(event) => setInviteForm((current) => ({ ...current, name: event.target.value }))} placeholder="Nama lengkap" /></label>
+            <label>Email pribadi<input required type="email" value={inviteForm.email} onChange={(event) => setInviteForm((current) => ({ ...current, email: event.target.value }))} placeholder="nama@email.com" /></label>
+          </div>
+          <div className="form-two-columns">
+            <label>Nomor WhatsApp<input value={inviteForm.phone} onChange={(event) => setInviteForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Opsional" /></label>
+            <label>Peran<select value={inviteForm.role} onChange={(event) => setInviteForm((current) => ({ ...current, role: event.target.value }))}><option value="CASHIER">Kasir</option><option value="ADMIN">Admin</option><option value="PARCEL_MANAGER">Pengelola Parsel</option></select></label>
+          </div>
+          <button className="btn btn-primary" type="submit">Kirim undangan email</button>
         </form>
       </main>
     </div>

@@ -13,6 +13,7 @@ import ProductDetailPage from './pages/ProductDetailPage';
 import FavoritesPage from './pages/FavoritesPage';
 import PublicInfoPage from './pages/PublicInfoPage';
 import EventPackagePage from './pages/EventPackagePage';
+import AuthActionPage from './pages/AuthActionPage';
 
 // Halaman kasir & admin: lazy-loaded (code-splitting) supaya bundle publik tidak ikut membawa kode admin.
 const CashierPage = lazy(() => import('./pages/CashierPage'));
@@ -99,6 +100,8 @@ export default function App() {
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/verify-email" element={<AuthActionPage action="verify" />} />
+            <Route path="/reset-password" element={<AuthActionPage action="reset" />} />
 
             {/* Menu Bersama: Kasir, Riwayat Kasir, dan Data Pelanggan */}
             <Route path="/kasir" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><CashierPage /></AuthRoute>} />
@@ -145,5 +148,6 @@ export default function App() {
 
 function OwnerDashboard() {
   const user = getStoredUser();
-  return user?.role === 'OWNER' ? <AdminSimpleDashboard /> : <AdminDashboard />;
+  const displayMode = user?.role === 'OWNER' ? (localStorage.getItem(`glosir_display_mode_${user.id}`) || 'simple') : 'complete';
+  return user?.role === 'OWNER' && displayMode === 'simple' ? <AdminSimpleDashboard /> : <AdminDashboard />;
 }

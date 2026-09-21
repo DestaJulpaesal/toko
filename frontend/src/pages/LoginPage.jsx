@@ -1,19 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch, monitorSessionExpiry } from '../services/api';
 
 export default function LoginPage() {
-  const [form, setForm] = useState({ email: 'cashier@glosir.com', password: '123456', rememberMe: true });
+  const [form, setForm] = useState({ email: '', password: '', rememberMe: false });
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [resetRequested, setResetRequested] = useState(false);
+  const [verificationRequired, setVerificationRequired] = useState(false);
+  const googleButtonRef = useRef(null);
+  const googleClientId = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
-  const handleSelectDemo = (email) => {
-    setForm({ email, password: '123456', rememberMe: true });
-    setMessage('');
   };
 
   const handleSubmit = async (e) => {
@@ -40,6 +42,20 @@ export default function LoginPage() {
       localStorage.setItem('glosir_user', JSON.stringify(data.user));
       monitorSessionExpiry();
 
+      if (data.mustChangePassword) {
+        setForcePasswordChange(true);
+        setMessage('Demi keamanan, buat password baru sebelum melanjutkan.');
+        setLoading(false);
+        return;
+      }
+
+      if (data.emailVerificationRequired) {
+        setVerificationRequired(true);
+        setMessage('Verifikasi email dulu. Tautan verifikasi akan dikirim ke email akun.');
+        setLoading(false);
+        return;
+      }
+
       const roleLabel = data.user.role === 'OWNER' ? 'Owner / Admin' : 'Karyawan / Kasir';
       setMessage(`Login berhasil sebagai ${roleLabel}. Mengalihkan...`);
 
@@ -54,6 +70,117 @@ export default function LoginPage() {
       }, 500);
     } catch (error) {
       setMessage('Backend belum berjalan. Jalankan server backend di port 5000 lalu coba lagi.');
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (response) => {
+    setLoading(true);
+    setMessage('Memeriksa akun Google...');
+    try {
+      const result = await apiFetch('/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+        silentNotify: true,
+      });
+      const data = await result.json();
+      if (!result.ok || !data.success) {
+        setMessage(data.message || 'Login Google belum berhasil.');
+        setLoading(false);
+        return;
+      }
+      localStorage.setItem('glosir_token', data.token);
+      localStorage.setItem('glosir_user', JSON.stringify(data.user));
+      monitorSessionExpiry();
+      setMessage('Login Google berhasil. Mengalihkan...');
+      window.location.href = data.user.role === 'OWNER' || data.user.role === 'ADMIN' ? '/admin' : data.user.role === 'PARCEL_MANAGER' ? '/parcel-manager' : '/kasir';
+    } catch {
+      setMessage('Login Google belum berhasil. Periksa koneksi internet lalu coba lagi.');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!googleClientId || !googleButtonRef.current) return undefined;
+    let attempts = 0;
+    const renderGoogleButton = () => {
+      if (!window.google?.accounts?.id || !googleButtonRef.current) {
+        attempts += 1;
+        if (attempts >= 100) window.clearInterval(timer);
+        return;
+      }
+      window.google.accounts.id.initialize({ client_id: googleClientId, callback: handleGoogleCredential });
+      window.google.accounts.id.renderButton(googleButtonRef.current, { theme: 'outline', size: 'large', width: 320, text: 'signin_with', locale: 'id' });
+      window.clearInterval(timer);
+    };
+    const timer = window.setInterval(renderGoogleButton, 100);
+    renderGoogleButton();
+    return () => window.clearInterval(timer);
+  }, [googleClientId]);
+
+  const resendVerification = async () => {
+    setLoading(true);
+    try {
+      const response = await apiFetch('/auth/request-verification', { method: 'POST', silentNotify: true });
+      const data = await response.json();
+      setMessage(data.message || 'Tautan verifikasi sudah dikirim.');
+    } catch {
+      setMessage('Tautan verifikasi belum bisa dikirim. Coba lagi sebentar.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (event) => {
+    event.preventDefault();
+    if (newPassword !== passwordConfirmation) {
+      setMessage('Password baru dan ulangi password harus sama.');
+      return;
+    }
+    setLoading(true);
+    setMessage('');
+    try {
+      const response = await apiFetch('/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword, passwordConfirmation }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setMessage(data.message || 'Password belum berhasil diganti.');
+        setLoading(false);
+        return;
+      }
+      setForcePasswordChange(false);
+      setMessage('Password berhasil diganti. Mengalihkan...');
+      const user = JSON.parse(localStorage.getItem('glosir_user') || '{}');
+      window.location.href = user.role === 'OWNER' || user.role === 'ADMIN' ? '/admin' : '/kasir';
+    } catch {
+      setMessage('Password belum berhasil diganti. Periksa koneksi internet lalu coba lagi.');
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!form.email) {
+      setMessage('Isi email terlebih dahulu, lalu pilih lupa password.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await apiFetch('/auth/request-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email }),
+        silentNotify: true,
+      });
+      const data = await response.json();
+      setMessage(data.message || 'Jika email terdaftar, tautan reset password sudah dikirim.');
+      setResetRequested(true);
+    } catch {
+      setMessage('Permintaan reset belum bisa diproses. Coba lagi sebentar.');
+    } finally {
       setLoading(false);
     }
   };
@@ -81,7 +208,7 @@ export default function LoginPage() {
             <p>Gunakan akun Karyawan / Kasir atau Owner untuk melanjutkan.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="login-form">
+          {!forcePasswordChange && <form onSubmit={handleSubmit} className="login-form">
             <label>
               Email
               <input
@@ -108,7 +235,27 @@ export default function LoginPage() {
             <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
               {loading ? 'Memproses login...' : 'Masuk ke sistem'}
             </button>
-          </form>
+            <button type="button" className="login-back" onClick={handleForgotPassword} disabled={loading || resetRequested}>
+              {resetRequested ? 'Tautan reset sudah diminta' : 'Lupa password?'}
+            </button>
+            {googleClientId && <><div className="login-divider"><span>atau</span></div><div ref={googleButtonRef} className="google-login-button" /></>}
+          </form>}
+
+          {forcePasswordChange && (
+            <form onSubmit={handleChangePassword} className="login-form">
+              <label>
+                Password baru
+                <input name="newPassword" type="password" minLength="8" required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Minimal 8 karakter" />
+              </label>
+              <label>
+                Ulangi password baru
+                <input name="passwordConfirmation" type="password" minLength="8" required value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} placeholder="Ketik ulang password baru" />
+              </label>
+              <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
+                {loading ? 'Menyimpan password...' : 'Simpan password baru'}
+              </button>
+            </form>
+          )}
 
           {message && (
             <p className={`login-message ${message.startsWith('Login berhasil') ? 'success' : 'error'}`}>
@@ -116,28 +263,7 @@ export default function LoginPage() {
             </p>
           )}
 
-          <div className="demo-accounts-box">
-            <span className="demo-title">Pilih Akun Demo Cepat:</span>
-            <div className="demo-chips">
-              <button
-                type="button"
-                className={`demo-chip ${form.email === 'cashier@glosir.com' ? 'active' : ''}`}
-                onClick={() => handleSelectDemo('cashier@glosir.com')}
-              >
-                <strong>Karyawan / Kasir</strong>
-                <small>cashier@glosir.com</small>
-              </button>
-              <button
-                type="button"
-                className={`demo-chip ${form.email === 'owner@glosir.com' ? 'active' : ''}`}
-                onClick={() => handleSelectDemo('owner@glosir.com')}
-              >
-                <strong>Owner / Admin</strong>
-                <small>owner@glosir.com</small>
-              </button>
-            </div>
-            <p className="demo-hint">Password demo: <code>123456</code></p>
-          </div>
+          {verificationRequired && <button type="button" className="btn btn-primary login-submit" onClick={resendVerification} disabled={loading}>Kirim ulang tautan verifikasi</button>}
 
           <Link to="/" className="login-back">← Kembali ke website utama</Link>
         </section>

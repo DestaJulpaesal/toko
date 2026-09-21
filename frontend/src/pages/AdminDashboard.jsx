@@ -125,7 +125,7 @@ export default function AdminDashboard() {
             <h1>Ringkasan bisnis</h1>
             <p className="admin-subtitle">Pantau arus uang dan aktivitas toko dalam satu ruang kerja.</p>
           </div>
-          <div className="admin-header-actions"><span className="live-status"><i /> {loading ? 'Memuat data...' : 'Terhubung database'}</span><Link to="/admin/products" className="btn btn-primary">+ Kelola Produk</Link></div>
+          <div className="admin-header-actions"><span className="live-status"><i /> {loading ? 'Memuat data...' : 'Terhubung database'}</span><Link to="/admin" className="btn btn-secondary" onClick={() => localStorage.setItem(`glosir_display_mode_${JSON.parse(localStorage.getItem('glosir_user') || '{}').id}`, 'simple')}>Mode Simpel</Link><Link to="/admin/products" className="btn btn-primary">+ Kelola Produk</Link></div>
         </header>
 
         {/* Indikator & Kontrol Backup Database Otomatis */}

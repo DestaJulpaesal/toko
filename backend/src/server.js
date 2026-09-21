@@ -6,6 +6,7 @@ import { startRecurringJob } from './jobs/recurringJob.js';
 import { startReminderJob } from './jobs/reminderJob.js';
 import { startDailyLoggingReminderJob } from './jobs/dailyLoggingReminder.js';
 import { startBackupJob } from './jobs/backupJob.js';
+import { startEmailNotificationJob } from './jobs/emailNotificationJob.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -27,6 +28,7 @@ async function startServer() {
     startReminderJob();
     startDailyLoggingReminderJob();
     startBackupJob();
+    startEmailNotificationJob();
   });
 }
 

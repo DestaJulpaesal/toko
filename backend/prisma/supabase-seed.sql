@@ -2,6 +2,13 @@
 -- Run after supabase-schema.sql in Supabase SQL Editor.
 -- Safe to run repeatedly: fixed IDs and ON CONFLICT keep rows stable.
 
+do $$
+begin
+  if current_setting('app.glossir_seed_environment', true) is distinct from 'development' then
+    raise exception 'Demo seed hanya boleh dijalankan dalam environment development.';
+  end if;
+end $$;
+
 insert into "Category" ("id", "name", "slug", "description") values
   ('cat-glosir', 'Glosir', 'glosir', 'Kebutuhan harian dan produk rumah tangga.'),
   ('cat-bahan-pokok', 'Bahan Pokok', 'bahan-pokok', 'Beras dan kebutuhan pokok keluarga.'),

@@ -31,19 +31,26 @@ export default function AdminSidebar({ active = '' }) {
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [secondaryOpen, setSecondaryOpen] = useState(false);
   const [pendingOrderCount, setPendingOrderCount] = useState(0);
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('glosir_display_mode') || 'simple');
   const [largeText, setLargeText] = useState(() => localStorage.getItem('glosir_large_text') === 'true');
 
   useEffect(() => {
     document.documentElement.style.setProperty('--base-font-size', largeText ? '20px' : '16px');
     localStorage.setItem('glosir_large_text', String(largeText));
-  }, [largeText]);
+    if (currentUser?.id) localStorage.setItem(`glosir_large_text_${currentUser.id}`, String(largeText));
+  }, [largeText, currentUser]);
   const navRef = useRef(null);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem('glosir_user');
       if (stored) {
-        setCurrentUser(JSON.parse(stored));
+        const user = JSON.parse(stored);
+        setCurrentUser(user);
+        const mode = localStorage.getItem(`glosir_display_mode_${user.id}`) || (user.role === 'OWNER' ? 'simple' : 'complete');
+        setDisplayMode(mode);
+        setSecondaryOpen(mode === 'complete');
+        setLargeText(localStorage.getItem(`glosir_large_text_${user.id}`) === 'true');
       } else {
         // Default fallback if no stored user
         setCurrentUser({ name: 'Kasir Glosir', role: 'CASHIER' });
@@ -102,8 +109,16 @@ export default function AdminSidebar({ active = '' }) {
   })).filter((group) => group.links.length > 0);
   const isOwner = !isCashier && !isParcelManager;
   const visibleGroups = filterGroups(isParcelManager ? parcelManagerGroups : isCashier ? cashierGroups : ownerPrimaryGroups);
-  const visibleSecondaryGroups = isOwner ? filterGroups(ownerSecondaryGroups) : [];
+  const visibleSecondaryGroups = isOwner && displayMode === 'complete' ? filterGroups(ownerSecondaryGroups) : [];
   const hasSecondarySearch = sidebarSearch.trim() && visibleSecondaryGroups.length > 0;
+  const toggleDisplayMode = () => {
+    const nextMode = displayMode === 'simple' ? 'complete' : 'simple';
+    setDisplayMode(nextMode);
+    setSecondaryOpen(nextMode === 'complete');
+    if (currentUser?.id) localStorage.setItem(`glosir_display_mode_${currentUser.id}`, nextMode);
+    localStorage.setItem('glosir_display_mode', nextMode);
+    navigate(nextMode === 'simple' ? '/admin' : '/admin/detail');
+  };
 
   return (
     <aside className={`admin-sidebar${collapsed ? ' sidebar-collapsed' : ''}`}>
@@ -169,9 +184,14 @@ export default function AdminSidebar({ active = '' }) {
         <strong>{isParcelManager ? 'Wilayah Parsel' : isCashier ? 'Workspace Kasir' : 'Menu Lainnya'} <span aria-hidden="true">✦</span></strong>
         <small>{isParcelManager ? 'Pantau peserta wilayah' : isCashier ? 'Operasional siap digunakan' : 'Akses fitur lanjutan toko'}</small>
         {isOwner ? (
-          <button type="button" onClick={() => setSecondaryOpen(true)} aria-expanded={secondaryOpen}>
-            {secondaryOpen ? 'Menu terbuka' : 'Buka menu'} <span aria-hidden="true">→</span>
-          </button>
+          <>
+            <button type="button" onClick={() => setSecondaryOpen(true)} aria-expanded={secondaryOpen}>
+              {secondaryOpen ? 'Menu terbuka' : 'Buka menu'} <span aria-hidden="true">→</span>
+            </button>
+            <button type="button" onClick={toggleDisplayMode}>
+              Mode {displayMode === 'simple' ? 'Lengkap' : 'Simpel'} <span aria-hidden="true">↔</span>
+            </button>
+          </>
         ) : (
           <Link to={isParcelManager ? '/parcel-manager' : '/kasir'}>{isParcelManager ? 'Buka wilayah' : 'Buka kasir'} <span aria-hidden="true">→</span></Link>
         )}

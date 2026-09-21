@@ -17,6 +17,14 @@ export const loginLimiter = rateLimit({
   message: { success: false, message: 'Terlalu banyak percobaan login. Coba lagi beberapa menit.' },
 });
 
+export const emailActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 8,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, message: 'Terlalu banyak permintaan. Coba lagi beberapa menit.' },
+});
+
 export const checkoutLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 120,
@@ -29,6 +37,54 @@ export const loginSchema = z.object({
   email: z.string().trim().email('Format email tidak valid'),
   password: z.string().min(1, 'Password wajib diisi'),
 });
+
+export const googleLoginSchema = z.object({
+  credential: z.string().trim().min(20, 'Token Google tidak valid'),
+});
+
+const commonPasswords = new Set(['password', 'password123', '12345678', 'qwerty123', 'qwertyui', 'admin123', 'glosir123']);
+
+export const strongPasswordSchema = z.string()
+  .min(8, 'Password minimal 8 karakter')
+  .refine((value) => !commonPasswords.has(value.trim().toLowerCase()), 'Gunakan password yang lebih sulit ditebak');
+
+export const changePasswordSchema = z.object({
+  newPassword: strongPasswordSchema,
+  passwordConfirmation: z.string().min(8, 'Ulangi password minimal 8 karakter'),
+}).refine((value) => value.newPassword === value.passwordConfirmation, {
+  message: 'Password baru dan ulangi password harus sama',
+  path: ['passwordConfirmation'],
+});
+
+export const emailSchema = z.string().trim().email('Format email tidak valid').transform((value) => value.toLowerCase());
+
+export const requestPasswordResetSchema = z.object({ email: emailSchema });
+export const verifyEmailSchema = z.object({ token: z.string().trim().min(32, 'Token verifikasi tidak valid') });
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(32, 'Token reset tidak valid'),
+  newPassword: strongPasswordSchema,
+  passwordConfirmation: z.string().min(8, 'Ulangi password minimal 8 karakter'),
+}).refine((value) => value.newPassword === value.passwordConfirmation, {
+  message: 'Password baru dan ulangi password harus sama',
+  path: ['passwordConfirmation'],
+});
+
+export const inviteUserSchema = z.object({
+  name: z.string().trim().min(1, 'Nama karyawan wajib diisi'),
+  email: emailSchema,
+  role: z.enum(['ADMIN', 'CASHIER', 'PARCEL_MANAGER']),
+  phone: z.string().trim().optional().nullable(),
+});
+
+export const notificationPreferencesSchema = z.object({
+  criticalStock: z.boolean().optional(),
+  overdueDebt: z.boolean().optional(),
+  newOnlineOrder: z.boolean().optional(),
+  onlinePayment: z.boolean().optional(),
+  dailySummary: z.boolean().optional(),
+  backupFailure: z.boolean().optional(),
+  newDeviceLogin: z.boolean().optional(),
+}).strict();
 
 export const checkoutSchema = z.object({
   items: z.array(z.object({

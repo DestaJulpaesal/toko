@@ -19,8 +19,28 @@ create table "User" (
   "role" "Role" not null default 'CASHIER',
   "isActive" boolean not null default true,
   "createdAt" timestamptz not null default now(),
-  "updatedAt" timestamptz not null default now()
+  "updatedAt" timestamptz not null default now(),
+  "emailVerifiedAt" timestamptz,
+  "emailVerificationTokenHash" text unique,
+  "emailVerificationExpiresAt" timestamptz,
+  "passwordResetTokenHash" text unique,
+  "passwordResetExpiresAt" timestamptz,
+  "notificationPreferences" jsonb
 );
+
+create table "EmailLog" (
+  "id" text primary key,
+  "userId" text references "User"("id") on update cascade on delete set null,
+  "recipient" text not null,
+  "subject" text not null,
+  "type" text not null,
+  "status" text not null,
+  "error" text,
+  "createdAt" timestamptz not null default now(),
+  "sentAt" timestamptz
+);
+create index "EmailLog_recipient_createdAt_idx" on "EmailLog"("recipient", "createdAt");
+create index "EmailLog_type_status_createdAt_idx" on "EmailLog"("type", "status", "createdAt");
 
 create table "Customer" (
   "id" text primary key,

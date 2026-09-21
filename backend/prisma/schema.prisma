@@ -90,6 +90,14 @@ model User {
   quickTemplates       FinanceQuickTemplate[]
   financeLoggingStreak FinanceLoggingStreak?
   dashboardLayout      Json?
+  emailVerifiedAt      DateTime?
+  emailVerificationTokenHash   String?   @unique
+  emailVerificationExpiresAt   DateTime?
+  passwordResetTokenHash       String?   @unique
+  passwordResetExpiresAt       DateTime?
+  notificationPreferences      Json?
+
+  emailLogs EmailLog[]
 }
 
 model ParcelRegion {
@@ -149,6 +157,7 @@ model Product {
   isParcel      Boolean       @default(false)
   isQuickAccess Boolean       @default(false)
   stockWarning  Int           @default(0)
+  baseUnit      String?       @default("pcs")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -160,20 +169,22 @@ model Product {
 }
 
 model ProductVariant {
-  id             String   @id @default(cuid())
-  productId      String
-  name           String // e.g. "Bungkus", "Sachet", "Kg"
-  sku            String   @unique
-  barcode        String?  @unique
-  basePrice      Decimal  @db.Decimal(12, 2)
-  sellPrice      Decimal  @db.Decimal(12, 2)
-  wholesalePrice Decimal? @db.Decimal(12, 2)
-  stockQty       Int      @default(0)
-  unit           String
-  isDefault      Boolean  @default(false)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               String   @id @default(cuid())
+  productId        String
+  name             String // e.g. "Bungkus", "Sachet", "Kg"
+  sku              String   @unique
+  barcode          String?  @unique
+  basePrice        Decimal  @db.Decimal(12, 2)
+  sellPrice        Decimal  @db.Decimal(12, 2)
+  wholesalePrice   Decimal? @db.Decimal(12, 2)
+  stockQty         Decimal  @default(0) @db.Decimal(12, 3)
+  conversionToBase Decimal  @default(1) @db.Decimal(12, 4)
+  unit             String
+  allowRetail      Boolean  @default(true)
+  isDefault        Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   product           Product            @relation(fields: [productId], references: [id])
   orderItems        OrderItem[]
@@ -189,7 +200,7 @@ model StockMovement {
   productId String
   variantId String?
   type      String // IN, OUT, ADJUSTMENT, RETURN
-  quantity  Int
+  quantity  Decimal  @db.Decimal(12, 3)
   note      String?
   reference String?
   createdAt DateTime @default(now())
@@ -410,7 +421,7 @@ model OrderItem {
   parcelId       String?
   eventPackageId String?
   name           String
-  quantity       Int
+  quantity       Decimal  @db.Decimal(12, 3)
   unitPrice      Decimal  @db.Decimal(12, 2)
   total          Decimal  @db.Decimal(12, 2)
   createdAt      DateTime @default(now())
@@ -769,9 +780,9 @@ model SiteProfile {
 model StockOpname {
   id            String   @id @default(cuid())
   variantId     String
-  systemQty     Int
-  physicalQty   Int
-  difference    Int
+  systemQty     Decimal  @db.Decimal(12, 3)
+  physicalQty   Decimal  @db.Decimal(12, 3)
+  difference    Decimal  @db.Decimal(12, 3)
   note          String?
   performedById String
   createdAt     DateTime @default(now())
@@ -795,6 +806,23 @@ model AuditLog {
   changedBy User @relation(fields: [changedById], references: [id])
 
   @@index([entityId, createdAt])
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  recipient String
+  subject   String
+  type      String
+  status    String
+  error     String?
+  createdAt DateTime @default(now())
+  sentAt    DateTime?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([recipient, createdAt])
+  @@index([type, status, createdAt])
 }
 
 model EventPackage {
