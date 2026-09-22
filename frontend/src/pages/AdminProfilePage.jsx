@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import AdminSidebar from '../components/AdminSidebar';
 import { confirmAction } from '../utils/confirmService';
+<<<<<<< HEAD
 import { apiFetch } from '../services/api';
+=======
+import { apiFetch, monitorSessionExpiry } from '../services/api';
+>>>>>>> cbd8857 (push fitur notifikasi email)
 
 const emptyForm = { name: '', email: '', phone: '', headline: '', story: '' };
 
@@ -83,6 +87,26 @@ export default function AdminProfilePage() {
     if (data.success) setNotificationPreferences(data.preferences);
   };
 
+<<<<<<< HEAD
+=======
+  const logoutOtherDevices = async () => {
+    if (!await confirmAction('Keluarkan semua perangkat lain dari akun ini? Perangkat yang sedang dipakai tetap masuk.')) return;
+    try {
+      const response = await apiFetch('/auth/logout-others', { method: 'POST', silentNotify: true });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Belum berhasil. Coba lagi sebentar.');
+      // Perangkat ini menerima token baru supaya tidak ikut keluar.
+      if (data.token) {
+        localStorage.setItem('glosir_token', data.token);
+        monitorSessionExpiry();
+      }
+      setNotice(data.message || 'Semua perangkat lain sudah dikeluarkan.');
+    } catch (error) {
+      setNotice(error.message || 'Belum berhasil. Coba lagi sebentar.');
+    }
+  };
+
+>>>>>>> cbd8857 (push fitur notifikasi email)
   const inviteEmployee = async (event) => {
     event.preventDefault();
     const response = await apiFetch('/auth/invite', {
@@ -124,6 +148,14 @@ export default function AdminProfilePage() {
           ].map(([key, label]) => <label key={key} className="login-remember"><input type="checkbox" checked={Boolean(notificationPreferences[key])} onChange={(event) => setNotificationPreferences((current) => ({ ...current, [key]: event.target.checked }))} /> {label}</label>)}
           <button className="btn btn-primary" type="button" onClick={saveNotificationPreferences}>Simpan pilihan notifikasi</button>
         </section>
+<<<<<<< HEAD
+=======
+        <section className="crud-form-panel profile-settings-form">
+          <div className="panel-heading"><div><span className="panel-kicker">Keamanan</span><h2>Keluar dari perangkat lain</h2></div></div>
+          <p>Kalau HP atau komputer pernah hilang, dipinjam, atau lupa logout, tekan tombol ini. Semua perangkat lain harus masuk lagi dengan password.</p>
+          <button className="btn btn-secondary" type="button" onClick={logoutOtherDevices}>Keluarkan semua perangkat lain</button>
+        </section>
+>>>>>>> cbd8857 (push fitur notifikasi email)
         <form className="crud-form-panel profile-settings-form" onSubmit={inviteEmployee}>
           <div className="panel-heading"><div><span className="panel-kicker">Akun karyawan</span><h2>Undang karyawan</h2></div></div>
           <div className="form-two-columns">

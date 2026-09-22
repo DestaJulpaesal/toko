@@ -122,7 +122,10 @@ export default function CashierPage() {
             barcode: variant.barcode,
             price: variant.price,
             wholesalePrice: variant.wholesalePrice,
+<<<<<<< HEAD
             purchasePrice: variant.purchasePrice,
+=======
+>>>>>>> cbd8857 (push fitur notifikasi email)
             stock: variant.stock,
           }))
           : [product]));

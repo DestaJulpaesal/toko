@@ -33,6 +33,20 @@ export const checkoutLimiter = rateLimit({
   message: { success: false, message: 'Terlalu banyak permintaan checkout. Coba lagi sebentar.' },
 });
 
+<<<<<<< HEAD
+=======
+// Webhook WhatsApp: dibatasi lebih ketat daripada apiLimiter umum, karena satu nomor toko
+// biasanya cuma perlu mengirim beberapa perintah per menit. Batas ini juga membuat percobaan
+// menebak secret webhook (lihat webhookSecurity.js) menjadi lambat dan gampang ketahuan di log.
+export const whatsappWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, message: 'Terlalu banyak permintaan webhook dalam waktu singkat.' },
+});
+
+>>>>>>> cbd8857 (push fitur notifikasi email)
 export const loginSchema = z.object({
   email: z.string().trim().email('Format email tidak valid'),
   password: z.string().min(1, 'Password wajib diisi'),

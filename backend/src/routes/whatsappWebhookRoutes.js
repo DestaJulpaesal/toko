@@ -1,8 +1,17 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { updateFinanceLoggingStreak } from '../services/financeStreakService.js';
+<<<<<<< HEAD
 
 const router = express.Router();
+=======
+import { createIdempotencyGuard, verifyWebhookSecret } from '../services/webhookSecurity.js';
+
+const router = express.Router();
+// Satu instance dipakai untuk semua request selama server hidup (lihat catatan di webhookSecurity.js
+// soal keterbatasannya kalau nanti backend dijalankan lebih dari satu proses sekaligus).
+const idempotency = createIdempotencyGuard();
+>>>>>>> cbd8857 (push fitur notifikasi email)
 const normalizePhone = (value) => String(value || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
 const allowedNumbers = () => String(process.env.OWNER_WHATSAPP_NUMBER || '').split(',').map(normalizePhone).filter(Boolean);
 const money = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
@@ -108,12 +117,38 @@ async function answerCustomer(sender, command) {
 }
 
 router.post('/', async (req, res) => {
+<<<<<<< HEAD
   const providedSecret = req.headers['x-webhook-secret'] || req.body?.secret;
   if (process.env.WHATSAPP_WEBHOOK_SECRET && providedSecret !== process.env.WHATSAPP_WEBHOOK_SECRET) return res.status(401).json({ success: false, message: 'Webhook tidak sah' });
   const sender = normalizePhone(req.body?.sender || req.body?.from || req.body?.phone);
   if (!sender) return res.json({ success: true, ignored: true });
   try {
     const message = req.body?.message || req.body?.text || req.body?.body || '';
+=======
+  // 1. Secret WAJIB ada dan dikirim lewat header, dibandingkan dengan waktu tetap.
+  //    Server yang belum diisi WHATSAPP_WEBHOOK_SECRET akan menolak SEMUA request (fail closed),
+  //    bukan malah menerima siapa saja seperti sebelumnya saat env kosong.
+  const verified = verifyWebhookSecret(req);
+  if (!verified.ok) {
+    if (verified.status >= 500) console.error('WhatsApp webhook: WHATSAPP_WEBHOOK_SECRET belum di-set di server.');
+    return res.status(verified.status).json({ success: false, message: verified.message });
+  }
+
+  const sender = normalizePhone(req.body?.sender || req.body?.from || req.body?.phone);
+  if (!sender) return res.json({ success: true, ignored: true });
+
+  const message = req.body?.message || req.body?.text || req.body?.body || '';
+  const timestamp = req.body?.timestamp || '';
+
+  // 2. Pesan yang sama (pengirim + isi + waktu kirim) tidak diproses dua kali. Provider WA
+  //    kadang mengirim ulang webhook yang sama (retry), dan ini terhubung ke pencatatan keuangan,
+  //    jadi "catat masuk 50rb" yang terkirim ulang tidak boleh tercatat dua kali.
+  if (idempotency.isDuplicate(sender, message, timestamp)) {
+    return res.json({ success: true, duplicate: true });
+  }
+
+  try {
+>>>>>>> cbd8857 (push fitur notifikasi email)
     const reply = allowedNumbers().includes(sender) ? await answerOwner(message, sender) : await answerCustomer(sender, message);
     await sendReply(sender, reply);
     return res.json({ success: true, replied: true });

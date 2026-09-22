@@ -1,6 +1,11 @@
 import express from 'express';
 import prisma from '../config/db.js';
+<<<<<<< HEAD
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+=======
+import { authenticateToken, requireRole, softAuth } from '../middleware/auth.js';
+import { parcelListWhere } from '../services/catalogSerializers.js';
+>>>>>>> cbd8857 (push fitur notifikasi email)
 
 const router = express.Router();
 
@@ -38,9 +43,17 @@ function formatParcel(parcel) {
   };
 }
 
+<<<<<<< HEAD
 router.get('/', async (req, res) => {
   try {
     const parcels = await prisma.parcel.findMany({
+=======
+// Publik: pengunjung hanya melihat parsel yang aktif. Parsel draft hanya untuk OWNER/ADMIN/PARCEL_MANAGER.
+router.get('/', softAuth, async (req, res) => {
+  try {
+    const parcels = await prisma.parcel.findMany({
+      where: parcelListWhere(req.user),
+>>>>>>> cbd8857 (push fitur notifikasi email)
       include: {
         items: {
           include: {

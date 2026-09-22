@@ -152,6 +152,14 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
+<<<<<<< HEAD
+=======
+      // Server mencabut semua sesi lama saat password diganti dan memberi token baru untuk perangkat ini.
+      if (data.token) {
+        localStorage.setItem('glosir_token', data.token);
+        monitorSessionExpiry();
+      }
+>>>>>>> cbd8857 (push fitur notifikasi email)
       setForcePasswordChange(false);
       setMessage('Password berhasil diganti. Mengalihkan...');
       const user = JSON.parse(localStorage.getItem('glosir_user') || '{}');

@@ -74,8 +74,13 @@ export default function AdminNetWorthPage() {
         {notice && <p className="notice-banner finance-notice">{notice}</p>}
         <section className="finance-summary-strip networth-summary">
           <div><span>Total aset</span><strong className="positive">{money(summary.totalAsset)}</strong><small>saldo, stok, dan aset lain</small></div>
+<<<<<<< HEAD
           <div><span>Total liabilitas</span><strong className="negative">{money(summary.totalLiability)}</strong><small>kewajiban yang tercatat</small></div>
           <div><span>Net worth</span><strong>{money(summary.netWorth)}</strong><small>aset dikurangi liabilitas</small></div>
+=======
+          <div><span>Total utang/kewajiban</span><strong className="negative">{money(summary.totalLiability)}</strong><small>kewajiban yang tercatat</small></div>
+          <div><span>Total Kekayaan Bersih</span><strong>{money(summary.netWorth)}</strong><small>aset dikurangi kewajiban</small></div>
+>>>>>>> cbd8857 (push fitur notifikasi email)
         </section>
         <div className="finance-two-column">
           <section className="finance-panel">

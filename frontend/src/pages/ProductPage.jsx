@@ -6,6 +6,10 @@ import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import CatalogImage from '../components/CatalogImage';
+<<<<<<< HEAD
+=======
+import { PUBLIC_CATALOG_CACHE_KEY, stripSensitive } from '../utils/catalogStorage';
+>>>>>>> cbd8857 (push fitur notifikasi email)
 
 export default function ProductPage() {
   const { addItem, totalItems } = useCart();
@@ -20,8 +24,13 @@ export default function ProductPage() {
 
   useEffect(() => {
     try {
+<<<<<<< HEAD
       const cachedProducts = JSON.parse(localStorage.getItem('glosir_products_cache') || '[]');
       if (Array.isArray(cachedProducts) && cachedProducts.length > 0) setProducts(cachedProducts);
+=======
+      const cachedProducts = JSON.parse(localStorage.getItem(PUBLIC_CATALOG_CACHE_KEY) || '[]');
+      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) setProducts(stripSensitive(cachedProducts));
+>>>>>>> cbd8857 (push fitur notifikasi email)
     } catch {
       // Ignore an invalid local cache and use the API response.
     }
@@ -62,7 +71,11 @@ export default function ProductPage() {
         })) : [];
         const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
         setProducts(merged);
+<<<<<<< HEAD
         localStorage.setItem('glosir_products_cache', JSON.stringify(merged));
+=======
+        localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));
+>>>>>>> cbd8857 (push fitur notifikasi email)
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));

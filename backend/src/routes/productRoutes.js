@@ -1,5 +1,6 @@
 import express from 'express';
 import prisma from '../config/db.js';
+<<<<<<< HEAD
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, productCreateSchema, productUpdateSchema, productBulkSchema } from '../middleware/security.js';
 
@@ -56,6 +57,18 @@ function formatProduct(product) {
       : 'Tersedia',
   };
 }
+=======
+import { authenticateToken, requireRole, softAuth } from '../middleware/auth.js';
+import { createCatalogHandlers } from '../services/catalogHandlers.js';
+import { AUDIENCE, formatProduct } from '../services/catalogSerializers.js';
+import { validateBody, productCreateSchema, productUpdateSchema, productBulkSchema } from '../middleware/security.js';
+
+const router = express.Router();
+const catalog = createCatalogHandlers(prisma);
+
+const statusToDb = { Aktif: 'ACTIVE', 'Stok menipis': 'ACTIVE', Draft: 'DRAFT' };
+const normalizeCategoryName = (name) => String(name || '').trim();
+>>>>>>> cbd8857 (push fitur notifikasi email)
 
 async function findCategory(name) {
   const normalizedName = normalizeCategoryName(name);
@@ -65,6 +78,7 @@ async function findCategory(name) {
   return prisma.category.findFirst({ where: { name: 'Warung' } });
 }
 
+<<<<<<< HEAD
 router.get('/', async (req, res) => {
   try {
     const products = await prisma.product.findMany({
@@ -86,6 +100,10 @@ router.get('/', async (req, res) => {
     });
   }
 });
+=======
+// Publik, tetapi isinya menyesuaikan siapa yang membuka (lihat services/catalogSerializers.js).
+router.get('/', softAuth, catalog.listProducts);
+>>>>>>> cbd8857 (push fitur notifikasi email)
 
 router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(productCreateSchema), async (req, res) => {
   try {
@@ -110,7 +128,11 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
       },
       include: { category: true, variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } } },
     });
+<<<<<<< HEAD
     return res.status(201).json({ success: true, product: formatProduct(product) });
+=======
+    return res.status(201).json({ success: true, product: formatProduct(product, AUDIENCE.OWNER) });
+>>>>>>> cbd8857 (push fitur notifikasi email)
   } catch (error) {
     return res.status(400).json({ success: false, message: error.code === 'P2002' ? 'SKU atau produk sudah digunakan' : 'Produk gagal disimpan' });
   }
@@ -157,7 +179,11 @@ router.post('/bulk', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
           },
           include: { category: true, variants: { where: { isDefault: true }, take: 1 } },
         });
+<<<<<<< HEAD
         result.push(formatProduct(product));
+=======
+        result.push(formatProduct(product, AUDIENCE.OWNER));
+>>>>>>> cbd8857 (push fitur notifikasi email)
       }
       return result;
     }, { maxWait: 10000, timeout: 30000 });
@@ -287,7 +313,11 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
         })),
       });
     }
+<<<<<<< HEAD
     return res.json({ success: true, product: formatProduct(product) });
+=======
+    return res.json({ success: true, product: formatProduct(product, AUDIENCE.OWNER) });
+>>>>>>> cbd8857 (push fitur notifikasi email)
   } catch (error) {
     console.error('Product update failed:', error.message);
     return res.status(error.message === 'PRODUCT_UPDATE_TIMEOUT' ? 504 : 400).json({ success: false, message: error.message === 'PRODUCT_UPDATE_TIMEOUT' ? 'Database terlalu lama merespons. Coba simpan lagi.' : error.code === 'P2002' ? 'SKU sudah digunakan' : 'Produk gagal diperbarui' });
@@ -317,6 +347,7 @@ router.delete('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (r
   }
 });
 
+<<<<<<< HEAD
 router.get('/:id', async (req, res) => {
   try {
     const product = await prisma.product.findUnique({
@@ -344,5 +375,8 @@ router.get('/:id', async (req, res) => {
     });
   }
 });
+=======
+router.get('/:id', softAuth, catalog.getProduct);
+>>>>>>> cbd8857 (push fitur notifikasi email)
 
 export default router;

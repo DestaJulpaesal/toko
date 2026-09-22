@@ -11,6 +11,12 @@
     "test": "node tests/daily-preflight.test.js",
     "test:security": "node tests/phase0-security.test.js",
     "test:phase1": "node tests/phase1-email-auth.test.js",
+<<<<<<< HEAD
+=======
+    "test:catalog": "node tests/catalog-data-exposure.test.js",
+    "test:session": "node tests/session-auth.test.js",
+    "test:webhook": "node tests/webhook-security.test.js",
+>>>>>>> cbd8857 (push fitur notifikasi email)
     "seed:demo": "node scripts/seedDemo.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

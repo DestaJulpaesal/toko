@@ -69,6 +69,10 @@ model User {
   phone        String?
   role         Role     @default(CASHIER)
   isActive     Boolean  @default(true)
+<<<<<<< HEAD
+=======
+  tokenVersion Int      @default(0)
+>>>>>>> cbd8857 (push fitur notifikasi email)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

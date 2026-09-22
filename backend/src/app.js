@@ -6,7 +6,11 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 import multer from 'multer';
 
+<<<<<<< HEAD
 import { apiLimiter } from './middleware/security.js';
+=======
+import { apiLimiter, whatsappWebhookLimiter } from './middleware/security.js';
+>>>>>>> cbd8857 (push fitur notifikasi email)
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
@@ -108,7 +112,11 @@ app.use('/api/parcel-collections', parcelCollectionRoutes);
 app.use('/api/stock-opnames', stockOpnameRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/event-packages', eventPackageRoutes);
+<<<<<<< HEAD
 app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
+=======
+app.use('/api/whatsapp/webhook', whatsappWebhookLimiter, whatsappWebhookRoutes);
+>>>>>>> cbd8857 (push fitur notifikasi email)
 app.use('/api/restock', restockRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/backup', backupRoutes);
