@@ -93,22 +93,11 @@ router.post('/google', loginLimiter, validateBody(googleLoginSchema), async (req
   }
 });
 
-<<<<<<< HEAD
-router.post('/change-password', authenticateToken, validateBody(changePasswordSchema), async (req, res) => {
-  try {
-    await changePassword(req.user.id, req.body.newPassword);
-    return res.json({ success: true, message: 'Password berhasil diganti.' });
-=======
-// Sisa waktu sesi yang sedang dipakai, supaya token pengganti tidak memperpanjang atau memperpendek masa login.
-const remainingSessionSeconds = (user) => Math.max(60, Number(user.exp || 0) - Math.floor(Date.now() / 1000));
-
 router.post('/change-password', authenticateToken, validateBody(changePasswordSchema), async (req, res) => {
   try {
     const user = await changePassword(req.user.id, req.body.newPassword);
-    // Semua sesi lama dicabut. Perangkat yang sedang dipakai menerima token baru agar tidak ikut keluar.
-    const token = generateToken(user, false, remainingSessionSeconds(req.user));
+    const token = generateToken(user, false, Math.max(60, Number(req.user.exp || 0) - Math.floor(Date.now() / 1000)));
     return res.json({ success: true, message: 'Password berhasil diganti.', token });
->>>>>>> cbd8857 (push fitur notifikasi email)
   } catch (error) {
     console.error('Change password error:', error);
     return res.status(500).json({ success: false, message: 'Password belum berhasil diganti. Coba lagi.' });

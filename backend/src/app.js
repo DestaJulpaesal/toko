@@ -6,11 +6,7 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 import multer from 'multer';
 
-<<<<<<< HEAD
-import { apiLimiter } from './middleware/security.js';
-=======
 import { apiLimiter, whatsappWebhookLimiter } from './middleware/security.js';
->>>>>>> cbd8857 (push fitur notifikasi email)
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
