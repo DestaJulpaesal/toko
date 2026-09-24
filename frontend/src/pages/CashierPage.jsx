@@ -4,6 +4,8 @@ import AdminSidebar from '../components/AdminSidebar';
 import CurrencyInput from '../components/CurrencyInput';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import CashierHelpModal from '../components/CashierHelpModal';
+import ProductUnitPicker from '../components/ProductUnitPicker';
+import StockAlertBadge from '../components/StockAlertBadge';
 import { playBeep } from '../utils/barcodeUtils';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
@@ -48,6 +50,7 @@ export default function CashierPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Semua');
   const [items, setItems] = useState([]);
+  const [selectedUnits, setSelectedUnits] = useState({}); // { productId: unit }
 
   // Promo Campaign state
   const [selectedPromoId, setSelectedPromoId] = useState('none');
@@ -428,8 +431,15 @@ export default function CashierPage() {
       return;
     }
 
+    // FASE 4: Check if product has units and if one is selected
+    const unit = selectedUnits[product.productId || product.id];
+    if (!unit) {
+      setNotice(`Pilih unit untuk ${product.name} terlebih dahulu.`);
+      return;
+    }
+
     setItems((current) => {
-      const existing = current.find((item) => item.id === product.id);
+      const existing = current.find((item) => item.id === product.id && item.unitId === unit.id);
       const maxStock = product.stock !== undefined ? product.stock : 999;
       if (existing) {
         const nextQty = Math.min(existing.qty + 1, maxStock);
@@ -438,10 +448,19 @@ export default function CashierPage() {
           return current;
         }
         return current.map((item) =>
-          item.id === product.id ? { ...item, qty: nextQty } : item
+          item.id === product.id && item.unitId === unit.id ? { ...item, qty: nextQty } : item
         );
       }
-      return [...current, { ...product, price: getSellingPrice(product), qty: 1 }];
+      return [...current, {
+        ...product,
+        unitId: unit.id,
+        unitName: unit.name,
+        price: getSellingPrice(product),
+        qty: 1,
+        availableStock: unit.baseStockQty,
+        minimumStock: unit.minimumStock,
+        maximumStock: unit.maximumStock,
+      }];
     });
   };
 
@@ -1119,6 +1138,19 @@ export default function CashierPage() {
                           <td className="col-name">
                             <strong>{item.name}</strong>
                             <small>{item.sku || item.barcode || ''}</small>
+                            {/* FASE 4: Show unit info */}
+                            {item.unitName && (
+                              <div style={{ fontSize: '11px', color: '#888', marginTop: '3px' }}>
+                                Unit: {item.unitName}
+                                {item.minimumStock && (
+                                  <StockAlertBadge
+                                    currentStock={item.availableStock}
+                                    minimumStock={item.minimumStock}
+                                    maximumStock={item.maximumStock}
+                                  />
+                                )}
+                              </div>
+                            )}
                           </td>
                           <td className="col-price">{formatMoney(item.price)}</td>
                           <td className="col-qty">
@@ -1376,7 +1408,7 @@ export default function CashierPage() {
                 <div
                   key={product.id}
                   className="pos-product-card"
-                  onClick={() => addProduct(product)}
+                  style={{ cursor: 'default' }}
                 >
                   <div className="pos-card-top">
                     <span className="pos-cat-tag">{product.category || 'Glosir'}</span>
@@ -1388,12 +1420,28 @@ export default function CashierPage() {
                   <div className="pos-card-body">
                     <strong className="pos-product-name">{product.name}</strong>
                     <small className="pos-product-sku">{product.sku}</small>
+                    
+                    {/* FASE 4: Add ProductUnitPicker */}
+                    <ProductUnitPicker
+                      product={product}
+                      onSelectUnit={(unit) => {
+                        setSelectedUnits((prev) => ({
+                          ...prev,
+                          [product.productId || product.id]: unit,
+                        }));
+                      }}
+                      selectedUnitId={selectedUnits[product.productId || product.id]?.id}
+                    />
                   </div>
 
                   <div className="pos-card-bottom">
                     <b className="pos-product-price">{formatMoney(getSellingPrice(product))}</b>
                     {customerType === 'WHOLESALE' && Number(product.wholesalePrice) > 0 && <small className="pos-wholesale-hint">Harga warung</small>}
-                    <button className="pos-btn-add" title="Tambah ke keranjang">
+                    <button
+                      className="pos-btn-add"
+                      title="Tambah ke keranjang"
+                      onClick={() => addProduct(product)}
+                    >
                       + Tambah
                     </button>
                   </div>
