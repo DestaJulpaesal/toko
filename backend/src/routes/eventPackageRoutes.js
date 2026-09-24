@@ -1,65 +1,19 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
-<<<<<<< HEAD
-
-const router = express.Router();
-=======
 import { createCatalogHandlers } from '../services/catalogHandlers.js';
 import { formatEventPackage } from '../services/catalogSerializers.js';
 
 const router = express.Router();
 const catalog = createCatalogHandlers(prisma);
->>>>>>> cbd8857 (push fitur notifikasi email)
 
 function slugify(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-<<<<<<< HEAD
-function formatPackage(item) {
-  return {
-    ...item,
-    price: Number(item.price),
-    items: item.items?.map((entry) => ({
-      ...entry,
-      variant: entry.variant ? { ...entry.variant, sellPrice: Number(entry.variant.sellPrice), stockQty: entry.variant.stockQty } : undefined,
-    })),
-  };
-}
-
-router.get('/', async (req, res) => {
-  try {
-    const packages = await prisma.eventPackage.findMany({
-      where: { isActive: true },
-      include: { items: { include: { variant: { include: { product: true } } } } },
-      orderBy: { createdAt: 'desc' },
-    });
-    return res.json({ success: true, packages: packages.map(formatPackage) });
-  } catch (error) {
-    console.error('Event package list failed:', error.message);
-    return res.status(503).json({ success: false, message: 'Daftar paket acara belum dapat dimuat.' });
-  }
-});
-
-router.get('/:id', async (req, res) => {
-  try {
-    const item = await prisma.eventPackage.findFirst({
-      where: { OR: [{ id: req.params.id }, { slug: req.params.id }], isActive: true },
-      include: { items: { include: { variant: { include: { product: true } } } } },
-    });
-    if (!item) return res.status(404).json({ success: false, message: 'Paket acara tidak ditemukan' });
-    return res.json({ success: true, package: formatPackage(item) });
-  } catch (error) {
-    console.error('Event package detail failed:', error.message);
-    return res.status(503).json({ success: false, message: 'Detail paket acara belum dapat dimuat.' });
-  }
-});
-=======
 // Publik. Isi respons di-whitelist (tanpa harga modal), lihat services/catalogHandlers.js.
 router.get('/', catalog.listEventPackages);
 router.get('/:id', catalog.getEventPackage);
->>>>>>> cbd8857 (push fitur notifikasi email)
 
 async function createPackage(req, res, isCustom = false) {
   try {
@@ -94,11 +48,7 @@ async function createPackage(req, res, isCustom = false) {
     },
     include: { items: { include: { variant: true } } },
   });
-<<<<<<< HEAD
-    return res.status(201).json({ success: true, package: formatPackage(created) });
-=======
     return res.status(201).json({ success: true, package: formatEventPackage(created) });
->>>>>>> cbd8857 (push fitur notifikasi email)
   } catch (error) {
     console.error('Event package create failed:', error.message);
     return res.status(400).json({ success: false, message: error.message || 'Paket acara gagal disimpan.' });
@@ -153,11 +103,7 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
     });
     return updated;
   });
-<<<<<<< HEAD
-    return res.json({ success: true, package: formatPackage(item) });
-=======
     return res.json({ success: true, package: formatEventPackage(item) });
->>>>>>> cbd8857 (push fitur notifikasi email)
   } catch (error) {
     console.error('Event package update failed:', error.message);
     return res.status(400).json({ success: false, message: error.message || 'Paket acara gagal diperbarui.' });

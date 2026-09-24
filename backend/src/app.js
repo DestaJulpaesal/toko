@@ -41,8 +41,8 @@ import whatsappWebhookRoutes from './routes/whatsappWebhookRoutes.js';
 import restockRoutes from './routes/restockRoutes.js';
 import mediaRoutes from './routes/mediaRoutes.js';
 import backupRoutes from './routes/backupRoutes.js';
-
-dotenv.config();
+import { initializeEmailService } from './services/emailService.js';
+import { startEmailNotificationJob } from './jobs/emailNotificationJob.js';
 
 const app = express();
 
@@ -108,14 +108,14 @@ app.use('/api/parcel-collections', parcelCollectionRoutes);
 app.use('/api/stock-opnames', stockOpnameRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/event-packages', eventPackageRoutes);
-<<<<<<< HEAD
-app.use('/api/whatsapp/webhook', whatsappWebhookRoutes);
-=======
 app.use('/api/whatsapp/webhook', whatsappWebhookLimiter, whatsappWebhookRoutes);
->>>>>>> cbd8857 (push fitur notifikasi email)
 app.use('/api/restock', restockRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/backup', backupRoutes);
+
+// Initialize email service & notification jobs
+initializeEmailService();
+startEmailNotificationJob();
 
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError || /Hanya file CSV|Gunakan gambar/.test(err?.message || '')) {
