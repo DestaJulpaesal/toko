@@ -17,7 +17,8 @@
     "seed:demo": "node scripts/seedDemo.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "finance:migrate-data": "node scripts/migrateFinanceData.js"
+    "finance:migrate-data": "node scripts/migrateFinanceData.js",
+    "migrate:product-units": "node scripts/migrateProductUnits.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",
