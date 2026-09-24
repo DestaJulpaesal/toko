@@ -162,11 +162,14 @@ model Product {
   isQuickAccess Boolean       @default(false)
   stockWarning  Int           @default(0)
   baseUnit      String?       @default("pcs")
+  baseStockQty  Decimal       @default(0) @db.Decimal(14, 4)
+  allowRetail   Boolean       @default(true)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   category       Category         @relation(fields: [categoryId], references: [id])
   variants       ProductVariant[]
+  units          ProductUnit[]
   orderItems     OrderItem[]
   stockMovements StockMovement[]
   restockItems   RestockItem[]
@@ -197,6 +200,28 @@ model ProductVariant {
   eventPackageItems EventPackageItem[]
   parcelItems       ParcelItem[]
   restockItems      RestockItem[]
+}
+
+model ProductUnit {
+  id               String   @id @default(cuid())
+  productId        String
+  name             String   // e.g. "Batang", "Bungkus", "1/4 kg", "Kg"
+  sku              String   @unique
+  barcode          String?  @unique
+  sellPrice        Decimal  @db.Decimal(12, 2)
+  wholesalePrice   Decimal? @db.Decimal(12, 2)
+  conversionToBase Decimal  @db.Decimal(12, 4)  // e.g. 1 bungkus = 12 batang
+  isSellable       Boolean  @default(true)
+  isDefault        Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@unique([productId, name])
+  @@index([productId])
 }
 
 model StockMovement {

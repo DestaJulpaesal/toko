@@ -7,10 +7,7 @@ import {
   createEmailVerificationToken,
   createPasswordResetToken,
   generateToken,
-<<<<<<< HEAD
-=======
   revokeOtherSessions,
->>>>>>> cbd8857 (push fitur notifikasi email)
   verifyGoogleCredential,
   verifyCredentials,
 } from '../services/authService.js';
@@ -214,14 +211,13 @@ router.patch('/me/notification-preferences', authenticateToken, async (req, res)
   return res.json({ success: true, message: 'Pilihan notifikasi berhasil disimpan.', preferences });
 });
 
-<<<<<<< HEAD
-=======
 // Tombol darurat (HP hilang, akun dipinjam orang): cabut semua sesi lain, perangkat ini tetap masuk.
 router.post('/logout-others', authenticateToken, async (req, res) => {
   try {
     const user = await revokeOtherSessions(req.user.id);
     await prisma.auditLog.create({ data: { entityType: 'User', entityId: user.id, field: 'sessions', newValue: 'logout_others', changedById: user.id } });
-    const token = generateToken(user, false, remainingSessionSeconds(req.user));
+    const remainingSeconds = Math.max(60, Number(req.user.exp || 0) - Math.floor(Date.now() / 1000));
+    const token = generateToken(user, false, remainingSeconds);
     return res.json({ success: true, message: 'Semua perangkat lain sudah dikeluarkan.', token });
   } catch (error) {
     console.error('Logout others failed:', error.message);
@@ -229,7 +225,6 @@ router.post('/logout-others', authenticateToken, async (req, res) => {
   }
 });
 
->>>>>>> cbd8857 (push fitur notifikasi email)
 router.get('/me', authenticateToken, (req, res) => {
   res.json({ success: true, user: req.user });
 });
