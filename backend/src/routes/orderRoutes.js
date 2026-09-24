@@ -4,6 +4,7 @@ import { updateCustomerPoints } from './customerRoutes.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { checkoutLimiter, checkoutSchema, holdCartSchema, onlineOrderSchema, validateBody } from '../middleware/security.js';
 import { sendWhatsappMessage } from '../services/whatsappService.js';
+import { validateStockAvailability, calculateStockDecrease } from '../utils/stockCalculation.js';
 
 const router = express.Router();
 
@@ -542,6 +543,13 @@ router.post('/checkout', authenticateToken, checkoutLimiter, validateBody(checko
         const variantById = new Map(variantRecords.map((variant) => [variant.id, variant]));
         const variants = items.map((item) => (item.variantId ? variantById.get(item.variantId) || null : null));
 
+        // FASE 4: Fetch ProductUnits for unit-based validation if unitId provided
+        const unitIds = [...new Set(items.filter((item) => item.unitId).map((item) => item.unitId))];
+        const productUnits = unitIds.length ? await transaction.productUnit.findMany({
+          where: { id: { in: unitIds }, isActive: true },
+        }) : [];
+        const unitById = new Map(productUnits.map((unit) => [unit.id, unit]));
+
         const lines = items.map((item, index) => {
           if (item.eventPackageId) {
             const eventPackage = eventPackages.find((candidate) => candidate.id === item.eventPackageId);
@@ -574,6 +582,27 @@ router.post('/checkout', authenticateToken, checkoutLimiter, validateBody(checko
           if (!variant || !Number.isInteger(quantity) || quantity < 1) {
             throw new Error('Produk atau jumlah beli tidak valid');
           }
+          
+          // FASE 4: If unitId provided, validate unit-based stock instead of variant stock
+          if (item.unitId) {
+            const unit = unitById.get(item.unitId);
+            if (!unit) {
+              throw new Error(`Unit produk ${variant.product.name} tidak ditemukan`);
+            }
+            if (!validateStockAvailability(unit.baseStockQty, quantity)) {
+              throw new Error(`Stok unit ${unit.name} untuk ${variant.product.name} tidak mencukupi (tersedia: ${unit.baseStockQty})`);
+            }
+            const submittedPrice = Number(item.unitPrice ?? item.price);
+            const unitPrice = holdOrderId && Number.isFinite(submittedPrice)
+              ? submittedPrice
+              : effectiveCustomerType === 'WHOLESALE' && variant.wholesalePrice != null
+                ? Number(variant.wholesalePrice)
+                : Number(variant.sellPrice);
+            if (!Number.isFinite(unitPrice)) throw new Error(`Harga produk ${variant.product.name} tidak valid`);
+            return { variant, quantity, unitPrice, total: unitPrice * quantity, productUnit: unit, unitId: item.unitId };
+          }
+          
+          // Fallback: Original variant-based validation
           if (!variant.isActive || variant.stockQty < quantity) {
             throw new Error(`Stok produk ${variant.product.name} tidak mencukupi`);
           }
@@ -707,6 +736,40 @@ router.post('/checkout', authenticateToken, checkoutLimiter, validateBody(checko
         }
         if (stockMovements.length) {
           await transaction.stockMovement.createMany({ data: stockMovements });
+        }
+
+        // FASE 4: Decrease ProductUnit stock for unit-based checkouts
+        const unitDeductions = new Map();
+        for (const line of lines) {
+          if (line.unitId && line.productUnit) {
+            const key = line.unitId;
+            const current = unitDeductions.get(key) || { quantity: 0, productId: line.variant.productId, unitId: line.unitId };
+            current.quantity += line.quantity;
+            unitDeductions.set(key, current);
+          }
+        }
+        
+        for (const [unitId, { quantity, productId }] of unitDeductions) {
+          const updateResult = await transaction.productUnit.updateMany({
+            where: { id: unitId, baseStockQty: { gte: quantity } },
+            data: { baseStockQty: { decrement: quantity } },
+          });
+          if (updateResult.count === 0) throw new Error(`Stok unit berubah. Silakan ulangi checkout.`);
+          
+          // Create audit log for unit stock decrease
+          await transaction.auditLog.create({
+            data: {
+              action: 'STOCK_DECREASE_CHECKOUT',
+              entityType: 'ProductUnit',
+              entityId: unitId,
+              changes: {
+                quantityDecreased: quantity,
+                orderNumber,
+              },
+              userId: req.user.id,
+              ipAddress: req.ip,
+            },
+          });
         }
 
         const financeDesc = paymentReference
