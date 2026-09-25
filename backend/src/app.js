@@ -44,6 +44,8 @@ import mediaRoutes from './routes/mediaRoutes.js';
 import backupRoutes from './routes/backupRoutes.js';
 import { initializeEmailService } from './services/emailService.js';
 import { startEmailNotificationJob } from './jobs/emailNotificationJob.js';
+import { startExpiryNotificationJob } from './jobs/expiryNotificationJob.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 
 const app = express();
 
@@ -114,10 +116,12 @@ app.use('/api/whatsapp/webhook', whatsappWebhookLimiter, whatsappWebhookRoutes);
 app.use('/api/restock', restockRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Initialize email service & notification jobs
 initializeEmailService();
 startEmailNotificationJob();
+startExpiryNotificationJob();
 
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError || /Hanya file CSV|Gunakan gambar/.test(err?.message || '')) {

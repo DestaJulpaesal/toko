@@ -42,6 +42,7 @@ const ParcelCollectionPage = lazy(() => import('./pages/ParcelCollectionPage'));
 const AdminStockOpnamePage = lazy(() => import('./pages/AdminStockOpnamePage'));
 const AdminRestockPage = lazy(() => import('./pages/AdminRestockPage'));
 const AdminEventPackagesPage = lazy(() => import('./pages/AdminEventPackagesPage'));
+const AdminProductPerformancePage = lazy(() => import('./pages/AdminProductPerformancePage'));
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -133,6 +134,7 @@ export default function App() {
             <Route path="/admin/stock-opname" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminStockOpnamePage /></AuthRoute>} />
             <Route path="/admin/restock" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminRestockPage /></AuthRoute>} />
             <Route path="/admin/event-packages" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminEventPackagesPage /></AuthRoute>} />
+            <Route path="/admin/product-performance" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminProductPerformancePage /></AuthRoute>} />
             <Route path="/parcel-manager" element={<AuthRoute roles={['PARCEL_MANAGER']}><AdminParcelParticipantsPage /></AuthRoute>} />
             <Route path="/parcel-manager/collections" element={<AuthRoute roles={['PARCEL_MANAGER']}><ParcelCollectionPage /></AuthRoute>} />
 

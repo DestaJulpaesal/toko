@@ -13,6 +13,55 @@ import CatalogImageField from '../components/CatalogImageField';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
+import { ADMIN_PRODUCTS_CACHE_KEY } from '../utils/catalogStorage';
+import * as XLSX from 'xlsx';
+
+const emptyForm = {
+  name: '',
+  sku: '',
+  barcode: '',
+  category: '',
+  price: '',
+  wholesalePrice: '',
+  purchasePrice: '',
+  originalPrice: '',
+  stock: '',
+  status: 'Aktif',
+  imageUrl: '',
+  isQuickAccess: false,
+  packages: [],
+};
+
+export default function AdminProductsPage() {
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Semua');
+  const [categoryFilter, setCategoryFilter] = useState('Semua');
+  const [sortBy, setSortBy] = useState('nameAsc');
+  const [notice, setNotice] = useState('');
+  const [selectedProductIds, setSelectedProductIds] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [printModalProduct, setPrintModalProduct] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+
+  const barcodeInputRef = useRef(null);
+  const scannerTimerRef = useRef(null);
+
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      const response = await apiFetch('/products');
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Gagal memuat produk');
+      setProducts(data.products || []);
       sessionStorage.setItem(ADMIN_PRODUCTS_CACHE_KEY, JSON.stringify(data.products));
     } catch (error) {
       try {
@@ -40,6 +89,24 @@ import { apiFetch } from '../services/api';
     } catch (error) {
       setNotice(error.message === 'Failed to fetch' ? 'Backend sedang tersambung ulang. Coba segarkan halaman.' : error.message || 'Kategori gagal dimuat.');
     }
+  };
+
+  const downloadExcel = () => {
+    const rows = products.map((item) => ({
+      SKU: item.sku || '',
+      Barcode: item.barcode || '',
+      'Nama Produk': item.name || '',
+      Kategori: item.category || '',
+      'Harga Beli': item.purchasePrice || 0,
+      'Harga Jual': item.price || 0,
+      'Harga Grosir': item.wholesalePrice || 0,
+      Stok: item.stock || 0,
+      Status: item.status || 'Aktif',
+    }));
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, 'Produk');
+    XLSX.writeFile(book, `katalog-produk-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   useEffect(() => {

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiFetch } from '../services/api';
 import AdminSidebar from '../components/AdminSidebar';
 import DatabaseBackupIndicator from '../components/DatabaseBackupIndicator';
+import ExpiryAlertWidget from '../components/ExpiryAlertWidget';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value || 0);
@@ -116,6 +117,8 @@ export default function AdminDashboard() {
   return (
     <div className="admin-shell">
       <AdminSidebar active="Dashboard" />
+      <div className="admin-main">
+        <ExpiryAlertWidget />
 
       <main className="admin-main">
         {error && <div className="crud-notice" role="alert">{error}</div>}

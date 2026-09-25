@@ -5,6 +5,7 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { checkoutLimiter, checkoutSchema, holdCartSchema, onlineOrderSchema, validateBody } from '../middleware/security.js';
 import { sendWhatsappMessage } from '../services/whatsappService.js';
 import { validateStockAvailability, calculateStockDecrease } from '../utils/stockCalculation.js';
+import { getActiveLoyaltyRule, calculatePoints, awardPoints, revokePoints, checkSellBelowCost } from '../services/loyaltyService.js';
 
 const router = express.Router();
 
@@ -468,7 +469,7 @@ router.patch('/:id/void', authenticateToken, requireRole('OWNER', 'ADMIN'), asyn
   if (!reason) return res.status(400).json({ success: false, message: 'Alasan pembatalan wajib diisi' });
   try {
     const result = await prisma.$transaction(async (transaction) => {
-      const order = await transaction.order.findUnique({ where: { id: req.params.id }, include: { financeEntries: true } });
+      const order = await transaction.order.findUnique({ where: { id: req.params.id }, include: { financeEntries: true, customer: true } });
       if (!order) throw Object.assign(new Error('Transaksi tidak ditemukan'), { statusCode: 404 });
       if (order.status === 'VOIDED') throw Object.assign(new Error('Transaksi sudah dibatalkan'), { statusCode: 409 });
       const movements = await transaction.stockMovement.findMany({ where: { reference: order.orderNumber, type: 'OUT', variantId: { not: null } } });
@@ -477,9 +478,34 @@ router.patch('/:id/void', authenticateToken, requireRole('OWNER', 'ADMIN'), asyn
         await transaction.stockMovement.create({ data: { productId: movement.productId, variantId: movement.variantId, type: 'RETURN', quantity: movement.quantity, note: `Void transaksi: ${reason}`, reference: order.orderNumber } });
       }
       await transaction.financeTransaction.updateMany({ where: { orderId: order.id, deletedAt: null }, data: { deletedAt: new Date() } });
-      return transaction.order.update({ where: { id: order.id }, data: { status: 'VOIDED', voidReason: reason, voidedById: req.user.id } });
+
+      // FASE 5: Kembalikan poin loyalitas saat void
+      let pointsRevoked = 0;
+      if (order.customerId && order.pointsAwarded > 0) {
+        await revokePoints(order.customerId, order.pointsAwarded, order.id, transaction);
+        pointsRevoked = order.pointsAwarded;
+      }
+
+      const updated = await transaction.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'VOIDED',
+          voidReason: reason,
+          voidedById: req.user.id,
+          pointsRedeemed: order.pointsRedeemed + pointsRevoked,
+        },
+      });
+
+      return { ...updated, pointsRevoked };
     });
-    return res.json({ success: true, order: { id: result.id, status: result.status, voidReason: result.voidReason } });
+    return res.json({
+      success: true,
+      order: { id: result.id, status: result.status, voidReason: result.voidReason },
+      pointsRevoked: result.pointsRevoked || 0,
+      message: result.pointsRevoked > 0
+        ? `Transaksi dibatalkan. ${result.pointsRevoked} poin dikembalikan dari pelanggan.`
+        : 'Transaksi berhasil dibatalkan.',
+    });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Transaksi gagal dibatalkan' });
   }
@@ -619,6 +645,16 @@ router.post('/checkout', authenticateToken, checkoutLimiter, validateBody(checko
         const subtotal = lines.reduce((sum, line) => sum + line.total, 0);
         const discountAmount = Math.min(Number(effectiveDiscount) || 0, subtotal);
         const total = Math.max(subtotal - discountAmount, 0);
+
+        // FASE 5: Cek jual rugi (harga jual < modal)
+        const lossItems = checkSellBelowCost(
+          lines.map((line) => ({
+            name: line.variant?.product.name || line.eventPackage?.name || line.parcel.name,
+            unitPrice: line.unitPrice,
+            basePrice: Number(line.variant?.basePrice || 0),
+          }))
+        );
+
         const saleCategories = [...new Set(lines.flatMap((line) => {
           if (line.variant) return [line.variant.product.category?.name];
           if (line.eventPackage) return line.eventPackage.items.map((item) => item.variant.product.category?.name);
@@ -669,6 +705,8 @@ router.post('/checkout', authenticateToken, checkoutLimiter, validateBody(checko
             paymentMethod,
             paymentStatus: paymentMethod === 'DEBT' ? 'UNPAID' : 'PAID',
             paidAmount: paid,
+            pointsAwarded: earnedPoints,
+            pointsRedeemed: Number(redeemedPoints) || 0,
             notes: `Points: +${earnedPoints} / -${redeemedPoints}`,
             items: {
               create: lines.map((line) => ({
@@ -690,6 +728,20 @@ router.post('/checkout', authenticateToken, checkoutLimiter, validateBody(checko
           await transaction.order.update({
             where: { id: sourceHold.id },
             data: { status: 'CANCELLED', notes: 'HOLD_CART:RESUMED' },
+          });
+        }
+
+        // FASE 5: Catat AuditLog jika ada barang dijual rugi
+        if (lossItems.length > 0) {
+          await transaction.auditLog.create({
+            data: {
+              entityType: 'Order',
+              entityId: order.id,
+              field: 'SELL_BELOW_COST',
+              oldValue: 'NORMAL',
+              newValue: JSON.stringify(lossItems),
+              changedById: req.user.id,
+            },
           });
         }
 

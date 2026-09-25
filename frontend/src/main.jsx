@@ -6,6 +6,7 @@ import './styles/admin.css';
 import { purgeLegacyCatalogCache } from './utils/catalogStorage';
 
 purgeLegacyCatalogCache();
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

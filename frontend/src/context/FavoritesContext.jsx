@@ -1,5 +1,15 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-      return saved ? stripSensitive(JSON.parse(saved)) : [];    } catch {
+import { stripSensitive } from '../utils/catalogStorage';
+
+const FavoritesContext = createContext(null);
+const FAVORITES_STORAGE_KEY = 'glosir_favorites_v1';
+
+export function FavoritesProvider({ children }) {
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      const saved = localStorage.getItem(FAVORITES_STORAGE_KEY);
+      return saved ? stripSensitive(JSON.parse(saved)) : [];
+    } catch {
       return [];
     }
   });
@@ -11,7 +21,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
   const toggleFavorite = (product) => {
     setFavorites((current) => current.some((item) => item.id === product.id)
       ? current.filter((item) => item.id !== product.id)
-      : [...current, stripSensitive(product)]);  };
+      : [...current, stripSensitive(product)]);
+  };
 
   const isFavorite = (id) => favorites.some((item) => item.id === id);
   const favoriteIds = useMemo(() => favorites.map((item) => item.id), [favorites]);

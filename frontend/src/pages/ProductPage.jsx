@@ -6,8 +6,24 @@ import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import CatalogImage from '../components/CatalogImage';
+import { PUBLIC_CATALOG_CACHE_KEY, stripSensitive } from '../utils/catalogStorage';
+
+export default function ProductPage() {
+  const { addItem, totalItems } = useCart();
+  const [activeFilter, setActiveFilter] = useState('Semua');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [addedProduct, setAddedProduct] = useState('');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('default');
+  const { toggleFavorite, isFavorite } = useFavorites();
+  const filters = ['Semua', 'Promo', ...new Set(products.map((product) => product.category).filter(Boolean))];
+
+  useEffect(() => {
+    try {
       const cachedProducts = JSON.parse(localStorage.getItem(PUBLIC_CATALOG_CACHE_KEY) || '[]');
-      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) setProducts(stripSensitive(cachedProducts));    } catch {
+      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) setProducts(stripSensitive(cachedProducts));
+    } catch {
       // Ignore an invalid local cache and use the API response.
     }
 
@@ -47,7 +63,8 @@ import CatalogImage from '../components/CatalogImage';
         })) : [];
         const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
         setProducts(merged);
-        localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));      })
+        localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));
+      })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   }, []);
