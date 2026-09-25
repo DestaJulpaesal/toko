@@ -9,6 +9,7 @@ import multer from 'multer';
 import { apiLimiter, whatsappWebhookLimiter } from './middleware/security.js';
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
+import productUnitRoutes from './routes/productUnitRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import parcelRoutes from './routes/parcelRoutes.js';
 import financeRoutes from './routes/financeRoutes.js';
@@ -81,6 +82,7 @@ app.use('/api', apiLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/products', productUnitRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/parcels', parcelRoutes);
 app.use('/api/finance', financeAdvancedRoutes);

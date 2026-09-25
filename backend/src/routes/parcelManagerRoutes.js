@@ -1,11 +1,8 @@
-import express from 'express';
+﻿import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, managerCreateSchema, managerUpdateSchema } from '../middleware/security.js';
-<<<<<<< HEAD
-=======
 import { sessions } from '../services/sessionService.js';
->>>>>>> cbd8857 (push fitur notifikasi email)
 
 const router = express.Router();
 const ownerOnly = [authenticateToken, requireRole('OWNER', 'ADMIN')];
@@ -78,15 +75,10 @@ router.patch('/:id', ...ownerOnly, validateBody(managerUpdateSchema), async (req
     if (password) {
       const hashRows = await prisma.$queryRaw`SELECT crypt(${String(password)}, gen_salt('bf')) AS hash`;
       data.passwordHash = hashRows[0].hash;
-<<<<<<< HEAD
-    }
-    const user = await prisma.user.update({ where: { id: req.params.id }, data, include: { region: { select: { name: true } } } });
-=======
       data.tokenVersion = { increment: 1 }; // password diganti admin: sesi lama akun itu dicabut
     }
     const user = await prisma.user.update({ where: { id: req.params.id }, data, include: { region: { select: { name: true } } } });
     sessions.invalidate(user.id);
->>>>>>> cbd8857 (push fitur notifikasi email)
     if (current.regionId && current.regionId !== nextRegionId) await prisma.parcelRegion.updateMany({ where: { id: current.regionId, managerId: current.id }, data: { managerId: null } });
     if (nextRegionId) await prisma.parcelRegion.update({ where: { id: nextRegionId }, data: { managerId: user.id } });
     return res.json({ success: true, manager: formatManager(user) });
@@ -100,10 +92,7 @@ router.delete('/:id', ...ownerOnly, async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!user || !['PARCEL_MANAGER', 'CASHIER'].includes(user.role)) return res.status(404).json({ success: false, message: 'Akun operasional tidak ditemukan.' });
     await prisma.user.update({ where: { id: user.id }, data: { isActive: false, regionId: null, role: 'CASHIER' } });
-<<<<<<< HEAD
-=======
     sessions.invalidate(user.id); // langsung tidak bisa dipakai, tanpa menunggu cache sesi habis
->>>>>>> cbd8857 (push fitur notifikasi email)
     await prisma.parcelRegion.updateMany({ where: { managerId: user.id }, data: { managerId: null } });
     return res.json({ success: true, message: 'Akun berhasil dinonaktifkan.' });
   } catch (error) {

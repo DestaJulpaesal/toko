@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react';
 import AdminSidebar from '../components/AdminSidebar';
 import { confirmAction } from '../utils/confirmService';
-<<<<<<< HEAD
-import { apiFetch } from '../services/api';
-=======
 import { apiFetch, monitorSessionExpiry } from '../services/api';
->>>>>>> cbd8857 (push fitur notifikasi email)
-
 const emptyForm = { name: '', email: '', phone: '', headline: '', story: '' };
 
 export default function AdminProfilePage() {
@@ -87,76 +82,11 @@ export default function AdminProfilePage() {
     if (data.success) setNotificationPreferences(data.preferences);
   };
 
-<<<<<<< HEAD
-=======
-  const logoutOtherDevices = async () => {
-    if (!await confirmAction('Keluarkan semua perangkat lain dari akun ini? Perangkat yang sedang dipakai tetap masuk.')) return;
-    try {
-      const response = await apiFetch('/auth/logout-others', { method: 'POST', silentNotify: true });
-      const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.message || 'Belum berhasil. Coba lagi sebentar.');
-      // Perangkat ini menerima token baru supaya tidak ikut keluar.
-      if (data.token) {
-        localStorage.setItem('glosir_token', data.token);
-        monitorSessionExpiry();
-      }
-      setNotice(data.message || 'Semua perangkat lain sudah dikeluarkan.');
-    } catch (error) {
-      setNotice(error.message || 'Belum berhasil. Coba lagi sebentar.');
-    }
-  };
-
->>>>>>> cbd8857 (push fitur notifikasi email)
-  const inviteEmployee = async (event) => {
-    event.preventDefault();
-    const response = await apiFetch('/auth/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(inviteForm),
-    });
-    const data = await response.json();
-    setNotice(data.message || 'Undangan belum berhasil dikirim.');
-    if (data.success) setInviteForm({ name: '', email: '', role: 'CASHIER', phone: '' });
-  };
-
-  return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Profil" />
-      <main className="admin-main">
-        <header className="admin-header"><div><p className="eyebrow light">Public identity</p><h1>Profil Pemilik</h1><p className="admin-subtitle">Informasi ini akan tampil di halaman Profil website publik.</p></div><span className={`database-status ${loading ? 'loading' : 'ready'}`}><i /> {loading ? 'Memuat data' : 'Terhubung ke API'}</span></header>
-        {notice && <div className="crud-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Tutup notifikasi">x</button></div>}
-        <form className="crud-form-panel profile-settings-form" onSubmit={submitForm}>
-          <div className="panel-heading"><div><span className="panel-kicker">Website publik</span><h2>Identitas Glosir</h2></div></div>
-          <div className="form-two-columns"><label>Nama pemilik<input name="name" value={form.name} onChange={updateField} placeholder="Nama pemilik" required /></label><label>Email<input name="email" value={form.email} onChange={updateField} type="email" placeholder="email@glosir.com" required /></label></div>
-          <label>Nomor WhatsApp<input name="phone" value={form.phone} onChange={updateField} placeholder="081234567890" inputMode="tel" required /></label>
-          <label>Foto pemilik<input type="file" accept="image/*" onChange={handlePhoto} /></label>
-          {form.photoUrl && <img className="profile-photo-preview" src={form.photoUrl} alt="Preview foto pemilik" />}
-          <label>Headline profil<input name="headline" value={form.headline} onChange={updateField} placeholder="Cerita singkat tentang usaha" required /></label>
-          <label>Deskripsi usaha<textarea name="story" value={form.story} onChange={updateField} rows="6" placeholder="Ceritakan Glosir kepada pelanggan" required /></label>
-          <button className="btn btn-primary" type="submit" disabled={loading || saving}>{saving ? 'Menyimpan...' : 'Simpan profil publik'}</button>
-        </form>
-        <section className="crud-form-panel profile-settings-form">
-          <div className="panel-heading"><div><span className="panel-kicker">Email</span><h2>Pilih notifikasi</h2></div></div>
-          {[
-            ['criticalStock', 'Stok kritis atau hampir habis'],
-            ['overdueDebt', 'Piutang jatuh tempo'],
-            ['newOnlineOrder', 'Pesanan online baru'],
-            ['onlinePayment', 'Pembayaran online berhasil atau gagal'],
-            ['dailySummary', 'Ringkasan omzet harian'],
-            ['backupFailure', 'Backup gagal'],
-            ['newDeviceLogin', 'Login dari perangkat baru'],
-          ].map(([key, label]) => <label key={key} className="login-remember"><input type="checkbox" checked={Boolean(notificationPreferences[key])} onChange={(event) => setNotificationPreferences((current) => ({ ...current, [key]: event.target.checked }))} /> {label}</label>)}
-          <button className="btn btn-primary" type="button" onClick={saveNotificationPreferences}>Simpan pilihan notifikasi</button>
-        </section>
-<<<<<<< HEAD
-=======
         <section className="crud-form-panel profile-settings-form">
           <div className="panel-heading"><div><span className="panel-kicker">Keamanan</span><h2>Keluar dari perangkat lain</h2></div></div>
           <p>Kalau HP atau komputer pernah hilang, dipinjam, atau lupa logout, tekan tombol ini. Semua perangkat lain harus masuk lagi dengan password.</p>
           <button className="btn btn-secondary" type="button" onClick={logoutOtherDevices}>Keluarkan semua perangkat lain</button>
-        </section>
->>>>>>> cbd8857 (push fitur notifikasi email)
-        <form className="crud-form-panel profile-settings-form" onSubmit={inviteEmployee}>
+        </section>        <form className="crud-form-panel profile-settings-form" onSubmit={inviteEmployee}>
           <div className="panel-heading"><div><span className="panel-kicker">Akun karyawan</span><h2>Undang karyawan</h2></div></div>
           <div className="form-two-columns">
             <label>Nama karyawan<input required value={inviteForm.name} onChange={(event) => setInviteForm((current) => ({ ...current, name: event.target.value }))} placeholder="Nama lengkap" /></label>

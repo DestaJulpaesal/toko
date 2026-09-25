@@ -1,63 +1,5 @@
 import express from 'express';
 import prisma from '../config/db.js';
-<<<<<<< HEAD
-import { authenticateToken, requireRole } from '../middleware/auth.js';
-import { validateBody, productCreateSchema, productUpdateSchema, productBulkSchema } from '../middleware/security.js';
-
-const router = express.Router();
-
-const statusToDb = { Aktif: 'ACTIVE', 'Stok menipis': 'ACTIVE', Draft: 'DRAFT' };
-const normalizeCategoryName = (name) => String(name || '').trim();
-const statusFromDb = (status, stock, stockWarning) => status === 'DRAFT' ? 'Draft' : stock <= stockWarning ? 'Stok menipis' : 'Aktif';
-
-function formatProduct(product) {
-  const variant = product.variants?.[0];
-  const stock = variant?.stockQty || 0;
-  const price = Number(variant?.sellPrice || 0);
-  const wholesalePrice = variant?.wholesalePrice == null ? null : Number(variant.wholesalePrice);
-  const basePrice = Number(variant?.basePrice || 0);
-  const originalPrice = product.originalPrice ? Number(product.originalPrice) : (basePrice > price ? basePrice : null);
-  const discountPercent = originalPrice && originalPrice > price
-    ? Math.round(((originalPrice - price) / originalPrice) * 100)
-    : 0;
-
-  return {
-    id: product.id,
-    variantId: variant?.id,
-    name: product.name,
-    sku: product.sku,
-    barcode: variant?.barcode || null,
-    category: product.category?.name || 'Glosir',
-    price,
-    wholesalePrice,
-    purchasePrice: basePrice,
-    originalPrice,
-    discountPercent,
-    isQuickAccess: Boolean(product.isQuickAccess),
-    imageUrl: product.imageUrl || null,
-    stock,
-    variants: (product.variants || []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      sku: item.sku,
-      barcode: item.barcode,
-      price: Number(item.sellPrice || 0),
-      wholesalePrice: item.wholesalePrice == null ? null : Number(item.wholesalePrice),
-      purchasePrice: Number(item.basePrice || 0),
-      stock: item.stockQty || 0,
-      isDefault: Boolean(item.isDefault),
-    })),
-    status: statusFromDb(product.status, stock, product.stockWarning),
-    badge: discountPercent > 0
-      ? `Diskon ${discountPercent}%`
-      : product.isFeatured
-      ? 'Best Seller'
-      : product.isParcel
-      ? 'Parsel'
-      : 'Tersedia',
-  };
-}
-=======
 import { authenticateToken, requireRole, softAuth } from '../middleware/auth.js';
 import { createCatalogHandlers } from '../services/catalogHandlers.js';
 import { AUDIENCE, formatProduct } from '../services/catalogSerializers.js';
@@ -68,8 +10,6 @@ const catalog = createCatalogHandlers(prisma);
 
 const statusToDb = { Aktif: 'ACTIVE', 'Stok menipis': 'ACTIVE', Draft: 'DRAFT' };
 const normalizeCategoryName = (name) => String(name || '').trim();
->>>>>>> cbd8857 (push fitur notifikasi email)
-
 async function findCategory(name) {
   const normalizedName = normalizeCategoryName(name);
   const category = await prisma.category.findFirst({ where: { name: normalizedName } });
@@ -78,33 +18,8 @@ async function findCategory(name) {
   return prisma.category.findFirst({ where: { name: 'Warung' } });
 }
 
-<<<<<<< HEAD
-router.get('/', async (req, res) => {
-  try {
-    const products = await prisma.product.findMany({
-      where: req.query.all === 'true' ? { status: { not: 'HIDDEN' } } : { status: 'ACTIVE' },
-      include: { category: true, variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } } },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return res.json({
-      success: true,
-      source: 'database',
-      products: products.map(formatProduct),
-    });
-  } catch (error) {
-    console.error('Product database unavailable:', error.message);
-    return res.status(503).json({
-      success: false,
-      message: 'Database produk tidak tersedia. Sinkronisasi DB perlu dijalankan terlebih dahulu.',
-    });
-  }
-});
-=======
 // Publik, tetapi isinya menyesuaikan siapa yang membuka (lihat services/catalogSerializers.js).
 router.get('/', softAuth, catalog.listProducts);
->>>>>>> cbd8857 (push fitur notifikasi email)
-
 router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(productCreateSchema), async (req, res) => {
   try {
     const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, status = 'Aktif', isQuickAccess = false, imageUrl } = req.body || {};
@@ -128,12 +43,7 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
       },
       include: { category: true, variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } } },
     });
-<<<<<<< HEAD
-    return res.status(201).json({ success: true, product: formatProduct(product) });
-=======
-    return res.status(201).json({ success: true, product: formatProduct(product, AUDIENCE.OWNER) });
->>>>>>> cbd8857 (push fitur notifikasi email)
-  } catch (error) {
+    return res.status(201).json({ success: true, product: formatProduct(product, AUDIENCE.OWNER) });  } catch (error) {
     return res.status(400).json({ success: false, message: error.code === 'P2002' ? 'SKU atau produk sudah digunakan' : 'Produk gagal disimpan' });
   }
 });
@@ -179,12 +89,7 @@ router.post('/bulk', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
           },
           include: { category: true, variants: { where: { isDefault: true }, take: 1 } },
         });
-<<<<<<< HEAD
-        result.push(formatProduct(product));
-=======
-        result.push(formatProduct(product, AUDIENCE.OWNER));
->>>>>>> cbd8857 (push fitur notifikasi email)
-      }
+        result.push(formatProduct(product, AUDIENCE.OWNER));      }
       return result;
     }, { maxWait: 10000, timeout: 30000 });
 
@@ -313,12 +218,7 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
         })),
       });
     }
-<<<<<<< HEAD
-    return res.json({ success: true, product: formatProduct(product) });
-=======
-    return res.json({ success: true, product: formatProduct(product, AUDIENCE.OWNER) });
->>>>>>> cbd8857 (push fitur notifikasi email)
-  } catch (error) {
+    return res.json({ success: true, product: formatProduct(product, AUDIENCE.OWNER) });  } catch (error) {
     console.error('Product update failed:', error.message);
     return res.status(error.message === 'PRODUCT_UPDATE_TIMEOUT' ? 504 : 400).json({ success: false, message: error.message === 'PRODUCT_UPDATE_TIMEOUT' ? 'Database terlalu lama merespons. Coba simpan lagi.' : error.code === 'P2002' ? 'SKU sudah digunakan' : 'Produk gagal diperbarui' });
   }
@@ -347,36 +247,5 @@ router.delete('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (r
   }
 });
 
-<<<<<<< HEAD
-router.get('/:id', async (req, res) => {
-  try {
-    const product = await prisma.product.findUnique({
-      where: { id: req.params.id },
-      include: { category: true, variants: { where: { isDefault: true, isActive: true }, take: 1 } },
-    });
-
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Produk tidak ditemukan',
-      });
-    }
-
-    return res.json({
-      success: true,
-      source: 'database',
-      product: formatProduct(product),
-    });
-  } catch (error) {
-    console.error('Product detail query failed:', error.message);
-    return res.status(503).json({
-      success: false,
-      message: 'Database produk tidak tersedia. Sinkronisasi DB perlu dijalankan terlebih dahulu.',
-    });
-  }
-});
-=======
 router.get('/:id', softAuth, catalog.getProduct);
->>>>>>> cbd8857 (push fitur notifikasi email)
-
 export default router;

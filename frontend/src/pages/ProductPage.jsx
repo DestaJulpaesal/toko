@@ -6,32 +6,8 @@ import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import CatalogImage from '../components/CatalogImage';
-<<<<<<< HEAD
-=======
-import { PUBLIC_CATALOG_CACHE_KEY, stripSensitive } from '../utils/catalogStorage';
->>>>>>> cbd8857 (push fitur notifikasi email)
-
-export default function ProductPage() {
-  const { addItem, totalItems } = useCart();
-  const [activeFilter, setActiveFilter] = useState('Semua');
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [addedProduct, setAddedProduct] = useState('');
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('default');
-  const { toggleFavorite, isFavorite } = useFavorites();
-  const filters = ['Semua', 'Promo', ...new Set(products.map((product) => product.category).filter(Boolean))];
-
-  useEffect(() => {
-    try {
-<<<<<<< HEAD
-      const cachedProducts = JSON.parse(localStorage.getItem('glosir_products_cache') || '[]');
-      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) setProducts(cachedProducts);
-=======
       const cachedProducts = JSON.parse(localStorage.getItem(PUBLIC_CATALOG_CACHE_KEY) || '[]');
-      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) setProducts(stripSensitive(cachedProducts));
->>>>>>> cbd8857 (push fitur notifikasi email)
-    } catch {
+      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) setProducts(stripSensitive(cachedProducts));    } catch {
       // Ignore an invalid local cache and use the API response.
     }
 
@@ -71,12 +47,7 @@ export default function ProductPage() {
         })) : [];
         const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
         setProducts(merged);
-<<<<<<< HEAD
-        localStorage.setItem('glosir_products_cache', JSON.stringify(merged));
-=======
-        localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));
->>>>>>> cbd8857 (push fitur notifikasi email)
-      })
+        localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));      })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
   }, []);

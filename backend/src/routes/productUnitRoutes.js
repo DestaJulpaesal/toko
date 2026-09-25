@@ -15,7 +15,7 @@ const router = express.Router();
 // Schema validation
 const productUnitSchema = z.object({
   name: z.string().min(1, 'Nama satuan wajib diisi'),
-  sku: z.string().min(1, 'SKU wajib diisi').unique('SKU sudah ada'),
+  sku: z.string().min(1, 'SKU wajib diisi'),
   barcode: z.string().optional(),
   sellPrice: z.coerce.number().positive('Harga jual harus positif'),
   wholesalePrice: z.coerce.number().positive().optional(),

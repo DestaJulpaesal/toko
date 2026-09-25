@@ -12,7 +12,6 @@ const ownerPrimaryGroups = [
 const ownerSecondaryGroups = [
   { label: 'Katalog', links: [['09', 'Kategori', '/admin/categories'], ['10', 'Promo', '/admin/promos']] },
   { label: 'Parsel', links: [['11', 'Parsel', '/admin/parcels'], ['12', 'Peserta Parsel', '/admin/parcel-participants'], ['13', 'Program Parsel', '/admin/parcel-programs'], ['14', 'Wilayah Parsel', '/admin/parcel-regions']] },
-<<<<<<< HEAD
   { label: 'Keuangan Lanjutan', links: [['15', 'Catatan Pribadi', '/admin/personal-finance'], ['16', 'Laporan Keuangan', '/admin/finance/reports'], ['17', 'Kalender Keuangan', '/admin/finance/calendar'], ['18', 'Total Kekayaan', '/admin/finance/networth'], ['19', 'Persetujuan Keuangan', '/admin/finance/approvals'], ['20', 'Audit Keuangan', '/admin/finance/audit']] },
   { label: 'Website & Kontrol', links: [['21', 'Konten Publik', '/admin/content'], ['22', 'Profil', '/admin/profile'], ['23', 'Stok Opname', '/admin/stock-opname'], ['24', 'Paket Acara', '/admin/event-packages']] },
 ];

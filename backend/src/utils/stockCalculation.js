@@ -77,6 +77,16 @@ export function validateStock(baseStockQty, requestedQty, conversionToBase) {
 }
 
 /**
+ * Validasi stok tersedia (simplified)
+ * @param {number} baseStockQty - stok dalam satuan dasar
+ * @param {number} requestedQty - jumlah yang diminta
+ * @returns {boolean} true jika stok cukup
+ */
+export function validateStockAvailability(baseStockQty, requestedQty) {
+  return Number(baseStockQty) >= Number(requestedQty);
+}
+
+/**
  * Hitung stok pengaman untuk restock
  * @param {number} avgDailyUsage - rata-rata pemakaian per hari dalam satuan dasar
  * @param {number} leadDays - berapa hari untuk barang datang

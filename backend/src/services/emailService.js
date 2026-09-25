@@ -73,4 +73,17 @@ export function renderActionEmail({ title, message, actionLabel, actionUrl }) {
   return `<!doctype html><html lang="id"><body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937"><h1>${title}</h1><p>${message}</p><p><a href="${actionUrl}" style="display:inline-block;padding:12px 18px;background:#166534;color:#fff;text-decoration:none;border-radius:6px">${actionLabel}</a></p><p>Jika tombol tidak bisa dibuka, salin tautan ini:</p><p>${actionUrl}</p></body></html>`;
 }
 
+/**
+ * Initialize email service
+ * Verify SMTP configuration is available
+ */
+export function initializeEmailService() {
+  const transporter = getTransporter();
+  if (transporter) {
+    console.log('✓ Email service initialized (SMTP configured)');
+  } else {
+    console.warn('⚠ Email service disabled (SMTP not configured)');
+  }
+}
+
 export { defaultPreferences };

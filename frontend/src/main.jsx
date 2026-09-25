@@ -3,13 +3,9 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/index.css';
 import './styles/admin.css';
-<<<<<<< HEAD
-=======
 import { purgeLegacyCatalogCache } from './utils/catalogStorage';
 
 purgeLegacyCatalogCache();
->>>>>>> cbd8857 (push fitur notifikasi email)
-
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

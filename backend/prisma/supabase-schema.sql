@@ -18,11 +18,7 @@ create table "User" (
   "phone" text,
   "role" "Role" not null default 'CASHIER',
   "isActive" boolean not null default true,
-<<<<<<< HEAD
-=======
-  "tokenVersion" integer not null default 0,
->>>>>>> cbd8857 (push fitur notifikasi email)
-  "createdAt" timestamptz not null default now(),
+  "tokenVersion" integer not null default 0,  "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now(),
   "emailVerifiedAt" timestamptz,
   "emailVerificationTokenHash" text unique,

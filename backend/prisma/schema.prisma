@@ -205,9 +205,11 @@ model ProductUnit {
   name             String   // e.g. "Batang", "Bungkus", "1/4 kg", "Kg"
   sku              String   @unique
   barcode          String?  @unique
+  basePrice        Decimal  @db.Decimal(12, 2)  // Harga modal (untuk validasi jual rugi)
   sellPrice        Decimal  @db.Decimal(12, 2)
   wholesalePrice   Decimal? @db.Decimal(12, 2)
   conversionToBase Decimal  @db.Decimal(12, 4)  // e.g. 1 bungkus = 12 batang
+  expiryDate       DateTime?  // Tanggal kadaluarsa (nullable, opsional)
   isSellable       Boolean  @default(true)
   isDefault        Boolean  @default(false)
   isActive         Boolean  @default(true)
@@ -218,6 +220,7 @@ model ProductUnit {
 
   @@unique([productId, name])
   @@index([productId])
+  @@index([expiryDate])  // Index untuk query notifikasi kadaluarsa
 }
 
 model StockMovement {
@@ -410,25 +413,27 @@ model ParcelItem {
 }
 
 model Order {
-  id            String      @id @default(cuid())
-  orderNumber   String      @unique
-  type          OrderType
-  status        OrderStatus @default(PENDING)
-  customerId    String?
-  userId        String?
-  subtotal      Decimal     @db.Decimal(12, 2)
-  discount      Decimal     @default(0) @db.Decimal(12, 2)
-  shippingCost  Decimal     @default(0) @db.Decimal(12, 2)
-  total         Decimal     @db.Decimal(12, 2)
-  paymentMethod String      @default("CASH")
-  paymentStatus String      @default("PAID")
-  paidAmount    Decimal     @default(0) @db.Decimal(12, 2)
-  notes         String?
-  whatsappLink  String?
-  voidReason    String?
-  voidedById    String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  type            OrderType
+  status          OrderStatus @default(PENDING)
+  customerId      String?
+  userId          String?
+  subtotal        Decimal     @db.Decimal(12, 2)
+  discount        Decimal     @default(0) @db.Decimal(12, 2)
+  shippingCost    Decimal     @default(0) @db.Decimal(12, 2)
+  total           Decimal     @db.Decimal(12, 2)
+  paymentMethod   String      @default("CASH")
+  paymentStatus   String      @default("PAID")
+  paidAmount      Decimal     @default(0) @db.Decimal(12, 2)
+  pointsAwarded   Int         @default(0)  // Poin yang diberikan saat order COMPLETED
+  pointsRedeemed  Int         @default(0)  // Poin yang digunakan sebagai diskon atau void
+  notes           String?
+  whatsappLink    String?
+  voidReason      String?
+  voidedById      String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   customer       Customer?            @relation(fields: [customerId], references: [id])
   user           User?                @relation(fields: [userId], references: [id])
@@ -816,6 +821,16 @@ model StockOpname {
   performedBy User           @relation(fields: [performedById], references: [id])
 
   @@index([variantId, createdAt])
+}
+
+model LoyaltyRule {
+  id                  String   @id @default(cuid())
+  pointsPerRp100k     Int      @default(100)   // Poin per Rp100.000 transaksi
+  minTransactionAmount Decimal  @default(100000) @db.Decimal(14, 2)  // Minimum nominal untuk dapat poin
+  pointsPerRp         Decimal  @default(0.001) @db.Decimal(12, 6)  // Alternatif: poin per rupiah (lebih fleksibel)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model AuditLog {

@@ -1,22 +1,5 @@
 import { showSuccess, showError } from '../utils/noticeService';
-<<<<<<< HEAD
-=======
-import { clearStaffCaches } from '../utils/catalogStorage';
->>>>>>> cbd8857 (push fitur notifikasi email)
-
-const configuredApiUrl = String(import.meta.env.VITE_API_URL || '').trim();
-let sessionExpiryTimer;
-
-export const API_BASE_URL = (configuredApiUrl || 'http://127.0.0.1:5000/api').replace(/\/$/, '');
-
-function clearExpiredSession() {
-  localStorage.removeItem('glosir_token');
-  localStorage.removeItem('glosir_user');
-<<<<<<< HEAD
-=======
-  clearStaffCaches();
->>>>>>> cbd8857 (push fitur notifikasi email)
-  if (window.location.pathname !== '/login') window.location.replace('/login');
+  clearStaffCaches();  if (window.location.pathname !== '/login') window.location.replace('/login');
 }
 
 export function monitorSessionExpiry() {

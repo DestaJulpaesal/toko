@@ -1,24 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-<<<<<<< HEAD
-=======
-import { stripSensitive } from '../utils/catalogStorage';
->>>>>>> cbd8857 (push fitur notifikasi email)
-
-const CartContext = createContext(null);
-const CART_STORAGE_KEY = 'glosir_cart_v1';
-const PROMO_STORAGE_KEY = 'glosir_promo_v1';
-
-export function CartProvider({ children }) {
-  const [items, setItems] = useState(() => {
-    try {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
-<<<<<<< HEAD
-      return saved ? JSON.parse(saved) : [];
-=======
       // Keranjang lama bisa saja masih menyimpan harga modal dari versi sebelumnya; bersihkan saat dimuat.
-      return saved ? stripSensitive(JSON.parse(saved)) : [];
->>>>>>> cbd8857 (push fitur notifikasi email)
-    } catch {
+      return saved ? stripSensitive(JSON.parse(saved)) : [];    } catch {
       return [];
     }
   });
@@ -43,12 +25,7 @@ export function CartProvider({ children }) {
         );
       }
 
-<<<<<<< HEAD
-      return [...prev, { ...product, qty: 1 }];
-=======
-      return [...prev, { ...stripSensitive(product), qty: 1 }];
->>>>>>> cbd8857 (push fitur notifikasi email)
-    });
+      return [...prev, { ...stripSensitive(product), qty: 1 }];    });
   };
 
   const updateQty = (id, qty) => {

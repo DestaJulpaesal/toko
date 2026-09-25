@@ -13,65 +13,10 @@ import CatalogImageField from '../components/CatalogImageField';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
-<<<<<<< HEAD
-=======
-import { ADMIN_PRODUCTS_CACHE_KEY } from '../utils/catalogStorage';
->>>>>>> cbd8857 (push fitur notifikasi email)
-import * as XLSX from 'xlsx';
-
-const emptyForm = { name: '', sku: '', barcode: '', category: '', price: '', wholesalePrice: '', purchasePrice: '', originalPrice: '', stock: '', status: 'Aktif', isQuickAccess: false, imageUrl: '', packages: [] };
-
-export default function AdminProductsPage() {
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Semua');
-  const [categoryFilter, setCategoryFilter] = useState('Semua');
-  const [sortBy, setSortBy] = useState('newest');
-  const [notice, setNotice] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [selectedProductIds, setSelectedProductIds] = useState([]);
-  const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [auditLogs, setAuditLogs] = useState([]);
-
-  const downloadExcel = () => {
-    const rows = visibleProducts.map((product) => ({ Nama: product.name, SKU: product.sku, Barcode: product.barcode || '', Kategori: product.category, Harga: product.price, Stok: product.stock, Status: product.status }));
-    const sheet = XLSX.utils.json_to_sheet(rows);
-    const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Produk');
-    XLSX.writeFile(book, `produk-glosir-${new Date().toISOString().slice(0, 10)}.xlsx`);
-  };
-
-  // Barcode & Bulk Modals
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [bulkModalOpen, setBulkModalOpen] = useState(false);
-  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
-  const [printModalProduct, setPrintModalProduct] = useState(null);
-  const barcodeInputRef = useRef(null);
-  const scannerBufferRef = useRef('');
-  const scannerTimerRef = useRef(null);
-
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const response = await apiFetch('/products?all=true');
-      const data = await response.json();
-      if (!response.ok || !data.success) throw new Error('Database produk belum tersedia');
-      setProducts(data.products);
-<<<<<<< HEAD
-      localStorage.setItem('glosir_products_cache', JSON.stringify(data.products));
-    } catch (error) {
-      try {
-        const cachedProducts = JSON.parse(localStorage.getItem('glosir_products_cache') || '[]');
-=======
       sessionStorage.setItem(ADMIN_PRODUCTS_CACHE_KEY, JSON.stringify(data.products));
     } catch (error) {
       try {
-        const cachedProducts = JSON.parse(sessionStorage.getItem(ADMIN_PRODUCTS_CACHE_KEY) || '[]');
->>>>>>> cbd8857 (push fitur notifikasi email)
-        setProducts(Array.isArray(cachedProducts) ? cachedProducts : []);
+        const cachedProducts = JSON.parse(sessionStorage.getItem(ADMIN_PRODUCTS_CACHE_KEY) || '[]');        setProducts(Array.isArray(cachedProducts) ? cachedProducts : []);
       } catch {
         setProducts([]);
       }
@@ -392,12 +337,7 @@ export default function AdminProductsPage() {
         const nextProducts = editingId
           ? previous.map((product) => product.id === editingId ? data.product : product)
           : [data.product, ...previous];
-<<<<<<< HEAD
-        localStorage.setItem('glosir_products_cache', JSON.stringify(nextProducts));
-=======
-        sessionStorage.setItem(ADMIN_PRODUCTS_CACHE_KEY, JSON.stringify(nextProducts));
->>>>>>> cbd8857 (push fitur notifikasi email)
-        return nextProducts;
+        sessionStorage.setItem(ADMIN_PRODUCTS_CACHE_KEY, JSON.stringify(nextProducts));        return nextProducts;
       });
       if (data.product?.id && form.packages?.length) {
         for (const packageForm of form.packages) {
