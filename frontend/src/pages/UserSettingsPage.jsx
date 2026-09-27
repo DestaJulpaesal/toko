@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 export default function UserSettingsPage() {
+  const { theme, toggleTheme } = useTheme();
   const [user, setUser] = useState(null);
   const [preferences, setPreferences] = useState({
     criticalStock: true,
@@ -172,6 +174,33 @@ export default function UserSettingsPage() {
           </button>
         </div>
 
+        {/* Appearance Section */}
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>🎨 Tampilan</h2>
+          <p style={styles.sectionSubtitle}>
+            Pilih tema tampilan aplikasi
+          </p>
+
+          <div style={styles.preferencesGrid}>
+            <label style={styles.preferenceItem}>
+              <div style={styles.preferenceContent}>
+                <span style={styles.preferenceLabel}>🌙 Mode Gelap</span>
+                <span style={styles.preferenceDesc}>Gunakan tema gelap untuk mengurangi kelelahan mata</span>
+              </div>
+              <button
+                onClick={toggleTheme}
+                style={{
+                  ...styles.themeToggle,
+                  background: theme === 'dark' ? '#1976d2' : '#e0e0e0',
+                  color: theme === 'dark' ? 'white' : '#333',
+                }}
+              >
+                {theme === 'dark' ? '☀️ Terang' : '🌙 Gelap'}
+              </button>
+            </label>
+          </div>
+        </section>
+
         {/* Security Section */}
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>🔒 Keamanan</h2>
@@ -301,6 +330,16 @@ const styles = {
   preferenceDesc: {
     fontSize: '12px',
     color: '#999',
+  },
+  themeToggle: {
+    padding: '8px 16px',
+    fontSize: '13px',
+    fontWeight: '600',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    whiteSpace: 'nowrap',
   },
   message: {
     padding: '12px 30px',

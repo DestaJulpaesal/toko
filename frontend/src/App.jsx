@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
 // Halaman publik: tetap eager-loaded karena ini yang paling sering diakses pengunjung pertama kali.
 import HomePage from './pages/HomePage';
 import ProductPage from './pages/ProductPage';
@@ -80,8 +81,9 @@ export default function App() {
           <FirstTimeGuide />
           <SupportButton />
           <QuickAddFab />
-          <Suspense fallback={<div className="page-loading">Memuat halaman...</div>}>
-          <Routes>
+          <ThemeProvider>
+            <Suspense fallback={<div className="page-loading">Memuat halaman...</div>}>
+              <Routes>
             {/* Toko Publik */}
             <Route path="/" element={<HomePage />} />
             <Route path="/products" element={<ProductPage />} />
@@ -141,7 +143,8 @@ export default function App() {
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          </Suspense>
+            </Suspense>
+          </ThemeProvider>
         </Router>
       </CartProvider>
     </FavoritesProvider>
