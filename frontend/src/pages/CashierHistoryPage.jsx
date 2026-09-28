@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import { calculateEarnedPoints } from './CashierPage';
 import { apiFetch } from '../services/api';
@@ -285,7 +286,7 @@ export default function CashierHistoryPage() {
         <section className="crud-table-panel">
           <div className="crud-toolbar">
             <label className="crud-search" style={{ maxWidth: '380px' }}>
-              <span>Cari</span>
+              <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

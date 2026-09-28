@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, FileText, Pencil, Printer, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, FileText, Pencil, Printer, RefreshCw, Search, Trash2 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
@@ -412,7 +412,7 @@ export default function AdminParcelParticipantsPage() {
             <BulkTableActions selectedCount={selectedIds.length} totalCount={filtered.length} allSelected={allSelected} onToggleAll={(checked) => setSelectedIds(checked ? filtered.map((item) => item.id) : [])} onDelete={deleteSelected} deleting={bulkDeleting} />
             <div className="crud-toolbar-actions">
               <label className="crud-search">
-                <span>Cari</span>
+                <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari peserta atau program..." />
               </label>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter status tagihan"><option value="ALL">Semua status</option><option value="OVERDUE">Perlu ditagih</option><option value="DUE">Jadwal berikutnya</option><option value="COMPLETED">Lunas</option></select>

@@ -147,7 +147,7 @@ export default function AdminSidebar({ active = '' }) {
 
       <nav ref={navRef} className={menuOpen ? 'admin-nav-open' : ''} onClick={() => setMenuOpen(false)}>
         <label className="sidebar-search" onClick={(event) => event.stopPropagation()}>
-          <span aria-hidden="true">⌕</span>
+          <Search className="w-4 h-4 text-emerald-400 mr-2 inline" aria-hidden="true" />
           <input value={sidebarSearch} onChange={(event) => setSidebarSearch(event.target.value)} placeholder="Cari menu" aria-label="Cari menu sidebar" />
         </label>
         {visibleGroups.map((group) => (

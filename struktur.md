@@ -1,7 +1,7 @@
 # BLUEPRINT SISTEM
 ## Digitalisasi Usaha Glosir, Parsel, E-Commerce & Keuangan Keluarga
 
-*Dokumen rancangan — September 2026; implementation status is noted on delivered modules.*
+*Dokumen rancangan — September 2026; status implementasi dicatat pada modul yang sudah selesai.*
 *September 2026*
 
 ---
@@ -66,7 +66,7 @@ Karena barang glosir dijual dalam berbagai satuan dan sebagian bisa pecahan (ece
 
 ### 3.2 Paket Glosir untuk Acara (Hajatan, Nikahan, dll.)
 
-**Status:** Database model, CRUD API, automatic/manual pricing, admin page, public catalog, cart integration, and checkout stock deduction are implemented.
+**Status:** Model database, API CRUD, penetapan harga otomatis/manual, halaman admin, katalog publik, integrasi keranjang, dan pemotongan stok saat checkout sudah diimplementasikan.
 
 Selain dijual satuan/eceran, barang Glosir bisa **dipaketkan** untuk kebutuhan acara besar — mirip konsep Parsel, tapi berbasis kebutuhan grosir dalam jumlah besar.
 
@@ -80,7 +80,7 @@ Selain dijual satuan/eceran, barang Glosir bisa **dipaketkan** untuk kebutuhan a
 
 ### 3.3 Rekomendasi Restock (Barang Perlu Dibeli)
 
-**Status:** API and dashboard recommendations are implemented from 14-day `OUT` movement averages; final purchase quantity remains manually editable.
+**Status:** API dan rekomendasi dashboard sudah diimplementasikan berdasarkan rata-rata pergerakan `OUT` 14 hari; jumlah pembelian akhir tetap bisa diedit manual.
 
 Sistem menghitung otomatis daftar barang yang perlu dibeli untuk hari berikutnya, berdasarkan stok saat ini dan rata-rata penjualan harian (gabungan penjualan kasir + online). Hasil ini tetap bisa diedit manual sebelum dijadikan daftar belanja final.
 
@@ -95,10 +95,10 @@ Sistem menghitung otomatis daftar barang yang perlu dibeli untuk hari berikutnya
 | --- | --- |
 | Stok masuk & keluar | Tercatat otomatis dari transaksi kasir, pesanan online, & input pembelian, dalam satuan dasar. |
 | Utang-piutang pelanggan | Sistem tempo/kredit untuk pelanggan langganan. |
-| Stok opname | **Implemented:** physical/system reconciliation, stock adjustment, movement record, and history. |
+| Stok opname | **Sudah diimplementasikan:** rekonsiliasi fisik/sistem, penyesuaian stok, pencatatan pergerakan, dan riwayat. |
 | Alert kadaluarsa | Notifikasi barang yang mendekati tanggal kadaluarsa, supaya bisa dijual/diskon lebih dulu. |
 | Deteksi jual rugi | Peringatan otomatis jika transaksi terjadi dengan harga jual di bawah harga modal. |
-| Log audit harga & stok | **Implemented:** variant price/stock changes record user, timestamp, and old/new values. |
+| Log audit harga & stok | **Sudah diimplementasikan:** perubahan harga/stok varian mencatat pengguna, waktu, dan nilai lama/baru. |
 | Laporan untung vs laku | Membedakan barang paling laris dengan barang paling menguntungkan. |
 
 ---
@@ -111,7 +111,7 @@ Menangani produk rakitan/kombinasi, dijual baik langsung di toko maupun lewat E-
 | --- | --- |
 | Data bahan/isi parsel | Diambil dari stok barang Glosir bila bahan yang sama dipakai di kedua modul. |
 | "Resep" paket parsel | Kombinasi bahan + jumlah per paket → sistem otomatis menghitung harga pokok & menyarankan harga jual. |
-| Pemotongan stok otomatis | **Implemented for POS checkout:** stok varian bahan parsel berkurang atomik dan `StockMovement` tercatat per varian. |
+| Pemotongan stok otomatis | **Sudah diimplementasikan untuk checkout Kasir (POS):** stok varian bahan parsel berkurang secara atomik dan `StockMovement` tercatat per varian. |
 | Pesanan / pre-order | Catat nama pelanggan, tanggal ambil, jumlah, status pesanan (dipesan/diproses/selesai) — baik dari toko langsung maupun dari pesanan online via WA. |
 | Custom parsel | Pelanggan bisa minta isi parsel disesuaikan lewat WA, dicatat sebagai varian custom dari resep dasar. |
 | Tampil di E-Commerce | Katalog parsel (paket standar + galeri contoh) ditampilkan di etalase online, kategori terpisah dari Glosir. |
@@ -234,3 +234,4 @@ Supaya sistem bisa mulai dipakai lebih cepat tanpa menunggu semua fitur selesai,
 | Fase 5 — Promo & Otomasi Lanjutan | Diskon & event/promo di E-Commerce, notifikasi WA (rekap malam, reminder piutang), OCR nota, import Excel, deteksi jual rugi, log audit, laporan untung vs laku. |
 
 *Dokumen ini adalah rancangan konsep. Struktur database (tabel & kolom), alur pesan WhatsApp, dan mockup tampilan akan disusun sebagai langkah lanjutan berdasarkan blueprint ini.*
+

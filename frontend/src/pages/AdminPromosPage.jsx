@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import { Link } from 'react-router-dom';
 import CurrencyInput from '../components/CurrencyInput';
@@ -173,7 +174,7 @@ export default function AdminPromosPage() {
           <section className="crud-table-panel">
             <div className="crud-toolbar">
               <label className="crud-search">
-                <span>cari</span>
+                <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama atau kode..." />
               </label>
             </div>

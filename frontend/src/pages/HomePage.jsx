@@ -3,8 +3,23 @@ import { Link } from 'react-router-dom';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
+import { 
+  ShoppingBag, 
+  Sparkles, 
+  ShieldCheck, 
+  Truck, 
+  Tag, 
+  ArrowRight, 
+  Gift, 
+  CheckCircle2, 
+  MessageCircle, 
+  Store,
+  ChevronRight,
+  TrendingUp,
+  Award
+} from 'lucide-react';
 
-const categories = ['Kebutuhan Harian', 'Promo'];
+const categories = ['Kebutuhan Harian', 'Minuman & Snack', 'Bahan Pokok & Sembako', 'Parsel Lebaran', 'Paket Acara', 'Promo Hemat'];
 
 export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState([]);
@@ -26,9 +41,11 @@ export default function HomePage() {
         if (products.length > 0) {
           setFeaturedProducts(
             products.slice(0, 4).map((product) => ({
+              id: product.id,
               name: product.name,
-              price: `Mulai Rp ${Number(product.price || 0).toLocaleString('id-ID')}`,
-              tag: product.badge || (product.category || 'Popular'),
+              price: `Rp ${Number(product.price || 0).toLocaleString('id-ID')}`,
+              tag: product.badge || (product.category || 'Populer'),
+              imageUrl: product.imageUrl,
             }))
           );
         }
@@ -46,9 +63,11 @@ export default function HomePage() {
         if (parcels.length > 0 && products.length === 0) {
           setFeaturedProducts(
             parcels.slice(0, 4).map((parcel) => ({
+              id: parcel.id,
               name: parcel.name,
-              price: `Mulai Rp ${Number(parcel.price || 0).toLocaleString('id-ID')}`,
+              price: `Rp ${Number(parcel.price || 0).toLocaleString('id-ID')}`,
               tag: parcel.type === 'CUSTOM' ? 'Custom' : 'Parsel',
+              imageUrl: parcel.imageUrl,
             }))
           );
         }
@@ -62,42 +81,192 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="glosir-shell">
+    <div className="public-page">
       <PublicHeader />
 
-      <main>
+      <main className="glosir-shell">
+        {/* Hero Section */}
         <section className="hero" id="home">
           <div className="hero-copy">
-            <span className="pill">Toko Glosir & Parcel Terpercaya</span>
-            <h1>Nikmati kebutuhan harian dan paket spesial dengan proses yang lebih praktis.</h1>
-            <p>
-              Glosir membantu pelanggan kebutuhan rumah tangga, usaha kecil, dan acara keluarga
-              dengan pilihan produk yang relevan, harga jelas, dan pelayanan yang cepat.
+            <span className="eyebrow-pill emerald mb-4">
+              <Store className="w-3.5 h-3.5 inline mr-1" /> Pusat Grosir & E-Commerce Terpercaya
+            </span>
+            <h1 className="hero-title">Belanja Sembako, Kebutuhan Harian & Parsel Lebih Hemat.</h1>
+            <p className="hero-subtitle">
+              Glosir melayani kebutuhan rumah tangga, warung eceran, dan parsel hampers acara keluarga 
+              dengan harga grosir transparan, jaminan produk asli, dan pengiriman cepat.
             </p>
             <div className="hero-actions">
-              <Link to="/products" className="btn btn-primary">Lihat Produk</Link>
-              <Link to="/contact-us" className="btn btn-secondary">Hubungi Kami</Link>
+              <Link to="/products" className="btn btn-primary shadow-lg">
+                <ShoppingBag className="w-4 h-4 inline mr-1.5" /> Lihat Katalog Produk
+              </Link>
+              <Link to="/parsel" className="btn btn-secondary shadow-sm">
+                <Gift className="w-4 h-4 inline mr-1.5 text-amber-600" /> Parsel & Hampers
+              </Link>
             </div>
-            <div className="stats">
-              <div><strong>Jelas</strong><span>Harga & proses</span></div>
-              <div><strong>Praktis</strong><span>Order cepat</span></div>
-              <div><strong>Responsif</strong><span>Pelayanan ramah</span></div>
+            
+            {/* Value Props / Stats */}
+            <div className="stats-strip">
+              <div className="stat-item">
+                <div className="stat-icon-wrap emerald">
+                  <ShieldCheck className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div>
+                  <strong>Harga Transparan</strong>
+                  <span>Grosir & Eceran Jelas</span>
+                </div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-icon-wrap amber">
+                  <Truck className="w-5 h-5 text-amber-700" />
+                </div>
+                <div>
+                  <strong>Pengiriman Cepat</strong>
+                  <span>Langsung ke Lokasi</span>
+                </div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-icon-wrap blue">
+                  <Award className="w-5 h-5 text-blue-700" />
+                </div>
+                <div>
+                  <strong>Produk Quality</strong>
+                  <span>Terjamin & Original</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="hero-card">
-            <div className="mini-card top">
-              <span>Best Seller</span>
-              <strong>Parcel Lebaran</strong>
-              <small>Rp 120.000</small>
+          <div className="hero-visual-card">
+            <div className="hero-card-banner top-card">
+              <div className="card-badge-top">
+                <Sparkles className="w-3.5 h-3.5 inline mr-1" /> Best Seller Momen Ini
+              </div>
+              <h3>Parsel Lebaran & Hampers Premium</h3>
+              <p>Isi lengkap sembako & kue kering favorit keluarga.</p>
+              <div className="hero-card-footer">
+                <span className="hero-card-price">Mulai Rp 120.000</span>
+                <Link to="/parsel" className="hero-card-link">
+                  Detail Parsel <ArrowRight className="w-3.5 h-3.5 inline ml-1" />
+                </Link>
+              </div>
             </div>
-            <div className="mini-card highlight">
-              <span>Promo</span>
-              <strong>Diskon 15%</strong>
-              <small>Untuk pembelian 3 item</small>
+
+            <div className="hero-card-banner highlight-card">
+              <div className="card-badge-top amber">
+                <Tag className="w-3.5 h-3.5 inline mr-1" /> Promo Grosir
+              </div>
+              <h3>Diskon Belanja Sembako</h3>
+              <p>Hemat hingga 15% untuk paket pembelian grosir.</p>
+              <Link to="/promo" className="btn btn-light small">Cek Promo Sekarang</Link>
             </div>
           </div>
         </section>
+
+        {/* Category Filter Row */}
+        <section className="category-showcase-section">
+          <div className="section-head mb-4">
+            <div>
+              <span className="eyebrow-pill gray">Kategori Belanja</span>
+              <h2 className="section-title">Pilih Kategori Kebutuhan Anda</h2>
+            </div>
+          </div>
+          <div className="category-pills-wrap">
+            {categories.map((item) => (
+              <Link key={item} to="/products" className="category-pill-card">
+                <TrendingUp className="w-4 h-4 text-emerald-600" />
+                <span>{item}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Product Recommendations Section */}
+        <section className="product-section" id="produk">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow-pill emerald">Pilihan Terbaik</span>
+              <h2 className="section-title">Rekomendasi Produk Hari Ini</h2>
+            </div>
+            <Link to="/products" className="section-more-link">
+              Lihat Semua Produk <ChevronRight className="w-4 h-4 inline" />
+            </Link>
+          </div>
+
+          <div className="product-grid">
+            {featuredProducts.map((item) => (
+              <article key={item.name} className="catalog-card hover-lift">
+                <div className={`img-box product-art-${item.tag.toLowerCase().replaceAll(' ', '-')}`}>
+                  <span className="product-art-label">GLOSIR</span>
+                  <small>{item.tag}</small>
+                </div>
+                <span className="catalog-badge mb-2">{item.tag}</span>
+                <h3 className="font-bold text-gray-900 text-base mb-2">{item.name}</h3>
+                <div className="product-meta">
+                  <div className="price-stack">
+                    <strong className="current-price">{item.price}</strong>
+                  </div>
+                  <Link to="/products" className="btn btn-primary small">
+                    Pesan <ArrowRight className="w-3.5 h-3.5 inline ml-1" />
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {/* Owner Profile Section */}
+        <section className="owner-section">
+          <div className="owner-card">
+            <div className="owner-photo-container">
+              <div className="owner-photo-badge">GLOSIR STORE</div>
+              <p className="text-sm font-semibold text-gray-700 mt-3 text-center">Pelayanan Dekat & Ramah</p>
+            </div>
+          </div>
+          <div className="owner-copy">
+            <span className="eyebrow-pill emerald">Profil Usaha</span>
+            <h2 className="section-title">Solusi Belanja Grosir & Parsel Terpercaya</h2>
+            <p className="text-gray-600 leading-relaxed mb-4">
+              Glosir hadir sebagai pusat pemenuhan kebutuhan harian, sembako, dan parsel berkualitas. 
+              Dengan komitmen pelayanan cepat, transparan, dan jujur, kami siap melayani pelanggan eceran maupun grosir skala usaha.
+            </p>
+            <div className="owner-badges-list">
+              <span className="badge-check-item"><CheckCircle2 className="w-4 h-4 text-emerald-600 inline mr-1.5" /> Produk Berkualitas</span>
+              <span className="badge-check-item"><CheckCircle2 className="w-4 h-4 text-emerald-600 inline mr-1.5" /> Pelayanan Ramah & Cepat</span>
+              <span className="badge-check-item"><CheckCircle2 className="w-4 h-4 text-emerald-600 inline mr-1.5" /> Siap Order via WhatsApp</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Event & Promo Section */}
+        <section className="events-section" id="promo">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow-pill amber"><Sparkles className="w-3.5 h-3.5 inline mr-1" /> Event & Penawaran</span>
+              <h2 className="section-title">Promo Spesial Untuk Anda</h2>
+            </div>
+            <Link to="/promo" className="section-more-link">
+              Lihat Semua Promo <ChevronRight className="w-4 h-4 inline" />
+            </Link>
+          </div>
+
+          <div className="event-grid">
+            {events.map((event) => (
+              <article key={event.title} className="event-card shadow-sm">
+                <span className="event-tag">{event.tag}</span>
+                <h3>{event.title}</h3>
+                <p>{event.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <PublicFooter />
+    </div>
+  );
+}
+
 
         <section className="category-row">
           {categories.map((item) => (

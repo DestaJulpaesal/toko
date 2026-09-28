@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
@@ -120,7 +121,7 @@ export default function AdminCategoriesPage() {
             <button className="btn btn-primary full" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah kategori'}</button>
           </form>
           <section className="crud-table-panel">
-            <div className="crud-toolbar"><label className="crud-search"><span>cari</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari kategori..." /></label></div>
+            <div className="crud-toolbar"><label className="crud-search"><Search className="w-4 h-4 text-emerald-600 inline mr-1" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari kategori..." /></label></div>
             <BulkTableActions selectedCount={selectedIds.length} totalCount={visibleCategories.length} allSelected={allSelected} onToggleAll={(checked) => setSelectedIds(checked ? visibleCategories.map((item) => item.id) : [])} onDelete={deleteSelected} deleting={bulkDeleting} />
             <div className="product-table-wrap"><table className="product-table"><thead><tr><th className="bulk-check-column">Pilih</th><th>Kategori</th><th>Slug</th><th>Produk</th><th>Aksi</th></tr></thead><tbody>{visibleCategories.map((category) => <tr key={category.id}><td className="bulk-check-column"><BulkRowCheckbox checked={selectedIds.includes(category.id)} onChange={(checked) => setSelectedIds((current) => checked ? [...new Set([...current, category.id])] : current.filter((id) => id !== category.id))} label={`Pilih ${category.name}`} /></td><td><strong>{category.name}</strong><small>{category.description || 'Tanpa deskripsi'}</small></td><td>{category.slug}</td><td>{category.productCount}</td><td><div className="row-actions"><button onClick={() => editCategory(category)}>Edit</button><button onClick={() => deleteCategory(category.id)}>Hapus</button></div></td></tr>)}</tbody></table>{loading && <div className="table-empty">Memuat kategori...</div>}{!loading && visibleCategories.length === 0 && <div className="table-empty">Kategori tidak ditemukan.</div>}</div>
           </section>
