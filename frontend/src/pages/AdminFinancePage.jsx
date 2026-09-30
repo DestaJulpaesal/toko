@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
@@ -106,7 +106,7 @@ export default function AdminFinancePage() {
     } finally { setBulkDeleting(false); }
   };
 
-  return <div className="admin-shell admin-crud-shell"><AdminSidebar active="Keuangan" /><main className="admin-main">
+  return <AdminShell active="Keuangan" className="admin-crud-shell">
     <header className="admin-header"><div><p className="eyebrow light">Finance management</p><h1>Keuangan & Laba</h1><p className="admin-subtitle">Catat pemasukan, pengeluaran, modal, dan pantau laba bersih toko.</p></div><div className="admin-header-actions"><button className="btn btn-secondary" onClick={() => setBulkPasteOpen(true)}>Paste transaksi</button><button className="btn btn-secondary" onClick={downloadExcel}>Unduh Excel</button><span className="database-status ready"><i /> {loading ? 'Memuat data' : 'Terhubung ke API'}</span></div></header>
     {notice && <div className="crud-notice" role="status">{notice}<button onClick={() => setNotice('')}>×</button></div>}
     <section className="metric-grid finance-metric-grid"><div className="metric-card green"><span>Pendapatan Hari Ini</span><strong>{money(summary.todaysIncome)}</strong></div><div className="metric-card orange"><span>Pengeluaran Hari Ini</span><strong>{money(summary.todaysExpense)}</strong></div><div className="metric-card blue"><span>Laba Hari Ini</span><strong>{money(summary.todaysGrossProfit)}</strong></div><div className="metric-card red"><span>Laba Bulan Ini</span><strong>{money(summary.monthGrossProfit)}</strong></div></section>
@@ -117,5 +117,5 @@ export default function AdminFinancePage() {
     <section className="crud-table-panel"><div className="crud-toolbar"><strong>Riwayat semua aktivitas keuangan</strong><select value={historyFilter} onChange={(event) => setHistoryFilter(event.target.value)}><option value="SEMUA">Semua sumber</option><option>KASIR / PENJUALAN</option><option>PENGELUARAN</option><option>PARCEL</option><option>TABUNGAN</option><option>NET WORTH</option><option>KEUANGAN LAINNYA</option></select></div><BulkTableActions selectedCount={selectedIds.length} totalCount={transactions.length} allSelected={allSelected} onToggleAll={(checked) => setSelectedIds(checked ? transactions.map((transaction) => transaction.id) : [])} onDelete={deleteSelected} deleting={bulkDeleting} /><div className="product-table-wrap"><table className="product-table"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Jenis</th><th>Keterangan</th><th>Nominal</th><th>Aksi</th></tr></thead><tbody>{unifiedHistory.filter((item) => historyFilter === 'SEMUA' || item.source === historyFilter).map((item) => <tr key={item.id}><td>{new Date(item.date || item.createdAt).toLocaleDateString('id-ID')}</td><td><span className="status-chip good">{item.source}</span></td><td>{item.type}</td><td><strong>{item.description}</strong><small>{item.category || item.paymentMethod || '-'}</small></td><td>{money(item.amount)}</td><td>{item.source === 'KEUANGAN LAINNYA' || item.source === 'PENGELUARAN' || item.source === 'KASIR / PENJUALAN' ? <div className="row-actions"><button onClick={() => remove(item)}>Hapus</button></div> : '-'}</td></tr>)}</tbody></table>{!loading && !unifiedHistory.length && <div className="table-empty">Belum ada aktivitas keuangan.</div>}</div></section></section>
     <section className="crud-layout"><div className="crud-table-panel"><div className="crud-toolbar"><strong>Tren cashflow</strong></div><CashflowChart data={cashflow} /></div><div className="crud-table-panel"><div className="crud-toolbar"><strong>Breakdown pengeluaran</strong></div><CategoryBreakdownChart data={breakdown} /></div></section>
     <BulkPasteModal isOpen={bulkPasteOpen} onClose={() => setBulkPasteOpen(false)} categories={categories} accounts={accounts} onDone={load} />
-  </main></div>;
+  </AdminShell>;
 }

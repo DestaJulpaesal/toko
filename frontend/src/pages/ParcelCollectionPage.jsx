@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import CurrencyInput from '../components/CurrencyInput';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
@@ -80,9 +80,7 @@ export default function ParcelCollectionPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Penagihan Wilayah" />
-      <main className="admin-main">
+    <AdminShell active="Penagihan Wilayah" className="admin-crud-shell">
         <header className="admin-header">
           <div><p className="eyebrow light">Buku setoran digital</p><h1>Penagihan Wilayah</h1><p className="admin-subtitle">Catat setoran peserta satu per satu, lalu cocokkan cash manager dengan catatan owner.</p></div>
         </header>
@@ -108,7 +106,6 @@ export default function ParcelCollectionPage() {
             </div>
           </section>
         </section>
-      </main>
-    </div>
+      </AdminShell>
   );
 }

@@ -1,0 +1,158 @@
+/* ==========================================================
+   GLOSIR UI LAYER — dimuat PALING AKHIR di main.jsx.
+   Bagian A: jembatan (menyeragamkan class lama tanpa edit halaman)
+   Bagian B: komponen baru berawalan g-
+   ========================================================== */
+
+/* ---------- A. JEMBATAN UNTUK CLASS LAMA ---------- */
+
+/* Area konten admin + posisi terhadap sidebar (SATU definisi, menggantikan 3 versi lama).
+   Desktop >=1025px: sidebar fixed 232px (76px kalau collapsed), konten digeser margin-kiri.
+   Tablet/HP <=1024px: sidebar jadi bar atas (sticky), konten penuh. */
+.g-shell { --g-sidebar-w: 232px; background: var(--g-bg); color: var(--g-text); font-family: var(--g-font); }
+.g-shell:has(.sidebar-collapsed) { --g-sidebar-w: 76px; }
+.g-shell > .admin-main.g-main {
+  box-sizing: border-box; min-width: 0; animation: none;
+  margin-left: 0; width: 100%; max-width: none;
+  padding: var(--g-space-4) var(--g-space-3) var(--g-space-8);
+}
+@media (min-width: 1025px) {
+  .g-shell > .admin-main.g-main {
+    margin-left: var(--g-sidebar-w); width: auto;
+    padding: var(--g-space-8) max(clamp(16px, 3vw, 40px), calc((100vw - var(--g-sidebar-w) - var(--g-content-max)) / 2));
+  }
+}
+@media (min-width: 901px) and (max-width: 1024px) {
+  .g-shell > .admin-main.g-main { padding: var(--g-space-6) var(--g-space-5) var(--g-space-8); }
+}
+
+/* Header halaman */
+.g-main .admin-header {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: var(--g-space-4); margin-bottom: var(--g-space-6);
+}
+.g-main .admin-header h1 { margin: 0; font-size: var(--g-text-xl); line-height: 1.2; letter-spacing: -0.02em; color: var(--g-text); }
+.g-main .admin-subtitle { margin: var(--g-space-1) 0 0; color: var(--g-muted); font-size: var(--g-text-sm); }
+
+/* Kartu / panel: satu gaya */
+.g-main .panel,
+.g-main .crud-form-panel,
+.g-main .crud-table-panel,
+.g-main .metric-card,
+.g-main .dashboard-panel {
+  background: var(--g-surface);
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius-lg);
+  box-shadow: var(--g-shadow-sm);
+  padding: var(--g-space-5);
+  color: var(--g-text);
+}
+
+/* Tombol: satu ukuran & satu palet */
+.g-main .btn, .g-main .g-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--g-space-2);
+  min-height: var(--g-control-h); padding: 0 var(--g-space-4);
+  border: 1px solid var(--g-border-strong); border-radius: var(--g-radius-sm);
+  background: var(--g-surface); color: var(--g-text);
+  font: 600 var(--g-text-sm)/1 var(--g-font); cursor: pointer; text-decoration: none;
+}
+.g-main .btn:hover:not(:disabled), .g-main .g-btn:hover:not(:disabled) { background: var(--g-surface-2); box-shadow: none; transform: none; }
+.g-main .btn-primary, .g-main .g-btn--primary { background: var(--g-primary); border-color: var(--g-primary); color: #fff; }
+.g-main .btn-primary:hover:not(:disabled), .g-main .g-btn--primary:hover:not(:disabled) { background: var(--g-primary-hover); color: #fff; }
+.g-main .btn-danger, .g-main .g-btn--danger { background: var(--g-danger-soft); border-color: transparent; color: var(--g-danger); }
+.g-main .btn.small, .g-main .g-btn--sm { min-height: 32px; padding: 0 var(--g-space-3); font-size: var(--g-text-xs); }
+.g-main .btn.full { width: 100%; }
+.g-main .btn:disabled, .g-main .g-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Input: seragam (tanpa menyentuh padding supaya input ber-ikon aman) */
+.g-main input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),
+.g-main select,
+.g-main textarea {
+  border: 1px solid var(--g-border-strong); border-radius: var(--g-radius-sm);
+  background: var(--g-surface); color: var(--g-text); font-family: var(--g-font); font-size: var(--g-text-sm);
+}
+.g-main input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):focus,
+.g-main select:focus, .g-main textarea:focus {
+  outline: 2px solid var(--g-primary-soft); outline-offset: 0; border-color: var(--g-primary);
+}
+.g-main label { color: var(--g-text); font-size: var(--g-text-sm); font-weight: 600; }
+
+/* Tabel: satu gaya */
+.g-main table { width: 100%; border-collapse: collapse; font-size: var(--g-text-sm); }
+.g-main th {
+  background: var(--g-surface-2); color: var(--g-muted); text-align: left;
+  font-size: var(--g-text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: var(--g-space-3) var(--g-space-4); border-bottom: 1px solid var(--g-border); white-space: nowrap;
+}
+.g-main td { padding: var(--g-space-3) var(--g-space-4); border-bottom: 1px solid var(--g-border); color: var(--g-text); }
+.g-main tbody tr:hover td { background: var(--g-surface-2); }
+
+/* ---------- B. KOMPONEN BARU (dipakai lewat components/ui) ---------- */
+.g-page-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--g-space-4); margin-bottom: var(--g-space-6); }
+.g-page-header h1 { margin: 0; font-size: var(--g-text-xl); letter-spacing: -0.02em; }
+.g-page-header p { margin: var(--g-space-1) 0 0; color: var(--g-muted); font-size: var(--g-text-sm); }
+.g-page-header__actions { display: flex; flex-wrap: wrap; gap: var(--g-space-2); }
+
+.g-panel { background: var(--g-surface); border: 1px solid var(--g-border); border-radius: var(--g-radius-lg); box-shadow: var(--g-shadow-sm); padding: var(--g-space-5); }
+.g-panel__title { margin: 0 0 var(--g-space-4); font-size: var(--g-text-lg); }
+
+.g-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--g-space-4); margin-bottom: var(--g-space-6); }
+.g-stat { background: var(--g-surface); border: 1px solid var(--g-border); border-radius: var(--g-radius-lg); padding: var(--g-space-5); }
+.g-stat__label { color: var(--g-muted); font-size: var(--g-text-sm); }
+.g-stat__value { margin-top: var(--g-space-1); font-size: var(--g-text-xl); font-weight: 800; letter-spacing: -0.02em; }
+.g-stat__hint { margin-top: var(--g-space-1); color: var(--g-muted); font-size: var(--g-text-xs); }
+
+.g-table-wrap { overflow-x: auto; border: 1px solid var(--g-border); border-radius: var(--g-radius); background: var(--g-surface); }
+
+.g-badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: var(--g-text-xs); font-weight: 700; background: var(--g-surface-2); color: var(--g-muted); }
+.g-badge--success { background: var(--g-primary-soft); color: var(--g-primary); }
+.g-badge--warning { background: var(--g-warning-soft); color: var(--g-warning); }
+.g-badge--danger { background: var(--g-danger-soft); color: var(--g-danger); }
+.g-badge--info { background: var(--g-info-soft); color: var(--g-info); }
+
+.g-empty { padding: var(--g-space-10) var(--g-space-4); text-align: center; color: var(--g-muted); }
+.g-empty strong { display: block; margin-bottom: var(--g-space-1); color: var(--g-text); }
+
+/* Tab & filter tanggal (dipakai halaman laporan) */
+.g-tabs { display: flex; gap: var(--g-space-5); border-bottom: 1px solid var(--g-border); margin-bottom: var(--g-space-5); overflow-x: auto; }
+.g-tab { display: inline-flex; align-items: center; gap: var(--g-space-2); padding: 0 var(--g-space-1) var(--g-space-3); background: none; border: 0; border-bottom: 2px solid transparent; color: var(--g-muted); font: 600 var(--g-text-sm)/1 var(--g-font); cursor: pointer; white-space: nowrap; }
+.g-tab:hover { color: var(--g-text); }
+.g-tab.is-active { color: var(--g-primary); border-bottom-color: var(--g-primary); }
+.g-tab.is-active.is-danger { color: var(--g-danger); border-bottom-color: var(--g-danger); }
+.g-filter { display: inline-flex; align-items: center; gap: var(--g-space-2); padding: var(--g-space-2) var(--g-space-3); background: var(--g-surface); border: 1px solid var(--g-border); border-radius: var(--g-radius); font-size: var(--g-text-sm); color: var(--g-muted); }
+.g-main .g-filter input { border: 0; background: transparent; padding: 0; }
+.g-notice--danger { padding: var(--g-space-3) var(--g-space-4); background: var(--g-danger-soft); color: var(--g-danger); font-size: var(--g-text-sm); border-bottom: 1px solid var(--g-border); }
+.g-num { text-align: right; white-space: nowrap; }
+.g-pos { color: var(--g-primary); font-weight: 700; }
+.g-neg { color: var(--g-danger); font-weight: 700; }
+
+/* ---------- Pengganti class ala Tailwind yang dipakai di JSX (Tailwind tidak aktif) ---------- */
+/* Ukuran ikon: tanpa ini ikon lucide tampil 24px+ dan merusak baris tombol/input */
+.w-3 { width: 12px; height: 12px; } .h-3 { height: 12px; }
+.w-3\.5 { width: 14px; } .h-3\.5 { height: 14px; }
+.w-4 { width: 16px; } .h-4 { height: 16px; }
+.w-5 { width: 20px; } .h-5 { height: 20px; }
+.w-6 { width: 24px; } .h-6 { height: 24px; }
+.w-12 { width: 48px; } .h-12 { height: 48px; }
+.inline { display: inline-block; vertical-align: middle; flex: 0 0 auto; }
+.mr-1 { margin-right: 4px; } .mr-1\.5 { margin-right: 6px; } .mr-2 { margin-right: 8px; }
+.ml-1 { margin-left: 4px; } .mb-2 { margin-bottom: 8px; } .mx-auto { margin-left: auto; margin-right: auto; }
+.text-emerald-500, .text-emerald-600, .text-emerald-700 { color: var(--g-primary); }
+.text-amber-500, .text-amber-600, .text-amber-700 { color: var(--g-warning); }
+.text-blue-700 { color: var(--g-info); }
+.text-gray-400, .text-gray-500 { color: var(--g-muted); }
+.text-white { color: #fff; }
+.fill-amber-400 { fill: var(--g-accent); }
+
+/* Kotak pencarian: pembungkus yang punya border, input di dalamnya polos (hindari border ganda) */
+.g-main :is(.crud-search, .pos-search-bar, .stock-quick-search-row) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]) {
+  border: 0; background: transparent; box-shadow: none; outline: none; padding-left: 0; flex: 1 1 auto; min-width: 0;
+}
+.g-main :is(.crud-search, .pos-search-bar) { display: flex; align-items: center; gap: var(--g-space-2); }
+
+/* Tabel produk & baris SKU: satu definisi (sebelumnya .product-table-wrap ditulis 8x dengan tinggi berbeda-beda) */
+.g-main .product-table-wrap { height: auto; max-height: min(560px, calc(100vh - 290px)); min-height: 220px; overflow: auto; border: 1px solid var(--g-border); border-radius: var(--g-radius); -webkit-overflow-scrolling: touch; }
+.g-main .product-table { min-width: 680px; }
+.g-main .sku-input-wrapper { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--g-space-2); align-items: stretch; }
+.g-main .sku-input-wrapper > * { min-width: 0; width: 100%; }
+.g-main th.g-num { text-align: right; }

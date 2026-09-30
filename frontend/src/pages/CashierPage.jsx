@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import CurrencyInput from '../components/CurrencyInput';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import CashierHelpModal from '../components/CashierHelpModal';
@@ -1282,8 +1282,7 @@ export default function CashierPage() {
   }
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Kasir" />
+    <AdminShell active="Kasir" className="admin-crud-shell" mainClassName="cashier-main-clean">
 
       {/* Barcode Camera Scanner Modal */}
       <BarcodeScannerModal
@@ -1297,8 +1296,6 @@ export default function CashierPage() {
         isOpen={helpModalOpen}
         onClose={() => setHelpModalOpen(false)}
       />
-
-      <main className="admin-main cashier-main-clean">
         {/* Compact, Modern Header */}
         <header className="pos-topbar-header">
           <div className="pos-title-block">
@@ -1676,7 +1673,6 @@ export default function CashierPage() {
         </section>
 
         {renderReceiptModal()}
-      </main>
-    </div>
+    </AdminShell>
   );
 }

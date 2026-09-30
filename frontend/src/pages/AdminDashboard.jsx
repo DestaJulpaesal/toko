@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '../services/api';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import DatabaseBackupIndicator from '../components/DatabaseBackupIndicator';
 import ExpiryAlertWidget from '../components/ExpiryAlertWidget';
 
@@ -115,12 +115,8 @@ export default function AdminDashboard() {
   const chartMax = Math.max(...chartData.map((item) => Math.max(item.income, item.expense)), 1);
 
   return (
-    <div className="admin-shell">
-      <AdminSidebar active="Dashboard" />
-      <div className="admin-main">
-        <ExpiryAlertWidget />
-
-      <main className="admin-main">
+    <AdminShell active="Dashboard">
+      <ExpiryAlertWidget />
         {error && <div className="crud-notice" role="alert">{error}</div>}
         <header className="admin-header dashboard-hero">
           <div>
@@ -179,7 +175,6 @@ export default function AdminDashboard() {
           </div>
         </section>
         <footer className="admin-footer">Glosir Owner Workspace <span>Data keuangan terhubung ke transaksi dan piutang</span></footer>
-      </main>
-    </div>
+    </AdminShell>
   );
 }

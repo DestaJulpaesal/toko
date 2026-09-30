@@ -598,6 +598,148 @@ a:focus-visible {
 }
 
 .cart-toast { position: fixed; right: 24px; bottom: 24px; z-index: 40; display: flex; align-items: center; gap: 10px; max-width: min(480px, calc(100vw - 32px)); padding: 13px 15px; border: 1px solid #cce4d0; border-radius: 12px; background: #f7fff8; color: #31533a; box-shadow: 0 18px 35px rgba(34, 74, 45, 0.16); font-size: 0.82rem; }
+
+/* Filter Pills & Catalog Tools Overhaul */
+.filter-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-pill-btn:hover {
+  border-color: #059669;
+  color: #059669;
+  background: #f0fdf4;
+}
+
+.filter-pill-btn.active {
+  background: #059669;
+  color: white;
+  border-color: #059669;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+}
+
+.catalog-search-bar {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 540px;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.catalog-search-icon {
+  width: 18px;
+  height: 18px;
+  color: #059669;
+  margin-right: 10px;
+}
+
+.catalog-search-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  height: 44px;
+  font-size: 0.88rem;
+  color: #1e293b;
+}
+
+.clear-search-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.catalog-sort-box {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0 14px;
+}
+
+.catalog-sort-box select {
+  border: none;
+  outline: none;
+  height: 44px;
+  font-size: 0.85rem;
+  color: #334155;
+  font-weight: 600;
+  background: transparent;
+}
+
+.catalog-add-btn {
+  margin-top: 12px;
+  width: 100%;
+}
+
+/* Footer Top Highlights & Brand */
+.footer-top-highlights {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  padding: 32px 0;
+  border-bottom: 1px solid #e2e8f0;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.footer-highlight-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.footer-highlight-item strong {
+  display: block;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.footer-highlight-item span {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.brand-footer-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #064e3b;
+  margin-bottom: 12px;
+}
+
+.footer-desc {
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.footer-contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #334155;
+}
 .cart-toast > span:nth-child(2) { display: grid; gap: 2px; }
 .toast-check { display: grid; flex: 0 0 24px; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #2d8a50; color: white; font-size: 0.7rem; font-weight: 900; }
 .cart-toast a { color: var(--primary-dark); font-weight: 800; text-decoration: none; white-space: nowrap; }

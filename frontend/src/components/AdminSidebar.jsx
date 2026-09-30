@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../services/api';
 import { clearStaffCaches } from '../utils/catalogStorage';
 import ReminderBell from './ReminderBell';
-import { Archive, CalendarRange, Check, ChevronDown, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
+import { Archive, CalendarRange, Check, ChevronDown, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Search, Settings, ShoppingCart, Tags, Users, WalletCards, BarChart3, Landmark, Receipt, ShieldCheck, Truck } from 'lucide-react';
 
 const ownerPrimaryGroups = [
   { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Penagihan Wilayah', '/admin/parcel-collections'], ['06', 'Keuangan', '/admin/finance'], ['07', 'Piutang', '/admin/debts'], ['08', 'Restock', '/admin/restock']] },
@@ -147,7 +147,7 @@ export default function AdminSidebar({ active = '' }) {
 
       <nav ref={navRef} className={menuOpen ? 'admin-nav-open' : ''} onClick={() => setMenuOpen(false)}>
         <label className="sidebar-search" onClick={(event) => event.stopPropagation()}>
-          <Search className="w-4 h-4 text-emerald-400 mr-2 inline" aria-hidden="true" />
+          <Search size={16} aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle', flex: '0 0 auto' }} />
           <input value={sidebarSearch} onChange={(event) => setSidebarSearch(event.target.value)} placeholder="Cari menu" aria-label="Cari menu sidebar" />
         </label>
         {visibleGroups.map((group) => (
@@ -233,7 +233,11 @@ function getSidebarIcon(label, fallback) {
     Promo: Percent,
     Parsel: Archive,
     'Peserta Parsel': Users,
-    'Penagihan Wilayah': WalletCards,
+    'Penagihan Wilayah': Truck,
+    Piutang: Receipt,
+    'Performa Produk': BarChart3,
+    'Total Kekayaan': Landmark,
+    'Persetujuan Keuangan': ShieldCheck,
     'Program Parsel': CalendarRange,
     'Wilayah Parsel': MapPinned,
     Keuangan: WalletCards,

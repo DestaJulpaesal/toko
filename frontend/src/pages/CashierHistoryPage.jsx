@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import { calculateEarnedPoints } from './CashierPage';
 import { apiFetch } from '../services/api';
 import { printReceipt } from '../utils/printReceipt';
@@ -193,10 +193,7 @@ export default function CashierHistoryPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Riwayat Transaksi" />
-
-      <main className="admin-main">
+    <AdminShell active="Riwayat Transaksi" className="admin-crud-shell">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Catatan Penjualan POS</p>
@@ -572,7 +569,6 @@ export default function CashierHistoryPage() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </AdminShell>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import { Link } from 'react-router-dom';
 import CurrencyInput from '../components/CurrencyInput';
 import CatalogImageField from '../components/CatalogImageField';
@@ -108,9 +108,7 @@ export default function AdminParcelsPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Parsel" />
-      <main className="admin-main">
+    <AdminShell active="Parsel" className="admin-crud-shell">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Parcel management</p>
@@ -235,7 +233,6 @@ export default function AdminParcelsPage() {
         </section>
 
         <footer className="admin-footer">Glosir Owner Workspace <span>Data parsel sinkron dari database</span></footer>
-      </main>
-    </div>
+      </AdminShell>
   );
 }

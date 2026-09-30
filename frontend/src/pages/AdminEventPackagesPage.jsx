@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import { apiFetch } from '../services/api';
 import CurrencyInput from '../components/CurrencyInput';
 import CatalogImageField from '../components/CatalogImageField';
@@ -81,9 +81,7 @@ export default function AdminEventPackagesPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell tool-page">
-      <AdminSidebar active="Paket Acara" />
-      <main className="admin-main">
+    <AdminShell active="Paket Acara" className="admin-crud-shell tool-page">
         <header className="tool-hero"><div><span className="eyebrow">Produk bundel</span><h1>Paket Acara</h1><p className="page-lead">Susun kombinasi barang untuk hajatan, nikahan, dan kebutuhan acara lainnya.</p></div><div className="tool-hero-mark">PA<span>+</span></div></header>
         {notice && <p className="notice-banner tool-notice">{notice}</p>}
         <section className="tool-panel"><div className="tool-panel-heading"><div><span className="panel-kicker">Buat katalog baru</span><h2>Rancang paket</h2></div><span className="tool-step">01 / 02</span></div><form onSubmit={(event) => submit(event).catch((error) => setNotice(error.message))}>
@@ -94,7 +92,6 @@ export default function AdminEventPackagesPage() {
           <div className="tool-form-actions"><button className="btn btn-primary tool-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Menyimpan...' : editingId ? 'Perbarui paket' : 'Simpan paket'} <span>→</span></button>{editingId && <button className="btn btn-secondary" type="button" onClick={() => { setEditingId(null); setForm({ name: '', description: '', imageUrl: '', isManualPrice: false, price: '', items: [] }); }}>Batal edit</button>}</div>
         </form></section>
         <section className="tool-panel"><div className="tool-panel-heading"><div><span className="panel-kicker">Katalog aktif</span><h2>Paket yang sudah dibuat</h2></div><span className="tool-count">{packages.length} paket</span></div><div className="package-list">{packages.map((item) => <div className="package-list-item" key={item.id}><span className="package-list-icon">PA</span><div><strong>{item.name}</strong><small>{item.items?.length || 0} komponen paket</small></div><b>Rp {Number(item.price).toLocaleString('id-ID')}</b><div className="package-list-actions"><button type="button" className="btn btn-secondary small" onClick={() => editPackage(item)}>Edit</button><button type="button" className="btn btn-danger small" onClick={() => deletePackage(item).catch((error) => setNotice(error.message))}>Hapus</button></div></div>)}{!packages.length && <div className="tool-empty">Belum ada paket aktif. Paket pertama yang dibuat akan muncul di sini.</div>}</div></section>
-      </main>
-    </div>
+      </AdminShell>
   );
 }

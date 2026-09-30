@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MessageCircle, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import DebtModal from '../components/DebtModal';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
@@ -207,11 +207,8 @@ export default function AdminCustomersPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell customer-page-shell">
-      <AdminSidebar active="Data Pelanggan" />
+    <AdminShell active="Data Pelanggan" className="admin-crud-shell customer-page-shell">
       <DebtModal isOpen={debtModal.open} customer={debtModal.customer} debt={debtModal.debt} onClose={() => setDebtModal({ open: false, customer: null, debt: null })} onSaved={(message) => { setNotice(message); loadCustomers(); }} />
-
-      <main className="admin-main">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Manajemen Pelanggan & Loyalitas</p>
@@ -425,7 +422,6 @@ export default function AdminCustomersPage() {
             </div>
           </section>
         </div>
-      </main>
-    </div>
+    </AdminShell>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, PackagePlus, Pencil, Search, ShoppingBag, Trash2 } from 'lucide-react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import BulkProductModal from '../components/BulkProductModal';
@@ -491,8 +491,7 @@ export default function AdminProductsPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Produk" />
+    <AdminShell active="Produk" className="admin-crud-shell">
 
       {/* Camera Barcode Scanner Modal */}
       <BarcodeScannerModal
@@ -535,8 +534,6 @@ export default function AdminProductsPage() {
         onClose={() => setPrintModalProduct(null)}
         product={printModalProduct}
       />
-
-      <main className="admin-main">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Product management</p>
@@ -801,7 +798,6 @@ export default function AdminProductsPage() {
         </section>
 
         <footer className="admin-footer">Glosir Owner Workspace <span>Sistem Barcode & Inventory Terintegrasi</span></footer>
-      </main>
-    </div>
+    </AdminShell>
   );
 }

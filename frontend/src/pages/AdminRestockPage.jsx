@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import { apiFetch } from '../services/api';
 
 const money = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
@@ -115,9 +115,7 @@ export default function AdminRestockPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell tool-page">
-      <AdminSidebar active="Restock" />
-      <main className="admin-main">
+    <AdminShell active="Restock" className="admin-crud-shell tool-page">
         <header className="tool-hero"><div><span className="eyebrow">Kontrol stok</span><h1>Manajemen Restock</h1><p className="page-lead">Prioritaskan produk yang stoknya berada di bawah batas minimum.</p></div><div className="tool-hero-mark">RS<span>↗</span></div></header>
         {notice && <p className="notice-banner tool-notice">{notice}</p>}
         <section className="tool-panel">
@@ -132,7 +130,6 @@ export default function AdminRestockPage() {
           </div>
           <div className="tool-table-wrap"><table className="tool-table"><thead><tr><th>Produk</th><th>Kategori</th><th>Stok</th><th>Saran</th><th>Harga modal</th><th>Jumlah beli</th><th>Satuan beli</th><th>Estimasi</th></tr></thead><tbody>{visibleItems.map((item) => <tr key={item.variantId}><td><strong>{item.productName}</strong><br /><small>{item.sku} · stok eceran: {item.unit}</small></td><td>{item.category}</td><td className={item.stockQty <= item.stockWarning ? 'negative' : ''}>{item.stockQty}</td><td><span className="restock-suggestion">{item.suggestedQty}</span></td><td>{money(item.purchasePrice)}</td><td><input className="restock-quantity-input" aria-label={`Jumlah beli ${item.productName}`} type="number" min="0" placeholder="Jumlah" value={item.requestedQty || ''} onChange={(event) => updateItem(item.variantId, { requestedQty: event.target.value })} /></td><td><select className="restock-unit-select" aria-label={`Satuan beli ${item.productName}`} value={item.purchaseUnit || item.unit || 'unit'} onChange={(event) => updateItem(item.variantId, { purchaseUnit: event.target.value })}><option value="ball">ball</option><option value="slop">slop</option><option value="pak">pak</option><option value="bungkus">bungkus</option><option value="dus">dus</option><option value="lusin">lusin</option><option value="unit">unit</option></select></td><td>{money(purchaseQty(item) * Number(item.purchasePrice || 0))}</td></tr>)}</tbody></table>{!visibleItems.length && <div className="tool-empty">Tidak ada barang yang cocok dengan pencarian atau filter stok.</div>}<div className="printable-area" aria-hidden="true"></div></div>
         </section>
-      </main>
-    </div>
+      </AdminShell>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
@@ -105,9 +105,7 @@ export default function AdminCategoriesPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Kategori" />
-      <main className="admin-main">
+    <AdminShell active="Kategori" className="admin-crud-shell">
         <header className="admin-header">
           <div><p className="eyebrow light">Catalog structure</p><h1>Kelola Kategori</h1><p className="admin-subtitle">Atur kelompok produk agar katalog tetap rapi.</p></div>
           <div className="admin-header-actions"><span className={`database-status ${loading ? 'loading' : 'ready'}`}><i /> {loading ? 'Memuat data' : 'Terhubung ke API'}</span></div>
@@ -127,7 +125,6 @@ export default function AdminCategoriesPage() {
           </section>
         </section>
         <footer className="admin-footer">Glosir Owner Workspace <span>Data kategori tersimpan di Supabase</span></footer>
-      </main>
-    </div>
+      </AdminShell>
   );
 }

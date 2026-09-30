@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import { Link } from 'react-router-dom';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
@@ -118,9 +118,7 @@ export default function AdminPromosPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Promo" />
-      <main className="admin-main">
+    <AdminShell active="Promo" className="admin-crud-shell">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Campaign management</p>
@@ -219,7 +217,6 @@ export default function AdminPromosPage() {
         </section>
 
         <footer className="admin-footer">Glosir Owner Workspace <span>Data promo terhubung ke database</span></footer>
-      </main>
-    </div>
+      </AdminShell>
   );
 }

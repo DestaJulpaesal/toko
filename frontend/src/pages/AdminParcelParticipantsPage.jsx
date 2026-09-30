@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, FileText, Pencil, Printer, RefreshCw, Search, Trash2 } from 'lucide-react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
@@ -272,9 +272,7 @@ export default function AdminParcelParticipantsPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Peserta Parsel" />
-      <main className="admin-main">
+    <AdminShell active="Peserta Parsel" className="admin-crud-shell">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Parcel membership</p>
@@ -473,7 +471,6 @@ export default function AdminParcelParticipantsPage() {
             </div>
           </section>
         </section>
-      </main>
-    </div>
+      </AdminShell>
   );
 }

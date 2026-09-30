@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import { apiFetch } from '../services/api';
 import { confirmAction } from '../utils/confirmService';
 
@@ -68,9 +68,7 @@ export default function AdminStockOpnamePage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell tool-page">
-      <AdminSidebar active="Stok Opname" />
-      <main className="admin-main">
+    <AdminShell active="Stok Opname" className="admin-crud-shell tool-page">
         <header className="tool-hero"><div><span className="eyebrow">Kontrol stok</span><h1>Stok Opname</h1><p className="page-lead">Cocokkan stok fisik dengan angka sistem dan simpan jejak penyesuaiannya.</p></div><div className="tool-hero-mark">SO<span>✓</span></div></header>
         {notice && <p className="notice-banner tool-notice">{notice}</p>}
         <section className="tool-panel"><div className="tool-panel-heading"><div><span className="panel-kicker">Pemeriksaan barang</span><h2>Catat hasil hitung fisik</h2></div><span className="tool-step">01 / 02</span></div>
@@ -86,7 +84,6 @@ export default function AdminStockOpnamePage() {
           </form>
         </section>
         <section className="tool-panel"><div className="tool-panel-heading"><div><span className="panel-kicker">Catatan kontrol</span><h2>Riwayat opname</h2></div><span className="tool-count">{records.length} pemeriksaan</span></div><div className="tool-table-wrap"><table className="tool-table"><thead><tr><th>Produk</th><th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Waktu</th><th>Aksi</th></tr></thead><tbody>{records.map((record) => <tr key={record.id}><td><strong>{record.variant?.product?.name || record.variantId}</strong></td><td>{record.systemQty}</td><td>{record.physicalQty}</td><td><span className={`difference-pill ${record.difference < 0 ? 'negative' : record.difference > 0 ? 'positive' : ''}`}>{record.difference > 0 ? '+' : ''}{record.difference}</span></td><td>{new Date(record.createdAt).toLocaleString('id-ID')}</td><td><button type="button" className="table-delete-action" disabled={deletingId === record.id} onClick={() => deleteRecord(record)}>{deletingId === record.id ? 'Menghapus...' : 'Hapus'}</button></td></tr>)}</tbody></table>{!records.length && <div className="tool-empty">Belum ada hasil opname yang tersimpan.</div>}</div></section>
-      </main>
-    </div>
+      </AdminShell>
   );
 }
