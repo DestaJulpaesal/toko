@@ -31,6 +31,8 @@ export default function PublicHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [headerSearch, setHeaderSearch] = useState('');
+  const storeWhatsAppNumber = String(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '').replace(/\D/g, '');
+  const hasStoreWhatsApp = /^\d{8,15}$/.test(storeWhatsAppNumber);
   const { totalItems } = useCart();
   const { favorites } = useFavorites();
 
@@ -59,9 +61,11 @@ export default function PublicHeader() {
             <span className="utility-item"><Clock className="w-3.5 h-3.5 inline mr-1" /> Buka Setiap Hari (08:00 - 21:00 WIB)</span>
           </div>
           <div className="utility-right">
-            <a href={`https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}`} target="_blank" rel="noreferrer" className="utility-item hover-link">
-              <Phone className="w-3.5 h-3.5 inline mr-1" /> CS WhatsApp
-            </a>
+            {hasStoreWhatsApp && (
+              <a href={`https://wa.me/${storeWhatsAppNumber}`} target="_blank" rel="noreferrer" className="utility-item hover-link">
+                <Phone className="w-3.5 h-3.5 inline mr-1" /> CS WhatsApp
+              </a>
+            )}
             {currentUser && (
               <Link to={portalLink} className="utility-portal-badge">
                 <UserCheck className="w-3.5 h-3.5 inline mr-1" /> {portalLabel}
@@ -122,15 +126,17 @@ export default function PublicHeader() {
               <span className="action-label">Keranjang</span>
             </Link>
 
-            <a 
-              href={`https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}`} 
-              target="_blank" 
-              rel="noreferrer" 
-              className="btn-wa-header"
-            >
-              <MessageCircle className="w-4 h-4 text-white inline" />
-              <span>Order WA</span>
-            </a>
+            {hasStoreWhatsApp && (
+              <a
+                href={`https://wa.me/${storeWhatsAppNumber}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-wa-header"
+              >
+                <MessageCircle className="w-4 h-4 text-white inline" />
+                <span>Order WA</span>
+              </a>
+            )}
 
             {/* Mobile Hamburger toggle */}
             <button 

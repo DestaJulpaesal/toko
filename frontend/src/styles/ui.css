@@ -156,3 +156,222 @@
 .g-main .sku-input-wrapper { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--g-space-2); align-items: stretch; }
 .g-main .sku-input-wrapper > * { min-width: 0; width: 100%; }
 .g-main th.g-num { text-align: right; }
+
+/* Utilitas ala Tailwind lain yang dipakai di halaman publik */
+.font-bold { font-weight: 700; } .font-semibold { font-weight: 600; }
+.text-sm { font-size: var(--g-text-sm); } .text-base { font-size: var(--g-text-base); }
+.text-center { text-align: center; }
+.text-gray-600, .text-gray-700 { color: var(--g-muted); } .text-gray-900 { color: var(--g-text); }
+.mb-4 { margin-bottom: 16px; } .mt-3 { margin-top: 12px; }
+.leading-relaxed { line-height: 1.7; }
+.shadow-sm { box-shadow: var(--g-shadow-sm); } .shadow-lg { box-shadow: var(--g-shadow); }
+.hover-lift { transition: transform .18s ease, box-shadow .18s ease; }
+.hover-lift:hover { transform: translateY(-3px); box-shadow: var(--g-shadow); }
+
+/* ---------- CSS Komponen Tambahan (Ref: README-DESAIN.md Section 3.B) ---------- */
+
+/* Transfer & Reconciliation Modals / Forms */
+.transfer-form, .reconciliation-form {
+  display: grid;
+  gap: var(--g-space-4);
+  padding: var(--g-space-4);
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius-lg);
+  background: var(--g-surface);
+  color: var(--g-text);
+}
+.reconciliation-form output {
+  margin-top: var(--g-space-2);
+  padding: var(--g-space-3);
+  background: var(--g-surface-2);
+  border-radius: var(--g-radius-sm);
+  font-weight: 700;
+  color: var(--g-primary);
+}
+.reconciliation-form output.negative {
+  color: var(--g-danger);
+}
+
+/* Budget Progress Card */
+.budget-progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--g-space-2);
+  padding: var(--g-space-4);
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius);
+  background: var(--g-surface);
+  color: var(--g-text);
+}
+.budget-progress-card > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--g-space-2);
+}
+.budget-progress-card progress {
+  width: 100%;
+  height: var(--g-space-2);
+  border-radius: var(--g-radius-sm);
+  accent-color: var(--g-primary);
+}
+.budget-progress-card.warning progress {
+  accent-color: var(--g-warning);
+}
+.budget-progress-card.exceeded progress,
+.budget-progress-card.danger progress {
+  accent-color: var(--g-danger);
+}
+.budget-progress-card small {
+  color: var(--g-muted);
+  font-size: var(--g-text-xs);
+}
+
+/* Bulk Product & Stock Receipt Modal helpers */
+.bulk-file-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--g-space-8) var(--g-space-4);
+  border: 2px dashed var(--g-border-strong);
+  border-radius: var(--g-radius-lg);
+  background: var(--g-surface-2);
+  cursor: pointer;
+  text-align: center;
+}
+.bulk-file-picker:hover {
+  border-color: var(--g-primary);
+  background: var(--g-primary-soft);
+}
+
+.stock-quick-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--g-space-4);
+}
+.stock-quick-search-row {
+  display: flex;
+  gap: var(--g-space-2);
+  align-items: center;
+}
+.stock-quick-search-row input[type="number"] {
+  width: 80px;
+}
+.stock-quick-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--g-space-1);
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius-sm);
+  padding: var(--g-space-2);
+  background: var(--g-surface);
+}
+.stock-quick-results button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--g-space-2) var(--g-space-3);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--g-radius-sm);
+  color: var(--g-text);
+}
+.stock-quick-results button:hover {
+  background: var(--g-surface-2);
+}
+.stock-quick-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--g-space-2);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.stock-quick-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--g-space-2) var(--g-space-3);
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius-sm);
+  background: var(--g-surface);
+}
+.stock-quick-quantity {
+  display: flex;
+  align-items: center;
+  gap: var(--g-space-2);
+}
+.stock-quick-quantity button {
+  width: var(--g-space-8);
+  height: var(--g-space-8);
+  border: 1px solid var(--g-border-strong);
+  border-radius: var(--g-radius-sm);
+  background: var(--g-surface-2);
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Database Backup Indicator */
+.backup-compact-label {
+  font-size: var(--g-text-xs);
+  color: var(--g-text);
+}
+.backup-test-result-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--g-space-4);
+  margin-top: var(--g-space-3);
+}
+.spinner {
+  width: var(--g-space-6);
+  height: var(--g-space-6);
+  border: 3px solid var(--g-border);
+  border-top-color: var(--g-primary);
+  border-radius: 50%;
+  animation: g-spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+@keyframes g-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Product Unit Picker */
+.unit-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--g-space-1);
+  margin-bottom: var(--g-space-3);
+}
+.unit-picker label {
+  font-size: var(--g-text-xs);
+  font-weight: 600;
+  color: var(--g-muted);
+}
+.unit-picker select {
+  width: 100%;
+  padding: var(--g-space-2);
+  border: 1px solid var(--g-border-strong);
+  border-radius: var(--g-radius-sm);
+  background: var(--g-surface);
+  color: var(--g-text);
+  font-size: var(--g-text-sm);
+  cursor: pointer;
+}
+.unit-picker select:disabled {
+  cursor: not-allowed;
+}
+
+/* Auth Action Page */
+.auth-action-panel {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: var(--g-space-6);
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius-lg);
+  background: var(--g-surface);
+  box-shadow: var(--g-shadow-sm);
+}

@@ -1,28 +1,28 @@
 :root {
   font-family: Inter, system-ui, sans-serif;
-  color: #111827;
-  background: #f5f3ef;
+  color: #19251d;
+  background: #f5faf7;
   line-height: 1.5;
   font-weight: 400;
-  --bg: #f4efe8;
-  --panel: #fffdf9;
-  --primary: #1f7a4a;
-  --primary-dark: #135b35;
-  --accent: #f0ba3f;
-  --text: #1c1b1a;
-  --muted: #69645d;
-  --border: #e5dfd4;
+  --bg: #f5faf7;
+  --panel: #ffffff;
+  --primary: #006040;
+  --primary-dark: #005035;
+  --accent: #d8a93a;
+  --text: #19251d;
+  --muted: #647168;
+  --border: #d6e8dc;
 }
 
 .dark {
-  --bg: #18181b;
-  --panel: #27272a;
-  --primary: #4ade80;
-  --primary-dark: #22c55e;
-  --accent: #fbbf24;
-  --text: #fafafa;
-  --muted: #a1a1aa;
-  --border: #3f3f46;
+  --bg: #f5faf7;
+  --panel: #ffffff;
+  --primary: #006040;
+  --primary-dark: #005035;
+  --accent: #d8a93a;
+  --text: #19251d;
+  --muted: #647168;
+  --border: #d6e8dc;
 }
 
 * {

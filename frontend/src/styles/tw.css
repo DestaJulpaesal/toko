@@ -1,0 +1,2 @@
+/* Utilitas Tailwind (tanpa reset) untuk ExpiryAlertWidget & LoyaltyPointsModal. Dimuat PERTAMA agar CSS lain menang bila bentrok. */
+@tailwind utilities;

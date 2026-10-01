@@ -1,264 +1,221 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowRight, Check, ChevronRight, PackageCheck, Search, ShieldCheck, Sparkles, Store, Truck } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
+import CatalogImage from '../components/CatalogImage';
 import { apiFetch } from '../services/api';
-import { 
-  ShoppingBag, 
-  Sparkles, 
-  ShieldCheck, 
-  Truck, 
-  Tag, 
-  ArrowRight, 
-  Gift, 
-  CheckCircle2, 
-  MessageCircle, 
-  Store,
-  ChevronRight,
-  TrendingUp,
-  Award
-} from 'lucide-react';
 
-const categories = ['Kebutuhan Harian', 'Minuman & Snack', 'Bahan Pokok & Sembako', 'Parsel Lebaran', 'Paket Acara', 'Promo Hemat'];
+const formatPrice = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 
 export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [events, setEvents] = useState([]);
+  const [productCategories, setProductCategories] = useState([]);
+  const [promotions, setPromotions] = useState([]);
 
   useEffect(() => {
     const loadPublicContent = async () => {
       try {
-        const [productsRes, promosRes, parcelsRes] = await Promise.all([
-          apiFetch('/products').then((res) => res.json()).catch(() => null),
-          apiFetch('/promos').then((res) => res.json()).catch(() => null),
-          apiFetch('/parcels').then((res) => res.json()).catch(() => null),
+        const [productsResponse, promosResponse, parcelsResponse] = await Promise.all([
+          apiFetch('/products').then((response) => response.json()).catch(() => null),
+          apiFetch('/promos').then((response) => response.json()).catch(() => null),
+          apiFetch('/parcels').then((response) => response.json()).catch(() => null),
         ]);
 
-        const products = productsRes?.success && Array.isArray(productsRes.products) ? productsRes.products : [];
-        const promos = promosRes?.success && Array.isArray(promosRes.promos) ? promosRes.promos : [];
-        const parcels = parcelsRes?.success && Array.isArray(parcelsRes.parcels) ? parcelsRes.parcels : [];
+        const products = productsResponse?.success && Array.isArray(productsResponse.products)
+          ? productsResponse.products
+          : [];
+        const parcels = parcelsResponse?.success && Array.isArray(parcelsResponse.parcels)
+          ? parcelsResponse.parcels
+          : [];
+        const promos = promosResponse?.success && Array.isArray(promosResponse.promos)
+          ? promosResponse.promos
+          : [];
 
-        if (products.length > 0) {
-          setFeaturedProducts(
-            products.slice(0, 4).map((product) => ({
-              id: product.id,
-              name: product.name,
-              price: `Rp ${Number(product.price || 0).toLocaleString('id-ID')}`,
-              tag: product.badge || (product.category || 'Populer'),
-              imageUrl: product.imageUrl,
-            }))
-          );
-        }
-
-        if (promos.length > 0) {
-          setEvents(
-            promos.slice(0, 3).map((promo) => ({
-              title: promo.name,
-              text: promo.description || 'Promo aktif dari Glosir untuk kebutuhan belanja Anda.',
-              tag: promo.discountType === 'PERCENT' ? `${promo.discountValue}% OFF` : `Rp ${Number(promo.discountValue || 0).toLocaleString('id-ID')}`,
-            }))
-          );
-        }
-
-        if (parcels.length > 0 && products.length === 0) {
-          setFeaturedProducts(
-            parcels.slice(0, 4).map((parcel) => ({
-              id: parcel.id,
-              name: parcel.name,
-              price: `Rp ${Number(parcel.price || 0).toLocaleString('id-ID')}`,
-              tag: parcel.type === 'CUSTOM' ? 'Custom' : 'Parsel',
-              imageUrl: parcel.imageUrl,
-            }))
-          );
-        }
+        setProductCategories([...new Set(products.map((product) => product.category).filter(Boolean))].slice(0, 6));
+        setFeaturedProducts(products.length > 0
+          ? products.slice(0, 4)
+          : parcels.slice(0, 4).map((parcel) => ({
+            ...parcel,
+            id: `parcel-${parcel.id}`,
+            category: parcel.type === 'CUSTOM' ? 'Paket acara' : 'Parsel',
+            detailPath: '/parsel',
+          })));
+        setPromotions(promos.slice(0, 3).map((promo) => ({
+          id: promo.id || promo.name,
+          title: promo.name,
+          description: promo.description || 'Lihat detail penawaran di katalog promo Glosir.',
+          tag: promo.discountType === 'PERCENT'
+            ? `${promo.discountValue}% OFF`
+            : `Hemat ${formatPrice(promo.discountValue)}`,
+        })));
       } catch {
         setFeaturedProducts([]);
-        setEvents([]);
+        setProductCategories([]);
+        setPromotions([]);
       }
     };
 
     loadPublicContent();
   }, []);
 
+  const heroProduct = featuredProducts[0];
+
   return (
-    <div className="public-page">
+    <div className="public-page home-page">
       <PublicHeader />
 
-      <main className="glosir-shell">
-        {/* Hero Section */}
-        <section className="hero" id="home">
-          <div className="hero-copy">
-            <span className="eyebrow-pill emerald mb-4">
-              <Store className="w-3.5 h-3.5 inline mr-1" /> Pusat Grosir & E-Commerce Terpercaya
-            </span>
-            <h1 className="hero-title">Belanja Sembako, Kebutuhan Harian & Parsel Lebih Hemat.</h1>
-            <p className="hero-subtitle">
-              Glosir melayani kebutuhan rumah tangga, warung eceran, dan parsel hampers acara keluarga 
-              dengan harga grosir transparan, jaminan produk asli, dan pengiriman cepat.
+      <main className="home-shell">
+        <section className="home-hero" aria-labelledby="home-title">
+          <div className="home-hero-copy">
+            <span className="home-eyebrow"><Store size={15} /> Pusat grosir untuk rumah dan usaha</span>
+            <h1 id="home-title">Belanja harian, <span>lebih ringan.</span></h1>
+            <p className="home-hero-description">
+              Sembako, kebutuhan rumah, parsel, sampai paket acara. Pilih yang dibutuhkan, cek harganya, lalu pesan dengan mudah.
             </p>
-            <div className="hero-actions">
-              <Link to="/products" className="btn btn-primary shadow-lg">
-                <ShoppingBag className="w-4 h-4 inline mr-1.5" /> Lihat Katalog Produk
-              </Link>
-              <Link to="/parsel" className="btn btn-secondary shadow-sm">
-                <Gift className="w-4 h-4 inline mr-1.5 text-amber-600" /> Parsel & Hampers
-              </Link>
+            <div className="home-hero-actions">
+              <Link to="/products" className="home-primary-link">Mulai belanja <ArrowRight size={17} /></Link>
+              <Link to="/parsel" className="home-secondary-link">Lihat parsel</Link>
             </div>
-            
-            {/* Value Props / Stats */}
-            <div className="stats-strip">
-              <div className="stat-item">
-                <div className="stat-icon-wrap emerald">
-                  <ShieldCheck className="w-5 h-5 text-emerald-700" />
-                </div>
-                <div>
-                  <strong>Harga Transparan</strong>
-                  <span>Grosir & Eceran Jelas</span>
-                </div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-icon-wrap amber">
-                  <Truck className="w-5 h-5 text-amber-700" />
-                </div>
-                <div>
-                  <strong>Pengiriman Cepat</strong>
-                  <span>Langsung ke Lokasi</span>
-                </div>
-              </div>
-              <div className="stat-item">
-                <div className="stat-icon-wrap blue">
-                  <Award className="w-5 h-5 text-blue-700" />
-                </div>
-                <div>
-                  <strong>Produk Quality</strong>
-                  <span>Terjamin & Original</span>
-                </div>
-              </div>
+            <div className="home-trust-list" aria-label="Keunggulan Glosir">
+              <span><Check size={15} /> Harga transparan</span>
+              <span><Check size={15} /> Eceran dan grosir</span>
+              <span><Check size={15} /> Pesan praktis</span>
             </div>
           </div>
 
-          <div className="hero-visual-card">
-            <div className="hero-card-banner top-card">
-              <div className="card-badge-top">
-                <Sparkles className="w-3.5 h-3.5 inline mr-1" /> Best Seller Momen Ini
-              </div>
-              <h3>Parsel Lebaran & Hampers Premium</h3>
-              <p>Isi lengkap sembako & kue kering favorit keluarga.</p>
-              <div className="hero-card-footer">
-                <span className="hero-card-price">Mulai Rp 120.000</span>
-                <Link to="/parsel" className="hero-card-link">
-                  Detail Parsel <ArrowRight className="w-3.5 h-3.5 inline ml-1" />
-                </Link>
-              </div>
+          <div className="home-hero-spotlight">
+            <div className="home-hero-photo">
+              {heroProduct?.imageUrl ? (
+                <img src={heroProduct.imageUrl} alt={heroProduct.name} fetchPriority="high" />
+              ) : (
+                <div className="home-hero-placeholder">
+                  <span className="home-placeholder-mark">G</span>
+                  <span>Rumah <b>•</b> Warung <b>•</b> Acara</span>
+                  <PackageCheck size={40} strokeWidth={1.25} />
+                </div>
+              )}
+              <span className="home-photo-note">Pilihan Glosir</span>
             </div>
-
-            <div className="hero-card-banner highlight-card">
-              <div className="card-badge-top amber">
-                <Tag className="w-3.5 h-3.5 inline mr-1" /> Promo Grosir
+            {heroProduct && (
+              <div className="home-spotlight-caption">
+                <div>
+                  <span>{heroProduct.category || 'Kebutuhan pilihan'}</span>
+                  <strong>{heroProduct.name}</strong>
+                </div>
+                <b>{formatPrice(heroProduct.price)}</b>
               </div>
-              <h3>Diskon Belanja Sembako</h3>
-              <p>Hemat hingga 15% untuk paket pembelian grosir.</p>
-              <Link to="/promo" className="btn btn-light small">Cek Promo Sekarang</Link>
-            </div>
+            )}
           </div>
         </section>
 
-        {/* Category Filter Row */}
-        <section className="category-showcase-section">
-          <div className="section-head mb-4">
-            <div>
-              <span className="eyebrow-pill gray">Kategori Belanja</span>
-              <h2 className="section-title">Pilih Kategori Kebutuhan Anda</h2>
-            </div>
-          </div>
-          <div className="category-pills-wrap">
-            {categories.map((item) => (
-              <Link key={item} to="/products" className="category-pill-card">
-                <TrendingUp className="w-4 h-4 text-emerald-600" />
-                <span>{item}</span>
+        {productCategories.length > 0 && (
+          <nav className="home-category-nav" aria-label="Kategori produk">
+            <span className="home-category-label">Jelajahi lorong</span>
+            {productCategories.map((category) => (
+              <Link key={category} to={`/products?search=${encodeURIComponent(category)}`}>
+                {category}<ChevronRight size={14} />
               </Link>
             ))}
-          </div>
-        </section>
+            <Link to="/products" className="home-all-categories">Semua produk <ArrowRight size={14} /></Link>
+          </nav>
+        )}
 
-        {/* Product Recommendations Section */}
-        <section className="product-section" id="produk">
-          <div className="section-head">
+        <section className="home-products-section" aria-labelledby="home-products-title">
+          <div className="home-section-heading">
             <div>
-              <span className="eyebrow-pill emerald">Pilihan Terbaik</span>
-              <h2 className="section-title">Rekomendasi Produk Hari Ini</h2>
+              <span className="home-section-kicker">Dari katalog Glosir</span>
+              <h2 id="home-products-title">Pilihan untuk hari ini</h2>
             </div>
-            <Link to="/products" className="section-more-link">
-              Lihat Semua Produk <ChevronRight className="w-4 h-4 inline" />
-            </Link>
+            <Link to="/products" className="home-text-link">Lihat semua produk <ArrowRight size={16} /></Link>
           </div>
 
-          <div className="product-grid">
-            {featuredProducts.map((item) => (
-              <article key={item.name} className="catalog-card hover-lift">
-                <div className={`img-box product-art-${item.tag.toLowerCase().replaceAll(' ', '-')}`}>
-                  <span className="product-art-label">GLOSIR</span>
-                  <small>{item.tag}</small>
-                </div>
-                <span className="catalog-badge mb-2">{item.tag}</span>
-                <h3 className="font-bold text-gray-900 text-base mb-2">{item.name}</h3>
-                <div className="product-meta">
-                  <div className="price-stack">
-                    <strong className="current-price">{item.price}</strong>
-                  </div>
-                  <Link to="/products" className="btn btn-primary small">
-                    Pesan <ArrowRight className="w-3.5 h-3.5 inline ml-1" />
+          {featuredProducts.length > 0 ? (
+            <div className="home-product-grid">
+              {featuredProducts.map((product) => (
+                <article key={product.id} className="home-product-card">
+                  <Link to={product.detailPath || `/products/${product.id}`} className="home-product-image" aria-label={`Lihat ${product.name}`}>
+                    <CatalogImage src={product.imageUrl} alt={product.name}>
+                      <div className="home-product-placeholder" aria-hidden="true">
+                        <PackageCheck size={30} strokeWidth={1.3} />
+                        <span>{product.category || 'Produk Glosir'}</span>
+                      </div>
+                    </CatalogImage>
+                    {product.badge && <span className="home-product-badge">{product.badge}</span>}
                   </Link>
-                </div>
-              </article>
-            ))}
+                  <div className="home-product-details">
+                    <span className="home-product-category">{product.category || 'Kebutuhan harian'}</span>
+                    <Link to={product.detailPath || `/products/${product.id}`} className="home-product-name">{product.name}</Link>
+                    <div className="home-product-bottom">
+                      <strong>{formatPrice(product.price)}</strong>
+                      <Link to={product.detailPath || `/products/${product.id}`} aria-label={`Buka ${product.name}`}>
+                        <ArrowRight size={17} />
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="home-products-empty">
+              <PackageCheck size={26} />
+              <div>
+                <strong>Katalog sedang disiapkan</strong>
+                <p>Produk pilihan Glosir akan muncul di sini. Sementara itu, jelajahi seluruh katalog.</p>
+              </div>
+              <Link to="/products">Buka katalog <ArrowRight size={16} /></Link>
+            </div>
+          )}
+        </section>
+
+        <section className="home-service-band" aria-label="Layanan Glosir">
+          <div className="home-service-item">
+            <span className="home-service-icon service-green"><ShieldCheck size={20} /></span>
+            <div><strong>Belanja lebih yakin</strong><span>Informasi produk dan harga tampil jelas.</span></div>
+          </div>
+          <div className="home-service-item">
+            <span className="home-service-icon service-yellow"><Truck size={20} /></span>
+            <div><strong>Untuk rumah dan warung</strong><span>Pilihan eceran maupun kebutuhan grosir.</span></div>
+          </div>
+          <div className="home-service-item">
+            <span className="home-service-icon service-blue"><Sparkles size={20} /></span>
+            <div><strong>Parsel dan paket acara</strong><span>Siap untuk berbagi dan momen spesial.</span></div>
           </div>
         </section>
 
-        {/* Owner Profile Section */}
-        <section className="owner-section">
-          <div className="owner-card">
-            <div className="owner-photo-container">
-              <div className="owner-photo-badge">GLOSIR STORE</div>
-              <p className="text-sm font-semibold text-gray-700 mt-3 text-center">Pelayanan Dekat & Ramah</p>
-            </div>
-          </div>
-          <div className="owner-copy">
-            <span className="eyebrow-pill emerald">Profil Usaha</span>
-            <h2 className="section-title">Solusi Belanja Grosir & Parsel Terpercaya</h2>
-            <p className="text-gray-600 leading-relaxed mb-4">
-              Glosir hadir sebagai pusat pemenuhan kebutuhan harian, sembako, dan parsel berkualitas. 
-              Dengan komitmen pelayanan cepat, transparan, dan jujur, kami siap melayani pelanggan eceran maupun grosir skala usaha.
-            </p>
-            <div className="owner-badges-list">
-              <span className="badge-check-item"><CheckCircle2 className="w-4 h-4 text-emerald-600 inline mr-1.5" /> Produk Berkualitas</span>
-              <span className="badge-check-item"><CheckCircle2 className="w-4 h-4 text-emerald-600 inline mr-1.5" /> Pelayanan Ramah & Cepat</span>
-              <span className="badge-check-item"><CheckCircle2 className="w-4 h-4 text-emerald-600 inline mr-1.5" /> Siap Order via WhatsApp</span>
-            </div>
-          </div>
-        </section>
-
-        {/* Event & Promo Section */}
-        <section className="events-section" id="promo">
-          <div className="section-head">
+        <section className="home-promotions-section" aria-labelledby="home-promotions-title">
+          <div className="home-section-heading">
             <div>
-              <span className="eyebrow-pill amber"><Sparkles className="w-3.5 h-3.5 inline mr-1" /> Event & Penawaran</span>
-              <h2 className="section-title">Promo Spesial Untuk Anda</h2>
+              <span className="home-section-kicker">Belanja lebih hemat</span>
+              <h2 id="home-promotions-title">Promo dan penawaran</h2>
             </div>
-            <Link to="/promo" className="section-more-link">
-              Lihat Semua Promo <ChevronRight className="w-4 h-4 inline" />
-            </Link>
+            <Link to="/promo" className="home-text-link">Semua promo <ArrowRight size={16} /></Link>
           </div>
+          {promotions.length > 0 ? (
+            <div className="home-promo-grid">
+              {promotions.map((promo) => (
+                <Link key={promo.id} to="/promo" className="home-promo-item">
+                  <span>{promo.tag}</span>
+                  <strong>{promo.title}</strong>
+                  <small>{promo.description}</small>
+                  <ArrowRight size={17} />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="home-promo-empty">
+              <div><strong>Temukan penawaran terbaru</strong><span>Cek promo aktif dan pilih yang paling sesuai dengan kebutuhanmu.</span></div>
+              <Link to="/promo">Jelajahi promo <ArrowRight size={16} /></Link>
+            </div>
+          )}
+        </section>
 
-          <div className="event-grid">
-            {events.map((event) => (
-              <article key={event.title} className="event-card shadow-sm">
-                <span className="event-tag">{event.tag}</span>
-                <h3>{event.title}</h3>
-                <p>{event.text}</p>
-              </article>
-            ))}
+        <section className="home-parcel-banner">
+          <div>
+            <span>Untuk momen yang ingin dirayakan</span>
+            <h2>Parsel dan paket acara, dibuat lebih mudah.</h2>
           </div>
+          <Link to="/paket-acara">Lihat pilihan paket <ArrowRight size={16} /></Link>
         </section>
       </main>
 

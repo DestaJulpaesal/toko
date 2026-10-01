@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { apiFetch, monitorSessionExpiry } from '../services/api';
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '', rememberMe: false });
   const [forcePasswordChange, setForcePasswordChange] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
-  const [resetRequested, setResetRequested] = useState(false);
-  const [verificationRequired, setVerificationRequired] = useState(false);
   const googleButtonRef = useRef(null);
   const googleClientId = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
+  const directPasswordResetAvailable = import.meta.env.DEV;
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -45,13 +47,6 @@ export default function LoginPage() {
       if (data.mustChangePassword) {
         setForcePasswordChange(true);
         setMessage('Demi keamanan, buat password baru sebelum melanjutkan.');
-        setLoading(false);
-        return;
-      }
-
-      if (data.emailVerificationRequired) {
-        setVerificationRequired(true);
-        setMessage('Verifikasi email dulu. Tautan verifikasi akan dikirim ke email akun.');
         setLoading(false);
         return;
       }
@@ -119,19 +114,6 @@ export default function LoginPage() {
     return () => window.clearInterval(timer);
   }, [googleClientId]);
 
-  const resendVerification = async () => {
-    setLoading(true);
-    try {
-      const response = await apiFetch('/auth/request-verification', { method: 'POST', silentNotify: true });
-      const data = await response.json();
-      setMessage(data.message || 'Tautan verifikasi sudah dikirim.');
-    } catch {
-      setMessage('Tautan verifikasi belum bisa dikirim. Coba lagi sebentar.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleChangePassword = async (event) => {
     event.preventDefault();
     if (newPassword !== passwordConfirmation) {
@@ -167,22 +149,37 @@ export default function LoginPage() {
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!form.email) {
-      setMessage('Isi email terlebih dahulu, lalu pilih lupa password.');
+  const handleForgotPassword = () => {
+    setResetEmail(form.email);
+    setResetMode(true);
+    setMessage('');
+  };
+
+  const handleDirectPasswordReset = async (event) => {
+    event.preventDefault();
+    if (newPassword !== passwordConfirmation) {
+      setMessage('Password baru dan ulangi password harus sama.');
       return;
     }
     setLoading(true);
+    setMessage('');
     try {
-      const response = await apiFetch('/auth/request-password-reset', {
+      const response = await apiFetch('/auth/development-password-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email }),
+        body: JSON.stringify({ email: resetEmail, newPassword, passwordConfirmation }),
         silentNotify: true,
       });
       const data = await response.json();
-      setMessage(data.message || 'Jika email terdaftar, tautan reset password sudah dikirim.');
-      setResetRequested(true);
+      if (!response.ok || !data.success) {
+        setMessage(data.message || 'Password belum berhasil direset.');
+        return;
+      }
+      setResetMode(false);
+      setForm((current) => ({ ...current, email: resetEmail, password: '' }));
+      setNewPassword('');
+      setPasswordConfirmation('');
+      setMessage('Password berhasil direset. Silakan masuk dengan password baru.');
     } catch {
       setMessage('Permintaan reset belum bisa diproses. Coba lagi sebentar.');
     } finally {
@@ -213,7 +210,7 @@ export default function LoginPage() {
             <p>Gunakan akun Karyawan / Kasir atau Owner untuk melanjutkan.</p>
           </div>
 
-          {!forcePasswordChange && <form onSubmit={handleSubmit} className="login-form">
+          {!forcePasswordChange && !resetMode && <form onSubmit={handleSubmit} className="login-form">
             <label>
               Email
               <input
@@ -225,37 +222,74 @@ export default function LoginPage() {
                 placeholder="nama@glosir.com"
               />
             </label>
-            <label>
-              Password
-              <input
-                name="password"
-                type="password"
-                required
-                value={form.password}
-                onChange={handleChange}
-                placeholder="Masukkan password"
-              />
-            </label>
+            <PasswordField
+              name="password"
+              label="Password"
+              autoComplete="current-password"
+              required
+              value={form.password}
+              onChange={handleChange}
+              placeholder="Masukkan password"
+            />
             <label className="login-remember"><input name="rememberMe" type="checkbox" checked={form.rememberMe} onChange={(event) => setForm((current) => ({ ...current, rememberMe: event.target.checked }))} /> Ingat saya di perangkat ini</label>
             <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
               {loading ? 'Memproses login...' : 'Masuk ke sistem'}
             </button>
-            <button type="button" className="login-back" onClick={handleForgotPassword} disabled={loading || resetRequested}>
-              {resetRequested ? 'Tautan reset sudah diminta' : 'Lupa password?'}
-            </button>
+            {directPasswordResetAvailable && (
+              <button type="button" className="login-back" onClick={handleForgotPassword} disabled={loading}>
+                Lupa password?
+              </button>
+            )}
             {googleClientId && <><div className="login-divider"><span>atau</span></div><div ref={googleButtonRef} className="google-login-button" /></>}
           </form>}
 
+          {resetMode && (
+            <form onSubmit={handleDirectPasswordReset} className="login-form">
+              <label>
+                Email akun
+                <input
+                  name="resetEmail"
+                  type="email"
+                  required
+                  value={resetEmail}
+                  onChange={(event) => setResetEmail(event.target.value)}
+                  placeholder="nama@glosir.com"
+                  autoComplete="username"
+                />
+              </label>
+              <PasswordField
+                name="newPassword"
+                label="Password baru"
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder="Minimal 8 karakter"
+              />
+              <PasswordField
+                name="passwordConfirmation"
+                label="Ulangi password baru"
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={passwordConfirmation}
+                onChange={(event) => setPasswordConfirmation(event.target.value)}
+                placeholder="Ketik ulang password baru"
+              />
+              <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
+                {loading ? 'Mereset password...' : 'Simpan password baru'}
+              </button>
+              <button type="button" className="login-back" onClick={() => { setResetMode(false); setMessage(''); }} disabled={loading}>
+                Kembali ke login
+              </button>
+            </form>
+          )}
+
           {forcePasswordChange && (
             <form onSubmit={handleChangePassword} className="login-form">
-              <label>
-                Password baru
-                <input name="newPassword" type="password" minLength="8" required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Minimal 8 karakter" />
-              </label>
-              <label>
-                Ulangi password baru
-                <input name="passwordConfirmation" type="password" minLength="8" required value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} placeholder="Ketik ulang password baru" />
-              </label>
+              <PasswordField name="newPassword" label="Password baru" autoComplete="new-password" minLength={8} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Minimal 8 karakter" />
+              <PasswordField name="passwordConfirmation" label="Ulangi password baru" autoComplete="new-password" minLength={8} required value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} placeholder="Ketik ulang password baru" />
               <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
                 {loading ? 'Menyimpan password...' : 'Simpan password baru'}
               </button>
@@ -263,16 +297,45 @@ export default function LoginPage() {
           )}
 
           {message && (
-            <p className={`login-message ${message.startsWith('Login berhasil') ? 'success' : 'error'}`}>
+            <p className={`login-message ${message.startsWith('Login berhasil') || message.startsWith('Password berhasil') ? 'success' : 'error'}`}>
               {message}
             </p>
           )}
-
-          {verificationRequired && <button type="button" className="btn btn-primary login-submit" onClick={resendVerification} disabled={loading}>Kirim ulang tautan verifikasi</button>}
 
           <Link to="/" className="login-back">← Kembali ke website utama</Link>
         </section>
       </div>
     </div>
+  );
+}
+
+function PasswordField({ label, name, value, onChange, placeholder, autoComplete, minLength, required }) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <label className="login-password-label">
+      {label}
+      <span className="login-password-field">
+        <input
+          name={name}
+          type={visible ? 'text' : 'password'}
+          minLength={minLength}
+          required={required}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+        />
+        <button
+          type="button"
+          className="login-password-toggle"
+          onClick={() => setVisible((current) => !current)}
+          aria-label={`${visible ? 'Sembunyikan' : 'Tampilkan'} ${label.toLowerCase()}`}
+          title={visible ? 'Sembunyikan password' : 'Tampilkan password'}
+        >
+          {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </span>
+    </label>
   );
 }

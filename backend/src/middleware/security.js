@@ -79,6 +79,14 @@ export const resetPasswordSchema = z.object({
   message: 'Password baru dan ulangi password harus sama',
   path: ['passwordConfirmation'],
 });
+export const directPasswordResetSchema = z.object({
+  email: emailSchema,
+  newPassword: strongPasswordSchema,
+  passwordConfirmation: z.string().min(8, 'Ulangi password minimal 8 karakter'),
+}).refine((value) => value.newPassword === value.passwordConfirmation, {
+  message: 'Password baru dan ulangi password harus sama',
+  path: ['passwordConfirmation'],
+});
 
 export const inviteUserSchema = z.object({
   name: z.string().trim().min(1, 'Nama karyawan wajib diisi'),

@@ -2,6 +2,10 @@ import { Link } from 'react-router-dom';
 import { Store, Phone, MapPin, Mail, ShieldCheck, Truck, Clock } from 'lucide-react';
 
 export default function PublicFooter() {
+  const storeWa = String(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '').replace(/\D/g, '');
+  const hasStoreWa = /^\d{8,15}$/.test(storeWa);
+  const displayWa = storeWa.startsWith('62') ? `0${storeWa.slice(2)}` : storeWa;
+
   return (
     <footer className="public-footer">
       <div className="footer-top-highlights">
@@ -45,7 +49,14 @@ export default function PublicFooter() {
             Pusat belanja kebutuhan harian, sembako, parsel hampers Lebaran/Hari Raya, dan paket acara terlengkap dengan harga grosir terbaik.
           </p>
           <div className="footer-contact-info">
-            <span className="contact-item"><Phone className="w-4 h-4 text-emerald-500 inline mr-2" /> WA: 0812-3456-7890</span>
+            {hasStoreWa && (
+              <span className="contact-item">
+                <Phone className="w-4 h-4 text-emerald-500 inline mr-2" />
+                <a href={`https://wa.me/${storeWa}`} target="_blank" rel="noreferrer" className="footer-whatsapp-link">
+                  WA: {displayWa}
+                </a>
+              </span>
+            )}
             <span className="contact-item"><MapPin className="w-4 h-4 text-emerald-500 inline mr-2" /> Toko Glosir Utama</span>
           </div>
         </div>

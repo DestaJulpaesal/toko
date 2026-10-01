@@ -6,14 +6,15 @@ import ReminderBell from './ReminderBell';
 import { Archive, CalendarRange, Check, ChevronDown, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Search, Settings, ShoppingCart, Tags, Users, WalletCards, BarChart3, Landmark, Receipt, ShieldCheck, Truck } from 'lucide-react';
 
 const ownerPrimaryGroups = [
-  { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Penagihan Wilayah', '/admin/parcel-collections'], ['06', 'Keuangan', '/admin/finance'], ['07', 'Piutang', '/admin/debts'], ['08', 'Restock', '/admin/restock']] },
+  { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Data Pelanggan', '/admin/customers'], ['06', 'Keuangan', '/admin/finance']] },
 ];
 
 const ownerSecondaryGroups = [
+  { label: 'Operasional Lanjutan', links: [['07', 'Piutang', '/admin/debts'], ['08', 'Restock', '/admin/restock'], ['23', 'Stok Opname', '/admin/stock-opname']] },
   { label: 'Katalog', links: [['09', 'Kategori', '/admin/categories'], ['10', 'Promo', '/admin/promos'], ['10b', 'Performa Produk', '/admin/product-performance']] },
-  { label: 'Parsel', links: [['11', 'Parsel', '/admin/parcels'], ['12', 'Peserta Parsel', '/admin/parcel-participants'], ['13', 'Program Parsel', '/admin/parcel-programs'], ['14', 'Wilayah Parsel', '/admin/parcel-regions']] },
+  { label: 'Parsel', links: [['05', 'Penagihan Wilayah', '/admin/parcel-collections'], ['11', 'Parsel', '/admin/parcels'], ['12', 'Peserta Parsel', '/admin/parcel-participants'], ['13', 'Program Parsel', '/admin/parcel-programs'], ['14', 'Wilayah Parsel', '/admin/parcel-regions'], ['24', 'Paket Acara', '/admin/event-packages']] },
   { label: 'Keuangan Lanjutan', links: [['15', 'Catatan Pribadi', '/admin/personal-finance'], ['16', 'Laporan Keuangan', '/admin/finance/reports'], ['17', 'Kalender Keuangan', '/admin/finance/calendar'], ['18', 'Total Kekayaan', '/admin/finance/networth'], ['19', 'Persetujuan Keuangan', '/admin/finance/approvals'], ['20', 'Audit Keuangan', '/admin/finance/audit']] },
-  { label: 'Website & Kontrol', links: [['21', 'Konten Publik', '/admin/content'], ['22', 'Profil', '/admin/profile'], ['23', 'Stok Opname', '/admin/stock-opname'], ['24', 'Paket Acara', '/admin/event-packages']] },
+  { label: 'Website & Kontrol', links: [['21', 'Konten Publik', '/admin/content'], ['22', 'Profil', '/admin/profile']] },
 ];
 
 const cashierGroups = [

@@ -44,8 +44,8 @@ export default function ProductUnitPicker({ product, onSelectUnit, selectedUnitI
   if (units.length === 0) return null;
 
   return (
-    <div className="unit-picker" style={{ marginBottom: '10px' }}>
-      <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#666' }}>
+    <div className="unit-picker">
+      <label>
         Pilih Unit:
       </label>
       <select
@@ -55,15 +55,6 @@ export default function ProductUnitPicker({ product, onSelectUnit, selectedUnitI
           if (unit) onSelectUnit(unit);
         }}
         disabled={loading}
-        style={{
-          width: '100%',
-          padding: '8px',
-          borderRadius: '4px',
-          border: '1px solid #ddd',
-          fontSize: '14px',
-          marginTop: '5px',
-          cursor: loading ? 'not-allowed' : 'pointer',
-        }}
       >
         <option value="">-- Pilih Unit --</option>
         {units.map((unit) => (

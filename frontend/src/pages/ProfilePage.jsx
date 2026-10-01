@@ -21,7 +21,7 @@ export default function ProfilePage() {
   useEffect(() => {
     apiFetch('/site-profile')
       .then((response) => response.json())
-      .then((data) => { if (data.success) setProfile(data.profile); })
+      .then((data) => { if (data.success && data.profile) setProfile((current) => ({ ...current, ...data.profile })); })
       .catch(() => {});
   }, []);
 

@@ -13,6 +13,7 @@ import {
 } from '../services/authService.js';
 import {
   changePasswordSchema,
+  directPasswordResetSchema,
   emailActionLimiter,
   googleLoginSchema,
   inviteUserSchema,
@@ -159,6 +160,28 @@ router.post('/request-password-reset', emailActionLimiter, validateBody(requestP
   } catch (error) {
     console.error('Password reset request failed:', error.message);
     return res.json({ success: true, message: neutralMessage });
+  }
+});
+
+router.post('/development-password-reset', emailActionLimiter, validateBody(directPasswordResetSchema), async (req, res) => {
+  if (process.env.NODE_ENV !== 'development') {
+    return res.status(404).json({ success: false, message: 'Reset password langsung tidak tersedia.' });
+  }
+
+  try {
+    const user = await prisma.user.findFirst({ where: { email: req.body.email, isActive: true } });
+    if (!user) return res.status(404).json({ success: false, message: 'Akun aktif dengan email tersebut tidak ditemukan.' });
+
+    await changePassword(user.id, req.body.newPassword);
+    if (!user.emailVerifiedAt) {
+      await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+    }
+    await prisma.auditLog.create({ data: { entityType: 'User', entityId: user.id, field: 'password', newValue: 'development_reset', changedById: user.id } });
+
+    return res.json({ success: true, message: 'Password berhasil direset.' });
+  } catch (error) {
+    console.error('Development password reset failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Password belum berhasil direset. Coba lagi.' });
   }
 });
 

@@ -4,23 +4,23 @@
    ========================================================== */
 :root {
   /* Warna */
-  --g-bg: #f3f1ec;
+  --g-bg: #f5faf7;
   --g-surface: #ffffff;
-  --g-surface-2: #faf9f6;
-  --g-border: #e4e1da;
-  --g-border-strong: #cfcac0;
-  --g-text: #1c1b1a;
-  --g-muted: #6b665f;
-  --g-primary: #1f7a4a;
-  --g-primary-hover: #176a3f;
-  --g-primary-soft: #e6f3ec;
-  --g-accent: #f0ba3f;
-  --g-danger: #c0392b;
-  --g-danger-soft: #fbeae8;
-  --g-warning: #b7791f;
-  --g-warning-soft: #fdf3dc;
-  --g-info: #2563a8;
-  --g-info-soft: #e7f0fa;
+  --g-surface-2: #f5faf7;
+  --g-border: #d6e8dc;
+  --g-border-strong: #b6d1c0;
+  --g-text: #19251d;
+  --g-muted: #647168;
+  --g-primary: #006040;
+  --g-primary-hover: #005035;
+  --g-primary-soft: #cfe7d9;
+  --g-accent: #d8a93a;
+  --g-danger: #b53a34;
+  --g-danger-soft: #f9ebea;
+  --g-warning: #936812;
+  --g-warning-soft: #fff5d9;
+  --g-info: #3d6f8c;
+  --g-info-soft: #e7f1f6;
 
   /* Spasi (kelipatan 4) */
   --g-space-1: 4px;  --g-space-2: 8px;  --g-space-3: 12px; --g-space-4: 16px;
@@ -30,8 +30,8 @@
   --g-radius-sm: 8px;
   --g-radius: 12px;
   --g-radius-lg: 16px;
-  --g-shadow-sm: 0 1px 2px rgba(35, 32, 26, 0.06);
-  --g-shadow: 0 6px 20px rgba(35, 32, 26, 0.07);
+  --g-shadow-sm: 0 1px 2px rgba(32, 66, 44, 0.06);
+  --g-shadow: 0 6px 20px rgba(32, 66, 44, 0.08);
 
   /* Tipografi */
   --g-font: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -48,22 +48,22 @@
 }
 
 .dark {
-  --g-bg: #16181a;
-  --g-surface: #202326;
-  --g-surface-2: #282c30;
-  --g-border: #363b40;
-  --g-border-strong: #4a5057;
-  --g-text: #f2f2f0;
-  --g-muted: #a3a8ad;
-  --g-primary: #4ade80;
-  --g-primary-hover: #22c55e;
-  --g-primary-soft: rgba(74, 222, 128, 0.14);
-  --g-danger: #f87171;
-  --g-danger-soft: rgba(248, 113, 113, 0.14);
-  --g-warning: #fbbf24;
-  --g-warning-soft: rgba(251, 191, 36, 0.14);
-  --g-info: #60a5fa;
-  --g-info-soft: rgba(96, 165, 250, 0.14);
-  --g-shadow-sm: none;
-  --g-shadow: none;
+  --g-bg: #f5faf7;
+  --g-surface: #ffffff;
+  --g-surface-2: #f5faf7;
+  --g-border: #d6e8dc;
+  --g-border-strong: #b6d1c0;
+  --g-text: #19251d;
+  --g-muted: #647168;
+  --g-primary: #006040;
+  --g-primary-hover: #005035;
+  --g-primary-soft: #cfe7d9;
+  --g-danger: #b53a34;
+  --g-danger-soft: #f9ebea;
+  --g-warning: #936812;
+  --g-warning-soft: #fff5d9;
+  --g-info: #3d6f8c;
+  --g-info-soft: #e7f1f6;
+  --g-shadow-sm: 0 1px 2px rgba(32, 66, 44, 0.06);
+  --g-shadow: 0 6px 20px rgba(32, 66, 44, 0.08);
 }
