@@ -7,6 +7,7 @@ import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import CatalogImage from '../components/CatalogImage';
 import { PUBLIC_CATALOG_CACHE_KEY, stripSensitive } from '../utils/catalogStorage';
+import { buildProductShareUrl, buildWhatsAppOrderLink, shareProduct } from '../utils/shareLink';
 import { 
   Search, 
   Star, 
@@ -17,7 +18,9 @@ import {
   Sparkles, 
   ShoppingBag, 
   SlidersHorizontal,
-  PackageCheck
+  PackageCheck,
+  Share2,
+  Send
 } from 'lucide-react';
 
 export default function ProductPage() {
@@ -166,6 +169,17 @@ export default function ProductPage() {
               >
                 <Star className={`w-4 h-4 ${isFavorite(product.id) ? 'fill-amber-400 text-amber-500' : 'text-gray-400'}`} />
               </button>
+              <button
+                type="button"
+                className="favorite-button share-button"
+                onClick={async () => {
+                  await shareProduct(product);
+                  setAddedProduct(`${product.name} link terbagi`);
+                }}
+                aria-label="Bagikan produk"
+              >
+                <Share2 className="w-4 h-4 text-slate-500" />
+              </button>
               
               <Link to={product.detailPath || `/products/${product.id}`} className="catalog-image product-art-link">
                 <CatalogImage src={product.imageUrl} alt={`Foto ${product.name}`}>
@@ -212,9 +226,20 @@ export default function ProductPage() {
                 {product.stock !== null && <small className="stock-label">{product.stock} stok tersedia</small>}
               </div>
 
-              <button className="btn btn-primary full catalog-add-btn" onClick={() => { addItem(product); setAddedProduct(product.name); }}>
-                <ShoppingCart className="w-4 h-4 inline mr-1.5" /> Tambah Ke Keranjang
-              </button>
+              <div className="catalog-actions-row">
+                <button className="btn btn-primary full catalog-add-btn" onClick={() => { addItem(product); setAddedProduct(product.name); }}>
+                  <ShoppingCart className="w-4 h-4 inline mr-1.5" /> Tambah Ke Keranjang
+                </button>
+                <a
+                  href={buildWhatsAppOrderLink(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '', product.name, 1, buildProductShareUrl(product))}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary catalog-wa-btn"
+                  aria-label={`Order ${product.name} via WhatsApp`}
+                >
+                  <Send className="w-4 h-4 inline mr-1.5" /> WA
+                </a>
+              </div>
             </article>
           ))}
         </div>

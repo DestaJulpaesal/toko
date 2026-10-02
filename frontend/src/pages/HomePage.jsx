@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Check, ChevronRight, PackageCheck, Search, ShieldCheck, Sparkles, Store, Truck } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import CatalogImage from '../components/CatalogImage';
 import { apiFetch } from '../services/api';
+import { buildProductShareUrl, buildPromoWhatsAppLink, buildWhatsAppOrderLink } from '../utils/shareLink';
+import { getUrgencyState } from '../utils/urgency';
 
 const formatPrice = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 
@@ -60,6 +62,20 @@ export default function HomePage() {
   }, []);
 
   const heroProduct = featuredProducts[0];
+  const spotlightPromo = promotions[0];
+  const urgencyDeadline = useMemo(() => new Date(Date.now() + (1000 * 60 * 60 * 36) + (1000 * 60 * 18)), []);
+  const [urgencyState, setUrgencyState] = useState(() => getUrgencyState(urgencyDeadline));
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setUrgencyState(getUrgencyState(urgencyDeadline));
+    }, 60000);
+
+    return () => window.clearInterval(interval);
+  }, [urgencyDeadline]);
+
+  const spotlightPromoLink = spotlightPromo ? buildPromoWhatsAppLink(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '', spotlightPromo.title, spotlightPromo.description, '/promo') : '#';
+  const bestSellers = featuredProducts.slice(0, 4);
 
   return (
     <div className="public-page home-page">
@@ -120,6 +136,105 @@ export default function HomePage() {
             <Link to="/products" className="home-all-categories">Semua produk <ArrowRight size={14} /></Link>
           </nav>
         )}
+
+        <section className="home-need-section" aria-labelledby="home-need-title">
+          <div className="home-section-heading">
+            <div>
+              <span className="home-section-kicker">Belanja sesuai kebutuhan</span>
+              <h2 id="home-need-title">Pilih yang paling cocok hari ini</h2>
+            </div>
+            <Link to="/products" className="home-text-link">Lihat katalog <ArrowRight size={16} /></Link>
+          </div>
+
+          <div className="home-need-grid">
+            {productCategories.length > 0 ? (
+              productCategories.slice(0, 4).map((category, index) => (
+                <Link key={category} to={`/products?search=${encodeURIComponent(category)}`} className={`home-need-card need-${index + 1}`}>
+                  <span>{index === 0 ? 'Rumah' : index === 1 ? 'Belanja' : index === 2 ? 'Acara' : 'Hemat'}</span>
+                  <strong>{category}</strong>
+                  <small>Cek produk favorit di kategori ini.</small>
+                  <ArrowRight size={16} />
+                </Link>
+              ))
+            ) : (
+              [
+                { label: 'Sembako', tag: 'Rumah', path: '/products?search=' + encodeURIComponent('Sembako') },
+                { label: 'Kebutuhan Rumah', tag: 'Harian', path: '/products?search=' + encodeURIComponent('Kebutuhan Rumah') },
+                { label: 'Parsel', tag: 'Acara', path: '/products?search=' + encodeURIComponent('Parsel') },
+                { label: 'Promo', tag: 'Hemat', path: '/promo' },
+              ].map((item, index) => (
+                <Link key={item.label} to={item.path} className={`home-need-card need-${index + 1}`}>
+                  <span>{item.tag}</span>
+                  <strong>{item.label}</strong>
+                  <small>Cek produk favorit di kategori ini.</small>
+                  <ArrowRight size={16} />
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+
+        {spotlightPromo && (
+          <section className="promo-spotlight" aria-label="Promo utama hari ini">
+            <div className="promo-spotlight-copy">
+              <span className="promo-spotlight-kicker">Promo hari ini</span>
+              <h3>{spotlightPromo.title}</h3>
+              <p>{spotlightPromo.description}</p>
+            </div>
+            <div className="promo-spotlight-actions">
+              <Link to="/promo" className="home-secondary-link">Lihat semua promo</Link>
+              <a href={spotlightPromoLink} target="_blank" rel="noreferrer" className="home-primary-link">Klaim via WA</a>
+            </div>
+          </section>
+        )}
+
+        <section className="home-urgency-banner" aria-label="Promo berakhir segera">
+          <div className="home-urgency-copy">
+            <span className="promo-spotlight-kicker">Promo terbatas</span>
+            <h3>Pesan cepat sebelum penawaran berakhir.</h3>
+          </div>
+          <div className="home-urgency-timer" aria-live="polite">
+            <div><strong>{urgencyState.days}</strong><small>Hari</small></div>
+            <div><strong>{urgencyState.hours}</strong><small>Jam</small></div>
+            <div><strong>{urgencyState.minutes}</strong><small>Menit</small></div>
+          </div>
+          <a href={spotlightPromoLink} target="_blank" rel="noreferrer" className="home-primary-link">Ambil sekarang</a>
+        </section>
+
+        <section className="home-bestseller-section" aria-labelledby="home-bestseller-title">
+          <div className="home-section-heading">
+            <div>
+              <span className="home-section-kicker">Paling laris</span>
+              <h2 id="home-bestseller-title">Best seller minggu ini</h2>
+            </div>
+            <Link to="/products" className="home-text-link">Lihat semua <ArrowRight size={16} /></Link>
+          </div>
+
+          <div className="home-bestseller-grid">
+            {bestSellers.map((product) => {
+              const orderLink = buildWhatsAppOrderLink(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '', product.name, 1, buildProductShareUrl(product));
+              return (
+                <article key={product.id} className="home-bestseller-card">
+                  <div className="home-bestseller-ribbon">Best seller</div>
+                  <Link to={product.detailPath || `/products/${product.id}`} className="home-bestseller-image" aria-label={`Lihat ${product.name}`}>
+                    <CatalogImage src={product.imageUrl} alt={product.name}>
+                      <div className="home-product-placeholder" aria-hidden="true">
+                        <PackageCheck size={28} strokeWidth={1.3} />
+                        <span>{product.category || 'Produk Glosir'}</span>
+                      </div>
+                    </CatalogImage>
+                  </Link>
+                  <div className="home-bestseller-content">
+                    <span className="home-product-category">{product.category || 'Kebutuhan harian'}</span>
+                    <Link to={product.detailPath || `/products/${product.id}`} className="home-product-name">{product.name}</Link>
+                    <strong className="home-bestseller-price">{formatPrice(product.price)}</strong>
+                    <a href={orderLink} target="_blank" rel="noreferrer" className="home-bestseller-cta">Order sekarang</a>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
 
         <section className="home-products-section" aria-labelledby="home-products-title">
           <div className="home-section-heading">

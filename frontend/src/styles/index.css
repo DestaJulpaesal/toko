@@ -516,6 +516,7 @@ a:focus-visible {
 
 .favorite-button { position: absolute; top: 27px; right: 27px; z-index: 2; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid rgba(255,255,255,0.8); border-radius: 50%; color: #6f675d; background: rgba(255,255,255,0.85); font-size: 1.15rem; }
 .favorite-button:hover, .favorite-button.active { color: #b36d31; background: #fff7ed; transform: scale(1.05); }
+.favorite-button.share-button { top: 67px; right: 27px; }
 
 .catalog-image {
   display: grid;
@@ -770,7 +771,12 @@ a:focus-visible {
 .quantity-stepper { display: flex; align-items: center; gap: 14px; height: 44px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 10px; background: white; }
 .quantity-stepper button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: 7px; background: #f5f1ea; color: var(--text); }
 .quantity-stepper button:hover { background: #e9f3eb; color: var(--primary-dark); }
-.detail-whatsapp { display: inline-flex; margin-top: 18px; color: var(--primary-dark); font-size: 0.84rem; font-weight: 800; text-decoration: none; }
+.detail-share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 18px; }
+.detail-buy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+.detail-whatsapp { display: inline-flex; color: var(--primary-dark); font-size: 0.84rem; font-weight: 800; text-decoration: none; }
+.share-message { margin: 10px 0 0; color: #436754; font-size: 0.82rem; font-weight: 700; }
+.catalog-actions-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 14px; }
+.catalog-wa-btn { display: inline-flex; justify-content: center; align-items: center; min-width: 64px; }
 .detail-empty { display: grid; place-items: center; gap: 20px; min-height: 500px; padding: 40px 20px; }
 .favorites-shell { max-width: 1180px; margin: 0 auto; padding-bottom: 80px; }
 .favorites-hero { padding-bottom: 40px; }
@@ -791,7 +797,7 @@ a:focus-visible {
 .cart-shell {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 40px 20px 80px;
+  padding: 40px 20px 100px;
 }
 
 .cart-shell h1 {
@@ -932,6 +938,48 @@ a:focus-visible {
 .applied-promo button:hover { transform: none; }
 .promo-message { margin: 7px 0 10px; color: #8a6a32; font-size: 0.72rem; }
 .discount-row { color: #2a8650; }
+.whatsapp-checkout-btn {
+  margin-top: 10px;
+}
+
+.mobile-summary-bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 20px 40px rgba(14, 30, 37, 0.16);
+  backdrop-filter: blur(12px);
+  z-index: 30;
+}
+
+.mobile-summary-bar span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.mobile-summary-bar strong {
+  color: var(--primary-dark);
+}
+
+.mobile-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn.small {
+  padding: 0.7rem 0.9rem;
+  font-size: 0.76rem;
+}
 
 .checkout-shell {
   max-width: 1100px;
@@ -1091,6 +1139,18 @@ a:focus-visible {
   .promo-banner {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .cart-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cart-summary {
+    display: none;
+  }
+
+  .mobile-summary-bar {
+    display: flex;
   }
 }
 
