@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../services/api';
 import { clearStaffCaches } from '../utils/catalogStorage';
 import ReminderBell from './ReminderBell';
@@ -27,6 +27,7 @@ const parcelManagerGroups = [
 
 export default function AdminSidebar({ active = '' }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -77,15 +78,26 @@ export default function AdminSidebar({ active = '' }) {
     return () => window.clearInterval(timer);
   }, [currentUser]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const nav = navRef.current;
     if (!nav) return undefined;
 
     const savedScrollTop = Number(sessionStorage.getItem('glosir-sidebar-scroll') || 0);
-    nav.scrollTop = savedScrollTop;
-    const handleScroll = () => sessionStorage.setItem('glosir-sidebar-scroll', String(nav.scrollTop));
-    nav.addEventListener('scroll', handleScroll, { passive: true });
+    if (Number.isFinite(savedScrollTop)) nav.scrollTop = savedScrollTop;
 
+    const activeLink = nav.querySelector('a.active');
+    activeLink?.scrollIntoView({ block: 'nearest' });
+  }, [location.pathname, currentUser?.id, displayMode, secondaryOpen]);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return undefined;
+
+    const handleScroll = () => {
+      sessionStorage.setItem('glosir-sidebar-scroll', String(nav.scrollTop));
+    };
+
+    nav.addEventListener('scroll', handleScroll, { passive: true });
     return () => nav.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -114,6 +126,8 @@ export default function AdminSidebar({ active = '' }) {
   const visibleGroups = filterGroups(isParcelManager ? parcelManagerGroups : isCashier ? cashierGroups : ownerPrimaryGroups);
   const visibleSecondaryGroups = isOwner && displayMode === 'complete' ? filterGroups(ownerSecondaryGroups) : [];
   const hasSecondarySearch = sidebarSearch.trim() && visibleSecondaryGroups.length > 0;
+  const isSecondaryRoute = ownerSecondaryGroups.some((group) => group.links.some(([, , to]) => to === location.pathname));
+  const secondaryMenuOpen = secondaryOpen || hasSecondarySearch || isSecondaryRoute;
   const toggleDisplayMode = () => {
     const nextMode = displayMode === 'simple' ? 'complete' : 'simple';
     setDisplayMode(nextMode);
@@ -163,12 +177,12 @@ export default function AdminSidebar({ active = '' }) {
           </div>
         ))}
         {isOwner && visibleSecondaryGroups.length > 0 && (
-          <div className={`sidebar-secondary-section${secondaryOpen || hasSecondarySearch ? ' is-open' : ''}`}>
-            <button type="button" className="sidebar-layer-toggle" onClick={(event) => { event.stopPropagation(); setSecondaryOpen((open) => !open); }} aria-expanded={secondaryOpen || Boolean(hasSecondarySearch)}>
+          <div className={`sidebar-secondary-section${secondaryMenuOpen ? ' is-open' : ''}`}>
+            <button type="button" className="sidebar-layer-toggle" onClick={(event) => { event.stopPropagation(); setSecondaryOpen((open) => !open); }} aria-expanded={secondaryMenuOpen}>
               <span><span className="sidebar-layer-mark"><Check size={13} /></span> Menu Lainnya</span>
               <ChevronDown size={15} aria-hidden="true" />
             </button>
-            {(secondaryOpen || hasSecondarySearch) && visibleSecondaryGroups.map((group) => (
+            {secondaryMenuOpen && visibleSecondaryGroups.map((group) => (
               <div className="sidebar-nav-group sidebar-secondary-group" key={group.label}>
                 <span className="nav-label">{group.label}</span>
                 {group.links.map(([number, label, to]) => (
