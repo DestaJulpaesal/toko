@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
-import { buildProductShareUrl, buildWhatsAppOrderLink, buildWhatsAppShareLink, shareProduct } from '../utils/shareLink';
+import { buildProductShareUrl, buildWhatsAppShareLink, shareProduct } from '../utils/shareLink';
 
 const products = [
   { id: '1', name: 'Kopi Bubuk Premium', category: 'Glosir', price: 48000, originalPrice: 60000, discountPercent: 20, stock: 25, badge: 'Diskon 20%', description: 'Kopi bubuk pilihan dengan rasa kuat dan aroma yang cocok untuk menemani aktivitas harian.' },
@@ -30,17 +30,10 @@ export default function ProductDetailPage() {
   };
 
   const productUrl = buildProductShareUrl(product);
-  const whatsappUrl = buildWhatsAppOrderLink(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '', product.name, quantity, productUrl);
 
   const handleShare = async () => {
     const result = await shareProduct(product);
     setShareNotice(result.ok ? 'Link produk berhasil disalin ke clipboard.' : 'Buka menu bagikan jika ingin membagikan link produk.');
-  };
-
-  const handleBuyNow = () => {
-    const url = buildWhatsAppOrderLink(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '', product.name, quantity, productUrl);
-    window.open(url, '_blank', 'noopener,noreferrer');
-    setShareNotice(`Siap order ${quantity} ${quantity > 1 ? 'pcs' : 'pcs'} via WhatsApp.`);
   };
 
   return (
@@ -73,10 +66,6 @@ export default function ProductDetailPage() {
             <p className="detail-description">{product.description}</p>
             <div className="detail-stock"><span className="stock-dot" /> {product.stock} stok tersedia</div>
             <div className="detail-actions"><div className="quantity-stepper"><button onClick={() => setQuantity((value) => Math.max(1, value - 1))}>-</button><strong>{quantity}</strong><button onClick={() => setQuantity((value) => Math.min(product.stock, value + 1))}>+</button></div><button className="btn btn-primary" onClick={addToCart}>Tambah ke keranjang</button></div>
-            <div className="detail-buy-row">
-              <button type="button" className="btn btn-primary" onClick={handleBuyNow}>Beli Sekarang</button>
-              <a href={whatsappUrl} target="_blank" rel="noreferrer" className="detail-whatsapp">Order via WhatsApp</a>
-            </div>
             <div className="detail-share-row">
               <button type="button" className="btn btn-secondary" onClick={handleShare}>Bagikan produk</button>
             </div>

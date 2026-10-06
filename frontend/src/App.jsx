@@ -41,6 +41,7 @@ const AdminParcelProgramsPage = lazy(() => import('./pages/AdminParcelProgramsPa
 const AdminParcelRegionsPage = lazy(() => import('./pages/AdminParcelRegionsPage'));
 const ParcelCollectionPage = lazy(() => import('./pages/ParcelCollectionPage'));
 const AdminStockOpnamePage = lazy(() => import('./pages/AdminStockOpnamePage'));
+const AdminStockLedgerPage = lazy(() => import('./pages/AdminStockLedgerPage'));
 const AdminRestockPage = lazy(() => import('./pages/AdminRestockPage'));
 const AdminEventPackagesPage = lazy(() => import('./pages/AdminEventPackagesPage'));
 const AdminProductPerformancePage = lazy(() => import('./pages/AdminProductPerformancePage'));
@@ -126,6 +127,7 @@ export default function App() {
             <Route path="/admin/debts" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminDebtsPage /></AuthRoute>} />
             <Route path="/admin/finance/reports" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinanceReportsPage /></AuthRoute>} />
             <Route path="/admin/finance/calendar" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinanceCalendarPage /></AuthRoute>} />
+            <Route path="/admin/finance/calendar/:date" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinanceCalendarPage /></AuthRoute>} />
             <Route path="/admin/finance/networth" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminNetWorthPage /></AuthRoute>} />
             <Route path="/admin/finance/approvals" element={<AuthRoute roles={['OWNER']}><AdminApprovalsPage /></AuthRoute>} />
             <Route path="/admin/finance/audit" element={<AuthRoute roles={['OWNER']}><FinanceAuditLogPage /></AuthRoute>} />
@@ -134,6 +136,7 @@ export default function App() {
             <Route path="/admin/parcel-regions" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelRegionsPage /></AuthRoute>} />
             <Route path="/admin/parcel-collections" element={<AuthRoute roles={['OWNER', 'ADMIN']}><ParcelCollectionPage /></AuthRoute>} />
             <Route path="/admin/stock-opname" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminStockOpnamePage /></AuthRoute>} />
+            <Route path="/admin/stock-ledger" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminStockLedgerPage /></AuthRoute>} />
             <Route path="/admin/restock" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminRestockPage /></AuthRoute>} />
             <Route path="/admin/event-packages" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminEventPackagesPage /></AuthRoute>} />
             <Route path="/admin/product-performance" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminProductPerformancePage /></AuthRoute>} />

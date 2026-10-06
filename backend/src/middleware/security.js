@@ -142,10 +142,11 @@ export const holdCartSchema = z.object({
 export const onlineOrderSchema = z.object({
   customerName: z.string().trim().min(2, 'Nama pelanggan wajib diisi'),
   customerPhone: z.string().trim().min(8, 'Nomor WhatsApp wajib diisi'),
-  address: z.string().trim().min(5, 'Alamat wajib diisi'),
+  address: z.string().trim().optional().default('Ambil langsung di toko'),
   note: z.string().trim().optional().default(''),
   promoCode: z.string().trim().optional().default(''),
-  shippingCost: z.coerce.number().nonnegative().default(25000),
+  fulfillmentMethod: z.enum(['DELIVERY', 'PICKUP']).default('DELIVERY'),
+  distanceKm: z.coerce.number().positive().optional(),
   items: z.array(z.object({
     variantId: z.string().min(1).optional(),
     parcelId: z.string().min(1).optional(),
@@ -375,6 +376,7 @@ export const productCreateSchema = z.object({
   purchasePrice: z.coerce.number().optional().nullable(),
   originalPrice: z.coerce.number().optional().nullable(),
   stock: z.coerce.number('Stok wajib diisi'),
+  stockWarning: z.coerce.number().int().nonnegative().optional(),
   status: z.string().optional().default('Aktif'),
 }).passthrough();
 export const productUpdateSchema = productCreateSchema;

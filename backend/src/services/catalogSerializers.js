@@ -86,6 +86,7 @@ export function formatProduct(product, audience = AUDIENCE.PUBLIC) {
     ...formatted,
     sku: product.sku,
     barcode: variant?.barcode || null,
+    stockWarning: Number(product.stockWarning || 0),
     wholesalePrice: toNumberOrNull(variant?.wholesalePrice),
     isQuickAccess: Boolean(product.isQuickAccess),
   };

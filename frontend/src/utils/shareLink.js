@@ -31,11 +31,13 @@ export function buildWhatsAppOrderLink(phoneNumber, productName, quantity = 1, p
   return normalizedPhone ? `https://wa.me/${normalizedPhone}?text=${message}` : `https://wa.me/?text=${message}`;
 }
 
-export function buildCartCheckoutLink(phoneNumber, items = [], total = 0) {
+export function buildCartCheckoutLink(phoneNumber, items = [], total = 0, delivery = {}) {
   const normalizedPhone = (phoneNumber || '').replace(/[^\d]/g, '');
   const details = (items || []).map((item) => `${item.name} x${item.qty} (${Number(item.price || 0).toLocaleString('id-ID')})`).join('\n');
+  const method = delivery.fulfillmentMethod === 'DELIVERY' ? 'Antar ke alamat' : 'Ambil sendiri';
+  const distance = delivery.fulfillmentMethod === 'DELIVERY' && delivery.distanceKm ? `\nJarak perkiraan: ${delivery.distanceKm} km` : '';
   const message = encodeURIComponent(
-    `Halo Glosir, saya ingin checkout keranjang:\n${details || 'Tidak ada item'}\n\nTotal: Rp ${Number(total || 0).toLocaleString('id-ID')}`
+    `Halo Glosir, saya ingin checkout keranjang:\n${details || 'Tidak ada item'}\n\nMetode: ${method}${distance}\nOngkir: Rp ${Number(delivery.shippingCost || 0).toLocaleString('id-ID')}\nTotal: Rp ${Number(total || 0).toLocaleString('id-ID')}`
   );
   return normalizedPhone ? `https://wa.me/${normalizedPhone}?text=${message}` : `https://wa.me/?text=${message}`;
 }

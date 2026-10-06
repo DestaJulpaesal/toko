@@ -2,6 +2,7 @@ import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole, softAuth } from '../middleware/auth.js';
 import { parcelListWhere } from '../services/catalogSerializers.js';
+import { writeAuditLog } from '../services/auditLogService.js';
 const router = express.Router();
 
 function makeSlug(value) {
@@ -96,6 +97,7 @@ async function createParcel(req, res) {
       },
       include: { items: { include: { variant: { include: { product: { select: { id: true, name: true, sku: true } } } } } } },
     });
+    await writeAuditLog({ entityType: 'Parcel', entityId: parcel.id, field: 'CREATE', newValue: { name: parcel.name, price: parcel.price, itemCount: parcel.items.length }, changedById: req.user.id });
 
     return res.status(201).json({ success: true, parcel: formatParcel(parcel) });
   } catch (error) {
@@ -133,6 +135,8 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
       return res.status(400).json({ success: false, message: 'Harga parcel tidak valid' });
     }
 
+    const existing = await prisma.parcel.findUnique({ where: { id: req.params.id }, select: { name: true, price: true, isActive: true } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Parcel tidak ditemukan' });
     const parcel = await prisma.parcel.update({
       where: { id: req.params.id },
       data: {
@@ -150,6 +154,7 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
       },
       include: { items: { include: { variant: { include: { product: { select: { id: true, name: true, sku: true } } } } } } },
     });
+    await writeAuditLog({ entityType: 'Parcel', entityId: parcel.id, field: 'UPDATE', oldValue: existing, newValue: { name: parcel.name, price: parcel.price, isActive: parcel.isActive }, changedById: req.user.id });
 
     return res.json({ success: true, parcel: formatParcel(parcel) });
   } catch (error) {
@@ -162,7 +167,10 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
 
 router.delete('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
   try {
+    const existing = await prisma.parcel.findUnique({ where: { id: req.params.id }, select: { id: true, name: true, price: true } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Parcel tidak ditemukan' });
     await prisma.parcel.delete({ where: { id: req.params.id } });
+    await writeAuditLog({ entityType: 'Parcel', entityId: existing.id, field: 'DELETE', oldValue: existing, changedById: req.user.id });
     return res.json({ success: true, message: 'Parcel berhasil dihapus' });
   } catch (error) {
     return res.status(error.code === 'P2025' ? 404 : 500).json({

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import prisma from '../config/db.js';
 
@@ -14,13 +15,10 @@ async function ensureBackupDir() {
 }
 
 async function safeFetch(modelGetter) {
-  try {
-    const data = await modelGetter();
-    return Array.isArray(data) ? data : data ? [data] : [];
-  } catch (error) {
-    console.warn(`[BackupService] Table query skipped: ${error.message}`);
-    return [];
-  }
+  // A backup which silently omits a table is unsafe to restore.  Fail the
+  // whole operation instead of producing a plausible-looking partial file.
+  const data = await modelGetter();
+  return Array.isArray(data) ? data : data ? [data] : [];
 }
 
 /**
@@ -39,13 +37,13 @@ export async function createDatabaseBackup({ trigger = 'MANUAL', initiatedBy = '
   const categories = await safeFetch(() => prisma.category.findMany());
   const products = await safeFetch(() => prisma.product.findMany());
   const productVariants = await safeFetch(() => prisma.productVariant.findMany());
-  const stockMovements = await safeFetch(() => prisma.stockMovement.findMany({ take: 5000, orderBy: { createdAt: 'desc' } }));
-  const orders = await safeFetch(() => prisma.order.findMany({ take: 5000, orderBy: { createdAt: 'desc' } }));
-  const orderItems = await safeFetch(() => prisma.orderItem.findMany({ take: 10000, orderBy: { id: 'desc' } }));
+  const stockMovements = await safeFetch(() => prisma.stockMovement.findMany({ orderBy: { createdAt: 'desc' } }));
+  const orders = await safeFetch(() => prisma.order.findMany({ orderBy: { createdAt: 'desc' } }));
+  const orderItems = await safeFetch(() => prisma.orderItem.findMany({ orderBy: { id: 'desc' } }));
   const customers = await safeFetch(() => prisma.customer.findMany());
   const promos = await safeFetch(() => prisma.promoCampaign.findMany());
   const debts = await safeFetch(() => prisma.debtRecord.findMany());
-  const financeTransactions = await safeFetch(() => prisma.financeTransaction.findMany({ take: 10000, orderBy: { createdAt: 'desc' } }));
+  const financeTransactions = await safeFetch(() => prisma.financeTransaction.findMany({ orderBy: { createdAt: 'desc' } }));
   const financeCategories = await safeFetch(() => prisma.financeCategory.findMany());
   const financeAccounts = await safeFetch(() => prisma.financeAccount.findMany());
   const savingsGoals = await safeFetch(() => prisma.savingsGoal.findMany());
@@ -54,7 +52,7 @@ export async function createDatabaseBackup({ trigger = 'MANUAL', initiatedBy = '
   const parcelRegions = await safeFetch(() => prisma.parcelRegion.findMany());
   const parcelParticipants = await safeFetch(() => prisma.parcelParticipant.findMany());
   const eventPackages = await safeFetch(() => prisma.eventPackage.findMany());
-  const stockOpnames = await safeFetch(() => prisma.stockOpname.findMany({ take: 200, orderBy: { createdAt: 'desc' } }));
+  const stockOpnames = await safeFetch(() => prisma.stockOpname.findMany({ orderBy: { createdAt: 'desc' } }));
   const siteProfile = await safeFetch(() => prisma.siteProfile.findMany());
   const siteContent = await safeFetch(() => prisma.siteContent.findMany());
 
@@ -87,7 +85,7 @@ export async function createDatabaseBackup({ trigger = 'MANUAL', initiatedBy = '
 
   const payload = {
     appName: 'Glosir Store Engine',
-    version: '1.0',
+    version: '1.1',
     createdAt: timestamp.toISOString(),
     trigger,
     initiatedBy,
@@ -120,7 +118,13 @@ export async function createDatabaseBackup({ trigger = 'MANUAL', initiatedBy = '
   };
 
   const jsonContent = JSON.stringify(payload, null, 2);
-  await fs.promises.writeFile(filePath, jsonContent, 'utf-8');
+  const checksum = crypto.createHash('sha256').update(jsonContent, 'utf8').digest('hex');
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
+  await fs.promises.writeFile(temporaryPath, jsonContent, { encoding: 'utf8', mode: 0o600 });
+  await fs.promises.rename(temporaryPath, filePath);
+  // chmod is best-effort on Windows, but prevents other local users reading
+  // exports on POSIX deployments.
+  try { await fs.promises.chmod(filePath, 0o600); } catch { /* platform limitation */ }
 
   const stats = await fs.promises.stat(filePath);
 
@@ -133,9 +137,11 @@ export async function createDatabaseBackup({ trigger = 'MANUAL', initiatedBy = '
     trigger,
     initiatedBy,
     status: 'SUCCESS',
+    sha256: checksum,
+    complete: true,
   };
 
-  await fs.promises.writeFile(META_FILE, JSON.stringify(meta, null, 2), 'utf-8');
+  await fs.promises.writeFile(META_FILE, JSON.stringify(meta, null, 2), { encoding: 'utf8', mode: 0o600 });
 
   // Rotasi backup lama (pertahankan maksimal MAX_BACKUP_FILES)
   await pruneOldBackups();
@@ -230,7 +236,7 @@ export async function getBackupStatus() {
  */
 export function getBackupFilePath(filename) {
   const safeFilename = path.basename(filename);
-  if (!safeFilename.startsWith('glosir-backup-') || !safeFilename.endsWith('.json')) {
+  if (safeFilename !== filename || !/^glosir-backup-[0-9TZ_.-]+\.json$/.test(safeFilename)) {
     throw new Error('Nama file backup tidak valid');
   }
   const filePath = path.join(BACKUP_DIR, safeFilename);

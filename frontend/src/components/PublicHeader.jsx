@@ -20,7 +20,6 @@ const navigation = [
   { label: 'Beranda', to: '/' },
   { label: 'Katalog Produk', to: '/products' },
   { label: 'Parsel Lebaran', to: '/parsel' },
-  { label: 'Paket Acara', to: '/paket-acara' },
   { label: 'Promo Spesial', to: '/promo' },
   { label: 'Profil Toko', to: '/profil' },
   { label: 'Pusat Bantuan', to: '/faq' },
@@ -171,4 +170,3 @@ export default function PublicHeader() {
     </header>
   );
 }
-

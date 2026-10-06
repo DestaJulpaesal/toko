@@ -7,7 +7,7 @@ import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import CatalogImage from '../components/CatalogImage';
 import { PUBLIC_CATALOG_CACHE_KEY, stripSensitive } from '../utils/catalogStorage';
-import { buildProductShareUrl, buildWhatsAppOrderLink, shareProduct } from '../utils/shareLink';
+import { buildProductShareUrl, shareProduct } from '../utils/shareLink';
 import { 
   Search, 
   Star, 
@@ -20,7 +20,6 @@ import {
   SlidersHorizontal,
   PackageCheck,
   Share2,
-  Send
 } from 'lucide-react';
 
 export default function ProductPage() {
@@ -230,15 +229,6 @@ export default function ProductPage() {
                 <button className="btn btn-primary full catalog-add-btn" onClick={() => { addItem(product); setAddedProduct(product.name); }}>
                   <ShoppingCart className="w-4 h-4 inline mr-1.5" /> Tambah Ke Keranjang
                 </button>
-                <a
-                  href={buildWhatsAppOrderLink(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '', product.name, 1, buildProductShareUrl(product))}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-secondary catalog-wa-btn"
-                  aria-label={`Order ${product.name} via WhatsApp`}
-                >
-                  <Send className="w-4 h-4 inline mr-1.5" /> WA
-                </a>
               </div>
             </article>
           ))}

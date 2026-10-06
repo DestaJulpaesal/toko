@@ -10,7 +10,7 @@ const ownerPrimaryGroups = [
 ];
 
 const ownerSecondaryGroups = [
-  { label: 'Operasional Lanjutan', links: [['07', 'Piutang', '/admin/debts'], ['08', 'Restock', '/admin/restock'], ['23', 'Stok Opname', '/admin/stock-opname']] },
+  { label: 'Operasional Lanjutan', links: [['07', 'Piutang', '/admin/debts'], ['08', 'Restock', '/admin/restock'], ['23', 'Kartu Stok', '/admin/stock-ledger'], ['24', 'Stok Opname', '/admin/stock-opname']] },
   { label: 'Katalog', links: [['09', 'Kategori', '/admin/categories'], ['10', 'Promo', '/admin/promos'], ['10b', 'Performa Produk', '/admin/product-performance']] },
   { label: 'Parsel', links: [['05', 'Penagihan Wilayah', '/admin/parcel-collections'], ['11', 'Parsel', '/admin/parcels'], ['12', 'Peserta Parsel', '/admin/parcel-participants'], ['13', 'Program Parsel', '/admin/parcel-programs'], ['14', 'Wilayah Parsel', '/admin/parcel-regions'], ['24', 'Paket Acara', '/admin/event-packages']] },
   { label: 'Keuangan Lanjutan', links: [['15', 'Catatan Pribadi', '/admin/personal-finance'], ['16', 'Laporan Keuangan', '/admin/finance/reports'], ['17', 'Kalender Keuangan', '/admin/finance/calendar'], ['18', 'Total Kekayaan', '/admin/finance/networth'], ['19', 'Persetujuan Keuangan', '/admin/finance/approvals'], ['20', 'Audit Keuangan', '/admin/finance/audit']] },
@@ -158,13 +158,27 @@ export default function AdminSidebar({ active = '' }) {
       <button type="button" className="admin-mobile-menu-button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen} aria-label={menuOpen ? 'Tutup menu' : 'Buka menu'}>
         <span /><span /><span />
       </button>
-      {currentUser && ['OWNER', 'ADMIN'].includes(currentUser.role) && <ReminderBell />}
+      {currentUser && ['OWNER', 'ADMIN', 'CASHIER'].includes(currentUser.role) && <ReminderBell />}
 
       <nav ref={navRef} className={menuOpen ? 'admin-nav-open' : ''} onClick={() => setMenuOpen(false)}>
         <label className="sidebar-search" onClick={(event) => event.stopPropagation()}>
           <Search size={16} aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle', flex: '0 0 auto' }} />
           <input value={sidebarSearch} onChange={(event) => setSidebarSearch(event.target.value)} placeholder="Cari menu" aria-label="Cari menu sidebar" />
         </label>
+        {isOwner && (
+          <div className={`mobile-sidebar-actions${displayMode === 'simple' ? '' : ' mobile-sidebar-actions-single'}`}>
+            {displayMode === 'simple' && (
+              <button type="button" className="mobile-sidebar-more" onClick={(event) => { event.stopPropagation(); toggleDisplayMode(); }}>
+                <span><Check size={16} aria-hidden="true" /> Menu Lainnya</span>
+                <span aria-hidden="true">→</span>
+              </button>
+            )}
+            <button type="button" className="mobile-sidebar-logout" onClick={(event) => { event.stopPropagation(); handleLogout(); }}>
+              <LogOut size={17} aria-hidden="true" />
+              <span>Keluar / Logout</span>
+            </button>
+          </div>
+        )}
         {visibleGroups.map((group) => (
           <div className="sidebar-nav-group" key={group.label}>
             <span className="nav-label">{group.label}</span>

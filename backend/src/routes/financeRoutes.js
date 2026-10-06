@@ -11,6 +11,7 @@ import {
 } from '../middleware/security.js';
 import { logFinanceAudit } from '../services/financeAuditService.js';
 import { updateFinanceLoggingStreak } from '../services/financeStreakService.js';
+import { writeAuditLog } from '../services/auditLogService.js';
 
 const router = express.Router();
 router.use(authenticateToken, (req, res, next) => {
@@ -263,6 +264,7 @@ router.post('/reconciliation', validateBody(reconciliationSchema), async (req, r
     ]);
     const systemBalance = money(account.startBalance) + money(income._sum.amount) - money(expense._sum.amount) + money(incoming._sum.amount) - money(outgoing._sum.amount);
     const row = await prisma.cashReconciliation.create({ data: { accountId: account.id, systemBalance, physicalCount: req.body.physicalCount, difference: Number(req.body.physicalCount) - systemBalance, note: req.body.note || null, userId: req.user.id } });
+    await writeAuditLog({ entityType: 'CashReconciliation', entityId: row.id, field: 'CREATE', newValue: { accountId: account.id, physicalCount: row.physicalCount, difference: row.difference }, changedById: req.user.id });
     return res.status(201).json({ success: true, data: { ...row, systemBalance: money(row.systemBalance), physicalCount: money(row.physicalCount), difference: money(row.difference) } });
   } catch (error) { return res.status(400).json({ success: false, message: error.message || 'Rekonsiliasi gagal disimpan.' }); }
 });

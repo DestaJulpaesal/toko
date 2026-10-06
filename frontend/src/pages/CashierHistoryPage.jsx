@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
-import { calculateEarnedPoints } from './CashierPage';
 import { apiFetch } from '../services/api';
 import { printReceipt } from '../utils/printReceipt';
 import * as XLSX from 'xlsx';
@@ -12,11 +11,19 @@ export default function CashierHistoryPage() {
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [cashierFilter, setCashierFilter] = useState('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [voidTarget, setVoidTarget] = useState(null);
   const [voidReason, setVoidReason] = useState('');
   const [voidSaving, setVoidSaving] = useState(false);
+  const [refundTarget, setRefundTarget] = useState(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundSaving, setRefundSaving] = useState(false);
   const [cashAccounts, setCashAccounts] = useState([]);
   const [closingAccountId, setClosingAccountId] = useState('');
   const [physicalCash, setPhysicalCash] = useState('');
@@ -25,7 +32,7 @@ export default function CashierHistoryPage() {
   const [reconciliationError, setReconciliationError] = useState('');
 
   const downloadExcel = () => {
-    const rows = filteredOrders.map((order) => ({ Faktur: order.orderNumber, Waktu: new Date(order.createdAt).toLocaleString('id-ID'), Pelanggan: order.customer?.name || 'Pelanggan Umum', Metode: order.paymentMethod, Total: order.total, Status: order.status }));
+    const rows = filteredOrders.map((order) => ({ Faktur: order.orderNumber, Waktu: new Date(order.createdAt).toLocaleString('id-ID'), Pelanggan: order.customer?.name || 'Pelanggan Umum', Tipe: order.type === 'ONLINE' ? 'Online' : 'Kasir', Pemenuhan: order.fulfillmentMethod === 'DELIVERY' ? `Antar (${order.distanceKm || '-'} km)` : 'Ambil sendiri', Ongkir: order.shippingCost || 0, Metode: order.paymentMethod, Total: order.total, Status: order.status }));
     const sheet = XLSX.utils.json_to_sheet(rows); const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, 'Transaksi');
     XLSX.writeFile(book, `riwayat-transaksi-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
@@ -65,20 +72,23 @@ export default function CashierHistoryPage() {
 
   const filteredOrders = orders.filter((ord) => {
     const matchesSearch =
-      ord.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
-      (ord.customer?.name && ord.customer.name.toLowerCase().includes(search.toLowerCase())) ||
-      (ord.paymentReference && ord.paymentReference.toLowerCase().includes(search.toLowerCase()));
+      String(ord.orderNumber || '').toLowerCase().includes(deferredSearch.toLowerCase()) ||
+      (ord.customer?.name && ord.customer.name.toLowerCase().includes(deferredSearch.toLowerCase())) ||
+      (ord.paymentReference && ord.paymentReference.toLowerCase().includes(deferredSearch.toLowerCase()));
 
-    const matchesMethod = methodFilter === 'ALL' || ord.paymentMethod.toUpperCase() === methodFilter;
+    const matchesMethod = methodFilter === 'ALL' || String(ord.paymentMethod || '').toUpperCase() === methodFilter;
+    const matchesStatus = statusFilter === 'ALL' || String(ord.status || '').toUpperCase() === statusFilter;
+    const matchesCashier = cashierFilter === 'ALL' || (ord.cashierName || 'Kasir Glosir') === cashierFilter;
+    const orderDate = new Date(ord.createdAt);
+    const dateKey = Number.isNaN(orderDate.getTime()) ? '' : orderDate.toLocaleDateString('en-CA');
+    const matchesFrom = !dateFrom || dateKey >= dateFrom;
+    const matchesTo = !dateTo || dateKey <= dateTo;
 
-    return matchesSearch && matchesMethod;
+    return matchesSearch && matchesMethod && matchesStatus && matchesCashier && matchesFrom && matchesTo;
   });
+  const cashierOptions = [...new Set(orders.map((order) => order.cashierName || 'Kasir Glosir'))].sort((a, b) => a.localeCompare(b, 'id'));
 
   const totalOmset = filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-  const totalPointsAwarded = filteredOrders.reduce(
-    (sum, o) => sum + (o.earnedPoints || calculateEarnedPoints(o.total)),
-    0
-  );
   const cashCount = filteredOrders.filter((o) => o.paymentMethod === 'CASH').length;
   const qrisCount = filteredOrders.filter((o) => o.paymentMethod === 'QRIS').length;
   const transferCount = filteredOrders.filter((o) => o.paymentMethod === 'TRANSFER').length;
@@ -104,6 +114,27 @@ export default function CashierHistoryPage() {
       if (!response.ok || !data.success) throw new Error(data.message || 'Transaksi gagal dibatalkan');
       setVoidTarget(null); setVoidReason(''); await loadOrders();
     } catch (error) { setVoidReason(error.message); } finally { setVoidSaving(false); }
+  };
+
+  const refundOrder = async () => {
+    if (!refundTarget || !refundReason.trim()) return;
+    setRefundSaving(true);
+    try {
+      const response = await apiFetch(`/orders/${refundTarget.id}/refund`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: refundReason.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Refund gagal diproses');
+      setRefundTarget(null);
+      setRefundReason('');
+      await loadOrders();
+    } catch (error) {
+      setRefundReason(error.message);
+    } finally {
+      setRefundSaving(false);
+    }
   };
 
   const printClosingReport = () => {
@@ -158,7 +189,6 @@ export default function CashierHistoryPage() {
   };
 
   const handleShareWhatsApp = (order) => {
-    const pts = order.earnedPoints !== undefined ? order.earnedPoints : calculateEarnedPoints(order.total);
     const itemsList = (order.items || [])
       .map((it) => `• ${it.name} (${it.quantity || it.qty}x) = ${formatMoney(it.total || (it.unitPrice * (it.quantity || it.qty)))}`)
       .join('\n');
@@ -177,7 +207,6 @@ export default function CashierHistoryPage() {
       (order.paymentReference ? `Ref: ${order.paymentReference}\n` : '') +
       `Status: LUNAS\n` +
       `--------------------------------\n` +
-      `*Poin Transaksi Ini: +${pts} Poin*\n` +
       `--------------------------------\n` +
       `Terima kasih telah berbelanja di Glosir!`;
 
@@ -199,7 +228,7 @@ export default function CashierHistoryPage() {
             <p className="eyebrow light">Catatan Penjualan POS</p>
             <h1>Riwayat Transaksi</h1>
             <p className="admin-subtitle">
-              Daftar seluruh transaksi kasir, rincian pembayaran Tunai, QRIS, & Transfer, poin didapat, serta cetak ulang struk.
+              Daftar seluruh transaksi kasir, rincian pembayaran Tunai, QRIS, & Transfer, serta cetak ulang struk.
             </p>
           </div>
           <div className="admin-header-actions"><button className="btn btn-secondary" onClick={downloadExcel}>Unduh Excel</button><button className="btn btn-light" onClick={loadOrders}>🔄 Segarkan Data</button></div>
@@ -214,15 +243,6 @@ export default function CashierHistoryPage() {
             </div>
             <strong>{formatMoney(totalOmset)}</strong>
             <small>{filteredOrders.length} transaksi selesai</small>
-          </div>
-
-          <div className="metric-card orange">
-            <div className="metric-top">
-              <span>Poin Diberikan</span>
-              <b>🎁</b>
-            </div>
-            <strong>+{totalPointsAwarded} Poin</strong>
-            <small>Loyalitas pelanggan</small>
           </div>
 
           <div className="metric-card blue">
@@ -291,7 +311,7 @@ export default function CashierHistoryPage() {
               />
             </label>
 
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#777' }}>Metode:</span>
               <select
                 value={methodFilter}
@@ -310,6 +330,19 @@ export default function CashierHistoryPage() {
                 <option value="QRIS">📱 QRIS</option>
                 <option value="TRANSFER">🏦 Transfer Bank</option>
               </select>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter status transaksi">
+                <option value="ALL">Semua Status</option>
+                <option value="PAID">Selesai</option>
+                <option value="PENDING">Menunggu</option>
+                <option value="CANCELLED">Dibatalkan</option>
+                <option value="REFUNDED">Refund</option>
+              </select>
+              <select value={cashierFilter} onChange={(e) => setCashierFilter(e.target.value)} aria-label="Filter kasir">
+                <option value="ALL">Semua Kasir</option>
+                {cashierOptions.map((cashier) => <option key={cashier} value={cashier}>{cashier}</option>)}
+              </select>
+              <label className="date-filter"><span>Dari</span><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
+              <label className="date-filter"><span>Sampai</span><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
             </div>
           </div>
 
@@ -321,15 +354,15 @@ export default function CashierHistoryPage() {
                   <th>No. Faktur</th>
                   <th>Waktu</th>
                   <th>Pelanggan</th>
+                  <th>Pemenuhan</th>
                   <th>Metode Bayar</th>
-                  <th>Total & Poin</th>
+                  <th>Total</th>
                   <th>Status</th>
                   <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredOrders.map((ord) => {
-                  const pts = ord.earnedPoints !== undefined ? ord.earnedPoints : calculateEarnedPoints(ord.total);
                   return (
                     <tr key={ord.id}>
                       <td>
@@ -357,6 +390,11 @@ export default function CashierHistoryPage() {
                         {ord.customer?.phone && <small>{ord.customer.phone}</small>}
                       </td>
                       <td>
+                        <strong>{ord.type === 'ONLINE' ? 'Online' : 'Kasir'}</strong>
+                        <small>{ord.fulfillmentMethod === 'DELIVERY' ? `Antar${ord.distanceKm ? ` • ${ord.distanceKm} km` : ''} • ${formatMoney(ord.shippingCost)}` : 'Ambil sendiri'}</small>
+                        {ord.fulfillmentMethod === 'DELIVERY' && ord.customer?.address && <small title={ord.customer.address}>{ord.customer.address}</small>}
+                      </td>
+                      <td>
                         <span className={`payment-badge ${getMethodBadgeClass(ord.paymentMethod)}`}>
                           {ord.paymentMethod === 'CASH' && '💵 '}
                           {ord.paymentMethod === 'QRIS' && '📱 '}
@@ -371,11 +409,6 @@ export default function CashierHistoryPage() {
                       </td>
                       <td>
                         <strong style={{ color: '#1b6336' }}>{formatMoney(ord.total)}</strong>
-                        {pts > 0 && (
-                          <small style={{ color: '#d97706', fontWeight: 800, display: 'block' }}>
-                            🎁 +{pts} Poin
-                          </small>
-                        )}
                       </td>
                       <td>
                         <span className={`status-chip ${ord.status === 'VOIDED' ? 'bad' : ord.paymentStatus === 'PAID' ? 'good' : 'warning'}`}>
@@ -392,6 +425,7 @@ export default function CashierHistoryPage() {
                             📄 Lihat Struk
                           </button>
                           {ord.status !== 'VOIDED' && <button className="btn-view-struk void-action" onClick={() => { setVoidTarget(ord); setVoidReason(''); }}>Batalkan</button>}
+                          {ord.status === 'COMPLETED' && <button className="btn-view-struk" onClick={() => { setRefundTarget(ord); setRefundReason(''); }}>Retur / Refund</button>}
                         </div>
                       </td>
                     </tr>
@@ -410,6 +444,7 @@ export default function CashierHistoryPage() {
         </section>
 
         {voidTarget && <div className="receipt-modal-backdrop" onClick={() => !voidSaving && setVoidTarget(null)}><div className="void-dialog" onClick={(event) => event.stopPropagation()}><span className="panel-kicker">Kontrol transaksi</span><h2>Batalkan transaksi?</h2><p>{voidTarget.orderNumber} · {formatMoney(voidTarget.total)}</p><label>Alasan pembatalan<textarea value={voidReason} onChange={(event) => setVoidReason(event.target.value)} placeholder="Contoh: salah input jumlah barang" autoFocus /></label><div className="void-dialog-actions"><button className="btn btn-secondary" onClick={() => setVoidTarget(null)} disabled={voidSaving}>Kembali</button><button className="btn btn-danger" onClick={voidOrder} disabled={voidSaving || !voidReason.trim()}>{voidSaving ? 'Memproses...' : 'Ya, batalkan'}</button></div></div></div>}
+        {refundTarget && <div className="receipt-modal-backdrop" onClick={() => !refundSaving && setRefundTarget(null)}><div className="void-dialog" onClick={(event) => event.stopPropagation()}><span className="panel-kicker">Retur & refund</span><h2>Refund transaksi?</h2><p>{refundTarget.orderNumber} · {formatMoney(refundTarget.total)}</p><small>Refund penuh akan mengembalikan stok dan membatalkan pencatatan pembayaran.</small><label>Alasan refund wajib<textarea value={refundReason} onChange={(event) => setRefundReason(event.target.value)} placeholder="Contoh: barang rusak saat diterima" autoFocus /></label><div className="void-dialog-actions"><button className="btn btn-secondary" onClick={() => setRefundTarget(null)} disabled={refundSaving}>Kembali</button><button className="btn btn-danger" onClick={refundOrder} disabled={refundSaving || !refundReason.trim()}>{refundSaving ? 'Memproses...' : 'Ya, refund penuh'}</button></div></div></div>}
 
         {/* Modal Struk Belanja / Cetak Ulang */}
         {selectedOrder && (
@@ -517,31 +552,6 @@ export default function CashierHistoryPage() {
                     </strong>
                   </div>
                 </div>
-
-                {/* Section Poin di Struk Cetak Ulang */}
-                <div className="receipt-divider-dash" />
-                <div className="receipt-point-summary">
-                  <strong style={{ display: 'block', textAlign: 'center', marginBottom: '6px' }}>
-                    ★ PROGRAM POIN MEMBER GLOSIR ★
-                  </strong>
-                  <div className="receipt-sum-row" style={{ color: '#177d47', fontWeight: 'bold' }}>
-                    <span>Poin Transaksi Ini:</span>
-                    <span>
-                      +{selectedOrder.earnedPoints !== undefined
-                        ? selectedOrder.earnedPoints
-                        : calculateEarnedPoints(selectedOrder.total)}{' '}
-                      Poin
-                    </span>
-                  </div>
-                  {selectedOrder.currentPoints && (
-                    <div className="receipt-sum-row">
-                      <span>Total Saldo Poin:</span>
-                      <strong>{selectedOrder.currentPoints} Poin</strong>
-                    </div>
-                  )}
-                </div>
-
-                <div className="receipt-divider-dash" />
 
                 <div className="receipt-footer">
                   <p>*** TERIMA KASIH ***</p>

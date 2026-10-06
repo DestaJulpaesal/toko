@@ -7,14 +7,18 @@ router.use(authenticateToken, requireRole('OWNER'));
 
 router.get('/', async (req, res) => {
   try {
-    const where = req.query.entityId ? { entityId: String(req.query.entityId) } : undefined;
+    const where = {
+      ...(req.query.entityId ? { entityId: String(req.query.entityId) } : {}),
+      ...(req.query.entityType ? { entityType: String(req.query.entityType) } : {}),
+      ...(req.query.field ? { field: String(req.query.field) } : {}),
+    };
     const logs = await prisma.auditLog.findMany({
       where,
       include: { changedBy: { select: { name: true, email: true } } },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
-    return res.json({ success: true, logs });
+    return res.json({ success: true, logs, data: logs });
   } catch (error) {
     console.error('Audit log load failed:', error.message);
     return res.status(503).json({ success: false, message: 'Riwayat perubahan belum dapat dimuat.' });

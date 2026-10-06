@@ -375,3 +375,90 @@
   background: var(--g-surface);
   box-shadow: var(--g-shadow-sm);
 }
+
+/* Mobile workspace pass: keep dense admin tools usable without horizontal page overflow. */
+@media (max-width: 720px) {
+  .g-main { padding: 16px 12px 32px; }
+  .g-main .admin-header,
+  .g-page-header { align-items: stretch; flex-direction: column; gap: 12px; }
+  .g-main .admin-header h1,
+  .g-page-header h1 { font-size: clamp(1.45rem, 7vw, 2rem); }
+  .g-main .admin-header-actions,
+  .g-page-header__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .g-main .admin-header-actions > *,
+  .g-page-header__actions > * { width: 100%; min-width: 0; }
+  .g-main .panel,
+  .g-main .crud-form-panel,
+  .g-main .crud-table-panel { padding: 14px; border-radius: 12px; }
+  .g-main .form-two-columns,
+  .g-main .form-grid,
+  .g-main .finance-form { grid-template-columns: minmax(0, 1fr); }
+  .g-main .form-two-columns > *,
+  .g-main .form-grid > * { grid-column: auto; }
+  .g-main input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),
+  .g-main select,
+  .g-main textarea { min-height: 42px; max-width: 100%; }
+  .g-main textarea { min-height: 86px; }
+  .g-main .btn { min-height: 42px; }
+  .g-main .crud-toolbar,
+  .g-main .crud-toolbar-actions,
+  .g-main .dashboard-toolbar { align-items: stretch; flex-wrap: wrap; gap: 8px; }
+  .g-main .crud-toolbar > *,
+  .g-main .crud-toolbar-actions > *,
+  .g-main .dashboard-toolbar > * { min-width: 0; flex: 1 1 150px; }
+  .g-main .crud-toolbar .crud-search,
+  .g-main .crud-toolbar-actions .crud-search { flex-basis: 100%; }
+  .g-main .product-table-wrap,
+  .g-main .finance-table-wrap,
+  .g-main .g-table-wrap,
+  .g-main .dashboard-activity-table { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .g-main table { min-width: 620px; }
+  .g-main th,
+  .g-main td { padding: 10px 9px; }
+  .g-main .tab-strip,
+  .g-main .g-tabs { margin-inline: -2px; padding-bottom: 2px; overflow-x: auto; }
+  .g-main .tab-strip button,
+  .g-main .g-tab { flex: 0 0 auto; min-height: 40px; }
+  .g-main .calendar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .g-main .calendar-cell { min-height: 72px; padding: 8px; }
+  .g-main .finance-investment-chart { min-height: 220px; overflow: hidden; }
+  .g-main .parcel-item-grid { grid-template-columns: minmax(0, 1fr); }
+  .g-main .parcel-item-option { min-width: 0; }
+}
+
+@media (max-width: 480px) {
+  .g-main .admin-header-actions,
+  .g-page-header__actions { grid-template-columns: 1fr; }
+  .g-main .crud-toolbar > *,
+  .g-main .crud-toolbar-actions > * { flex-basis: 100%; width: 100%; }
+  .g-main table { min-width: 560px; font-size: .78rem; }
+  .g-main th,
+  .g-main td { padding: 8px 7px; }
+  .g-main .calendar-grid { grid-template-columns: 1fr; }
+}
+
+/* POS: the cart remains actionable after the catalog has scrolled. */
+@media (max-width: 720px) {
+  .pos-topbar-header { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .pos-header-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .pos-header-actions > * { width: 100%; min-width: 0; }
+  .pos-cart-panel { box-shadow: 0 8px 24px rgba(26, 54, 38, .08); }
+  .pos-cart-items-scroll { max-height: 34vh; }
+  .pos-payment-selector .btn,
+  .pos-payment-tabs button { flex: 1 1 120px; min-height: 42px; }
+  .kiosk-cart-table { min-width: 540px; }
+}
+
+/* Public parcel cards and long purchase forms. */
+@media (max-width: 640px) {
+  .parcel-page-shell { width: min(100% - 24px, 560px); padding-inline: 0; }
+  .parcel-hero { align-items: flex-start; flex-direction: column; gap: 14px; }
+  .parcel-hero-actions { width: 100%; display: grid; grid-template-columns: 1fr; }
+  .parcel-grid { grid-template-columns: 1fr; gap: 12px; }
+  .parcel-feature-card { min-width: 0; }
+  .parcel-card-footer { align-items: stretch; flex-direction: column; }
+  .parcel-card-footer .btn { width: 100%; }
+  .checkout-layout,
+  .checkout-form-grid { grid-template-columns: 1fr; }
+  .checkout-summary { position: static; }
+}

@@ -4,7 +4,6 @@ import { confirmAction } from '../utils/confirmService';
 import { Link } from 'react-router-dom';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
-import { buildCartCheckoutLink } from '../utils/shareLink';
 
 export default function CartPage() {
   const { items, updateQty, removeItem, totalPrice, promo, discount, applyPromo, removePromo } = useCart();
@@ -12,9 +11,8 @@ export default function CartPage() {
   const [promoMessage, setPromoMessage] = useState('');
 
   const subtotal = totalPrice;
-  const ongkir = 25000;
+  const ongkir = 0;
   const total = subtotal - discount + ongkir;
-  const whatsappCheckoutLink = buildCartCheckoutLink(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '', items, total);
 
   const confirmRemoveItem = async (item) => {
     if (await confirmAction(`Hapus "${item.name}" dari keranjang?`)) removeItem(item.id);
@@ -67,8 +65,9 @@ export default function CartPage() {
           </div>
           <div className="summary-row">
             <span>Ongkir</span>
-            <strong>Rp {ongkir.toLocaleString('id-ID')}</strong>
+            <strong>{ongkir ? `Rp ${ongkir.toLocaleString('id-ID')}` : 'Gratis'}</strong>
           </div>
+          <div className="pickup-summary"><strong>Pengambilan: Ambil langsung di toko</strong><small>Ongkir Rp0 · Pesanan disiapkan setelah konfirmasi WhatsApp.</small></div>
           <form className="promo-form" onSubmit={handlePromo}><input value={promoInput} onChange={(event) => setPromoInput(event.target.value)} placeholder="Kode promo" aria-label="Kode promo" /><button type="submit">Pakai</button></form>
           {promo && <div className="applied-promo"><span>{promo} aktif</span><button onClick={removePromo}>Hapus</button></div>}
           {promoMessage && <p className="promo-message">{promoMessage}</p>}
@@ -80,9 +79,6 @@ export default function CartPage() {
           <Link to="/checkout" className={`btn btn-primary full center-link ${items.length === 0 ? 'is-disabled' : ''}`} aria-disabled={items.length === 0} onClick={(event) => { if (items.length === 0) event.preventDefault(); }}>
             {items.length === 0 ? 'Belanja dulu' : 'Lanjut ke checkout'}
           </Link>
-          <a href={whatsappCheckoutLink} target="_blank" rel="noreferrer" className={`btn btn-secondary full center-link whatsapp-checkout-btn ${items.length === 0 ? 'is-disabled' : ''}`} aria-disabled={items.length === 0}>
-            Checkout via WhatsApp
-          </a>
         </aside>
         </div>
         {items.length > 0 && (
@@ -93,7 +89,6 @@ export default function CartPage() {
             </div>
             <div className="mobile-summary-actions">
               <Link to="/checkout" className="btn btn-primary small">Checkout</Link>
-              <a href={whatsappCheckoutLink} target="_blank" rel="noreferrer" className="btn btn-secondary small">WA</a>
             </div>
           </div>
         )}

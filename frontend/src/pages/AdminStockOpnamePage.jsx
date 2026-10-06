@@ -19,9 +19,10 @@ export default function AdminStockOpnamePage() {
     ]);
     const productsData = await productsResponse.json();
     const recordsData = await recordsResponse.json();
-    setProducts(productsData.products || []);
+    const eligibleProducts = (productsData.products || []).filter((product) => !['parsel', 'acara'].includes(String(product.category || '').trim().toLowerCase()));
+    setProducts(eligibleProducts);
     setRecords(recordsData.records || []);
-    setForm((current) => ({ ...current, variantId: current.variantId || productsData.products?.[0]?.variantId || '' }));
+    setForm((current) => ({ ...current, variantId: current.variantId || eligibleProducts[0]?.variantId || '' }));
   };
 
   useEffect(() => { load().catch((error) => setNotice(error.message || 'Data opname gagal dimuat')); }, []);
@@ -69,7 +70,7 @@ export default function AdminStockOpnamePage() {
 
   return (
     <AdminShell active="Stok Opname" className="admin-crud-shell tool-page">
-        <header className="tool-hero"><div><span className="eyebrow">Kontrol stok</span><h1>Stok Opname</h1><p className="page-lead">Cocokkan stok fisik dengan angka sistem dan simpan jejak penyesuaiannya.</p></div><div className="tool-hero-mark">SO<span>✓</span></div></header>
+        <header className="tool-hero"><div><span className="eyebrow">Kontrol stok</span><h1>Stok Opname</h1><p className="page-lead">Cocokkan stok fisik produk biasa dengan angka sistem. Parsel dan Paket Sembako tidak dihitung sebagai stok terpisah.</p></div><div className="tool-hero-mark">SO<span>✓</span></div></header>
         {notice && <p className="notice-banner tool-notice">{notice}</p>}
         <section className="tool-panel"><div className="tool-panel-heading"><div><span className="panel-kicker">Pemeriksaan barang</span><h2>Catat hasil hitung fisik</h2></div><span className="tool-step">01 / 02</span></div>
           <form onSubmit={(event) => submit(event).catch((error) => setNotice(error.message))} className="tool-form-grid">

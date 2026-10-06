@@ -116,18 +116,6 @@ const StockAlertBadge = ({ currentStock, minimumStock, maximumStock }) => {
   );
 };
 
-// Hitung poin loyalitas:
-// - Minimal 100rb dapat 10 poin (setiap kelipatan 100rb = 10 poin)
-// - Minimal 50rb dapat 2 poin (sisa >= 50rb = +2 poin)
-export const calculateEarnedPoints = (total) => {
-  const amount = Number(total) || 0;
-  if (amount < 50000) return 0;
-  const ratusan = Math.floor(amount / 100000);
-  const sisa = amount % 100000;
-  const bonusSisa = sisa >= 50000 ? 2 : 0;
-  return ratusan * 10 + bonusSisa;
-};
-
 // Daftar Promo Campaign Aktif
 export const availablePromos = [
   { id: 'none', name: 'Tanpa Promo', code: '', type: 'NONE', value: 0, tag: 'NORMAL' },

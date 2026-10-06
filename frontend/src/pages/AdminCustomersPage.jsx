@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { MessageCircle, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { useDeferredValue, useEffect, useState } from 'react';
+import { Download, Eye, MessageCircle, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import DebtModal from '../components/DebtModal';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
@@ -13,12 +13,15 @@ const emptyCustomer = {
   email: '',
   address: '',
   notes: '',
-  points: 0,
 };
 
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
+  const [debtFilter, setDebtFilter] = useState('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [form, setForm] = useState(emptyCustomer);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +31,8 @@ export default function AdminCustomersPage() {
   const [debtModal, setDebtModal] = useState({ open: false, customer: null, debt: null });
   const [selectedCustomerIds, setSelectedCustomerIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const loadCustomers = async () => {
     setLoading(true);
@@ -69,21 +74,52 @@ export default function AdminCustomersPage() {
     loadCustomers();
   }, []);
 
+  const loadDetail = async (customer) => {
+    setDetailLoading(true);
+    try {
+      const response = await apiFetch(`/customers/${customer.id}/detail`);
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Detail pelanggan gagal dimuat');
+      setDetail(data);
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const exportCustomers = () => {
+    const rows = filteredCustomers.map((customer) => [
+      customer.name, customer.phone || '', customer.email || '', customer.address || '',
+      customer.totalOrders || 0, customer.debtTotal || 0, customer.notes || '',
+    ]);
+    const csv = [['Nama', 'WhatsApp', 'Email', 'Alamat', 'Total Pesanan', 'Piutang', 'Catatan'], ...rows]
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'data-pelanggan.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
   const debtMap = customers.reduce((acc, customer) => {
     acc[customer.id] = Number(customer.debtTotal || 0);
     return acc;
   }, {});
 
   const filteredCustomers = customers.filter((c) => {
-    const q = search.toLowerCase();
+    const q = deferredSearch.toLowerCase();
+    const createdDate = new Date(c.createdAt);
+    const dateKey = Number.isNaN(createdDate.getTime()) ? '' : createdDate.toLocaleDateString('en-CA');
     return (
       c.name.toLowerCase().includes(q) ||
       (c.phone && c.phone.includes(q)) ||
       (c.address && c.address.toLowerCase().includes(q))
-    );
+    ) && (debtFilter === 'ALL' || (debtFilter === 'OWING' && Number(c.debtTotal || 0) > 0) || (debtFilter === 'CLEAR' && Number(c.debtTotal || 0) <= 0))
+      && (!dateFrom || dateKey >= dateFrom) && (!dateTo || dateKey <= dateTo);
   });
 
-  const totalPointsDistributed = customers.reduce((sum, c) => sum + (c.points || 0), 0);
   const allVisibleCustomersSelected = filteredCustomers.length > 0 && filteredCustomers.every((customer) => selectedCustomerIds.includes(customer.id));
   const toggleCustomerSelection = (id, checked) => setSelectedCustomerIds((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id));
   const toggleAllCustomers = (checked) => setSelectedCustomerIds(checked ? filteredCustomers.map((customer) => customer.id) : []);
@@ -111,7 +147,6 @@ export default function AdminCustomersPage() {
       email: customer.email || '',
       address: customer.address || '',
       notes: customer.notes || '',
-      points: customer.points || 0,
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -155,15 +190,12 @@ export default function AdminCustomersPage() {
       }
     } catch (err) {
       if (editingId) {
-        setCustomers((prev) =>
-          prev.map((c) => (c.id === editingId ? { ...c, ...form, points: Number(form.points) || 0 } : c))
-        );
+        setCustomers((prev) => prev.map((c) => (c.id === editingId ? { ...c, ...form } : c)));
         setNotice('Data pelanggan berhasil diperbarui (mode lokal).');
       } else {
         const newCust = {
           id: `cust-local-${Date.now()}`,
           ...form,
-          points: Number(form.points) || 0,
           createdAt: new Date().toISOString(),
           totalOrders: 0,
         };
@@ -211,16 +243,13 @@ export default function AdminCustomersPage() {
       <DebtModal isOpen={debtModal.open} customer={debtModal.customer} debt={debtModal.debt} onClose={() => setDebtModal({ open: false, customer: null, debt: null })} onSaved={(message) => { setNotice(message); loadCustomers(); }} />
         <header className="admin-header">
           <div>
-            <p className="eyebrow light">Manajemen Pelanggan & Loyalitas</p>
+            <p className="eyebrow light">Manajemen Pelanggan</p>
             <h1>Data Pelanggan</h1>
             <p className="admin-subtitle">
-              Kelola data pembeli toko, poin loyalitas member, dan riwayat kontak WhatsApp.
+              Kelola data pembeli toko, piutang, dan riwayat kontak WhatsApp.
             </p>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span className="pos-badge-points" style={{ fontSize: '0.8rem', padding: '6px 12px' }}>
-              ⭐ Total {totalPointsDistributed} Poin Beredar
-            </span>
             <span className={`database-status ${loading ? 'loading' : 'ready'}`}>
               <i /> {loading ? 'Memuat data...' : `${customers.length} Pelanggan`}
             </span>
@@ -272,17 +301,6 @@ export default function AdminCustomersPage() {
                   />
                 </label>
 
-                <label>
-                  Saldo Poin Member
-                  <input
-                    name="points"
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    value={form.points}
-                    onChange={handleChange}
-                  />
-                </label>
               </div>
 
               <label>
@@ -339,6 +357,14 @@ export default function AdminCustomersPage() {
                   placeholder="Cari nama, no. HP, atau alamat..."
                 />
               </label>
+              <select value={debtFilter} onChange={(event) => setDebtFilter(event.target.value)} aria-label="Filter status piutang">
+                <option value="ALL">Semua status piutang</option>
+                <option value="OWING">Masih berutang</option>
+                <option value="CLEAR">Tidak ada piutang</option>
+              </select>
+              <label className="date-filter"><span>Daftar dari</span><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
+              <label className="date-filter"><span>Sampai</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
+              <button type="button" className="btn btn-secondary" onClick={exportCustomers} title="Export data pelanggan"><Download size={15} /> Export CSV</button>
             </div>
             <BulkTableActions selectedCount={selectedCustomerIds.length} totalCount={filteredCustomers.length} allSelected={allVisibleCustomersSelected} onToggleAll={toggleAllCustomers} onDelete={deleteSelectedCustomers} deleting={bulkDeleting} />
 
@@ -347,7 +373,6 @@ export default function AdminCustomersPage() {
                 <thead>
                   <tr>
                     <th className="bulk-check-column">Pilih</th><th>Pelanggan</th>
-                    <th>Poin Member</th>
                     <th>Piutang / Utang</th>
                     <th>Kontak / WhatsApp</th>
                     <th>Alamat</th>
@@ -362,14 +387,6 @@ export default function AdminCustomersPage() {
                         <strong>{cust.name}</strong>
                         <small>Terdaftar: {new Date(cust.createdAt).toLocaleDateString('id-ID')}</small>
                         {cust.notes && <small style={{ color: '#888' }}>{cust.notes}</small>}
-                      </td>
-                      <td>
-                        <span
-                          className="pos-badge-points"
-                          style={{ fontSize: '0.75rem', display: 'inline-flex', padding: '3px 8px' }}
-                        >
-                          ⭐ {cust.points || 0} Poin
-                        </span>
                       </td>
                       <td>
                         <span className={Number(cust.debtTotal || 0) > 0 ? 'status-chip warning' : 'status-chip good'}>
@@ -400,6 +417,7 @@ export default function AdminCustomersPage() {
                       </td>
                       <td>
                         <div className="row-actions">
+                          <button className="icon-action" onClick={() => loadDetail(cust)} title="Lihat detail pelanggan" aria-label={`Lihat detail ${cust.name}`}><Eye size={14} /></button>
                           <button className="icon-action icon-action-debt" onClick={() => setDebtModal({ open: true, customer: cust, debt: null })} title="Tambah piutang" aria-label={`Tambah piutang ${cust.name}`}><Plus size={15} strokeWidth={2.5} /></button>
                           <button className="icon-action" onClick={() => handleEdit(cust)} title="Edit pelanggan" aria-label={`Edit pelanggan ${cust.name}`}><Pencil size={14} /></button>
                           <button className="icon-action icon-action-danger" onClick={() => handleDelete(cust.id, cust.name)} title="Hapus pelanggan" aria-label={`Hapus pelanggan ${cust.name}`}><Trash2 size={14} /></button>
@@ -420,6 +438,29 @@ export default function AdminCustomersPage() {
                 </tbody>
               </table>
             </div>
+            {detail && (
+              <section className="customer-detail-panel" style={{ marginTop: 20, padding: 20, border: '1px solid #dce8e0', borderRadius: 12 }}>
+                <div className="panel-heading">
+                  <div><span className="panel-kicker">Profil Belanja</span><h2>{detail.customer.name}</h2></div>
+                  <button type="button" className="text-button" onClick={() => setDetail(null)}>Tutup</button>
+                </div>
+                {detailLoading ? <p>Memuat detail...</p> : (
+                  <>
+                    <div className="form-two-columns">
+                      <div><small>Total belanja</small><strong>Rp {Number(detail.summary.totalSpent).toLocaleString('id-ID')}</strong></div>
+                      <div><small>Transaksi</small><strong>{detail.summary.totalOrders}</strong></div>
+                      <div><small>Piutang berjalan</small><strong>Rp {Number(detail.summary.outstandingDebt).toLocaleString('id-ID')}</strong></div>
+                      <div><small>WhatsApp</small><strong>{detail.customer.phone || '-'}</strong></div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 18 }}>
+                      <div><h3>Produk sering dibeli</h3>{detail.frequentProducts.length ? detail.frequentProducts.map((item) => <p key={item.name}><strong>{item.name}</strong> · {item.quantity} unit · Rp {Number(item.total).toLocaleString('id-ID')}</p>) : <p>Belum ada riwayat belanja.</p>}</div>
+                      <div><h3>Riwayat belanja</h3>{detail.orders.slice(0, 8).map((order) => <p key={order.id}><strong>{order.orderNumber}</strong> · {new Date(order.createdAt).toLocaleDateString('id-ID')} · Rp {Number(order.total).toLocaleString('id-ID')}</p>)}</div>
+                    </div>
+                    {detail.customer.notes && <p><strong>Catatan:</strong> {detail.customer.notes}</p>}
+                  </>
+                )}
+              </section>
+            )}
           </section>
         </div>
     </AdminShell>

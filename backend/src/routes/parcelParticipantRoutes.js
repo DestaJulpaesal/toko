@@ -2,6 +2,7 @@ import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, parcelParticipantCreateSchema, parcelParticipantUpdateSchema, parcelContributionSchema } from '../middleware/security.js';
+import { writeAuditLog } from '../services/auditLogService.js';
 
 const router = express.Router();
 router.use(authenticateToken, requireRole('OWNER', 'ADMIN', 'PARCEL_MANAGER'));
@@ -65,10 +66,25 @@ const includeData = {
 
 router.get('/', async (req, res) => {
   try {
+    const search = String(req.query.search || '').trim();
     const where = req.query.status ? { status: String(req.query.status).toUpperCase() } : {};
+    if (req.query.regionId) where.regionId = String(req.query.regionId);
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { participantPhone: { contains: search, mode: 'insensitive' } },
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+        { customer: { phone: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
     if (req.user?.role === 'PARCEL_MANAGER') where.regionId = req.user.regionId || '__unassigned__';
     const rows = await prisma.parcelParticipant.findMany({ where, include: includeData, orderBy: { createdAt: 'desc' } });
-    return res.json({ success: true, participants: rows.map(formatParticipant) });
+    const participants = rows.map(formatParticipant);
+    const collectionStatus = String(req.query.collectionStatus || '').toUpperCase();
+    const filtered = ['PAID', 'UNPAID', 'OVERDUE'].includes(collectionStatus)
+      ? participants.filter((item) => collectionStatus === 'PAID' ? item.collectionStatus === 'COMPLETED' : collectionStatus === 'OVERDUE' ? item.collectionStatus === 'OVERDUE' : item.collectionStatus === 'DUE')
+      : participants;
+    return res.json({ success: true, participants: filtered });
   } catch (error) { return res.status(500).json({ success: false, message: error.message || 'Peserta parsel gagal dimuat.' }); }
 });
 
@@ -83,6 +99,7 @@ router.post('/', validateBody(parcelParticipantCreateSchema), async (req, res) =
     const officialTargetAmount = Number(program.targetAmount || 0);
     const regionId = req.user?.role === 'PARCEL_MANAGER' ? req.user.regionId || null : (req.body?.regionId || null);
     const created = await prisma.parcelParticipant.create({ data: { customerId: customerId ? String(customerId) : null, participantPhone: participantPhone ? String(participantPhone).trim() : null, parcelId: parcelId || null, programId: programId || null, regionId, name: participantDisplayName, targetAmount: officialTargetAmount, salePrice: Number(req.body?.salePrice || 0), grossMargin: Number(req.body?.grossMargin || 0), managerCommission: Number(req.body?.managerCommission || 0), contributionAmount: Number(contributionAmount), frequency: String(frequency).toUpperCase(), startDate: startDate ? new Date(startDate) : new Date(), endDate: endDate ? new Date(endDate) : null, notes: notes ? String(notes).trim() : null }, include: includeData });
+    await writeAuditLog({ entityType: 'ParcelParticipant', entityId: created.id, field: 'CREATE', newValue: { name: created.name, programId: created.programId, regionId: created.regionId, targetAmount: created.targetAmount }, changedById: req.user.id });
     return res.status(201).json({ success: true, participant: formatParticipant(created) });
   } catch (error) { return res.status(400).json({ success: false, message: error.message || 'Peserta parsel gagal dibuat.' }); }
 });
@@ -94,6 +111,7 @@ router.patch('/:id', validateBody(parcelParticipantUpdateSchema), async (req, re
     if (req.user?.role === 'PARCEL_MANAGER' && existing?.regionId !== req.user.regionId) return res.status(403).json({ success: false, message: 'Peserta ini bukan bagian dari wilayah Anda.' });
     const program = programId ? await prisma.parcelProgram.findUnique({ where: { id: String(programId) }, select: { name: true, targetAmount: true } }) : null;
     const updated = await prisma.parcelParticipant.update({ where: { id: req.params.id }, data: { ...(customerId !== undefined ? { customerId: customerId ? String(customerId) : null } : {}), ...(participantPhone !== undefined ? { participantPhone: participantPhone ? String(participantPhone).trim() : null } : {}), parcelId: parcelId || null, programId: programId || null, ...(participantName !== undefined || name !== undefined ? { name: String(participantName || name || '').trim() } : {}), ...(program?.targetAmount !== undefined ? { targetAmount: Number(program.targetAmount) } : targetAmount !== undefined ? { targetAmount: Number(targetAmount) } : {}), ...(contributionAmount !== undefined ? { contributionAmount: Number(contributionAmount) } : {}), ...(frequency ? { frequency: String(frequency).toUpperCase() } : {}), ...(startDate ? { startDate: new Date(startDate) } : {}), endDate: endDate ? new Date(endDate) : null, ...(status ? { status: String(status).toUpperCase() } : {}), notes: notes ? String(notes).trim() : null }, include: includeData });
+    await writeAuditLog({ entityType: 'ParcelParticipant', entityId: updated.id, field: 'UPDATE', oldValue: { name: existing?.name, status: existing?.status, targetAmount: existing?.targetAmount }, newValue: { name: updated.name, status: updated.status, targetAmount: updated.targetAmount }, changedById: req.user.id });
     return res.json({ success: true, participant: formatParticipant(updated) });
   } catch (error) { return res.status(error.code === 'P2025' ? 404 : 400).json({ success: false, message: error.message || 'Peserta parsel gagal diperbarui.' }); }
 });
@@ -106,6 +124,7 @@ router.post('/:id/contributions', validateBody(parcelContributionSchema), async 
     const amount = Number(req.body?.amount || participant.contributionAmount);
     if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'Nominal setoran tidak valid.' });
     const contribution = await prisma.parcelContribution.create({ data: { participantId: participant.id, amount, paidAt: req.body?.paidAt ? new Date(req.body.paidAt) : new Date(), note: req.body?.note ? String(req.body.note).trim() : null } });
+    await writeAuditLog({ entityType: 'ParcelContribution', entityId: contribution.id, field: 'CREATE', newValue: { participantId: participant.id, amount: contribution.amount }, changedById: req.user.id });
     const updated = await prisma.parcelParticipant.findUnique({ where: { id: participant.id }, include: includeData });
     const paidAfterContribution = (updated.contributions || []).reduce((sum, row) => sum + Number(row.amount || 0), 0);
     if (paidAfterContribution >= Number(updated.targetAmount || 0) && updated.status !== 'COMPLETED') {
@@ -117,7 +136,7 @@ router.post('/:id/contributions', validateBody(parcelContributionSchema), async 
 });
 
 router.delete('/:id', async (req, res) => {
-  try { const participant = await prisma.parcelParticipant.findUnique({ where: { id: req.params.id } }); if (req.user?.role === 'PARCEL_MANAGER' && participant?.regionId !== req.user.regionId) return res.status(403).json({ success: false, message: 'Peserta ini bukan bagian dari wilayah Anda.' }); await prisma.parcelParticipant.delete({ where: { id: req.params.id } }); return res.json({ success: true, message: 'Peserta parsel berhasil dihapus.' }); }
+  try { const participant = await prisma.parcelParticipant.findUnique({ where: { id: req.params.id } }); if (req.user?.role === 'PARCEL_MANAGER' && participant?.regionId !== req.user.regionId) return res.status(403).json({ success: false, message: 'Peserta ini bukan bagian dari wilayah Anda.' }); await prisma.parcelParticipant.delete({ where: { id: req.params.id } }); await writeAuditLog({ entityType: 'ParcelParticipant', entityId: req.params.id, field: 'DELETE', oldValue: participant, changedById: req.user.id }); return res.json({ success: true, message: 'Peserta parsel berhasil dihapus.' }); }
   catch (error) { return res.status(error.code === 'P2025' ? 404 : 500).json({ success: false, message: error.message || 'Peserta parsel gagal dihapus.' }); }
 });
 

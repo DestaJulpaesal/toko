@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Check, FileText, Pencil, Printer, RefreshCw, Search, Trash2 } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import CurrencyInput from '../components/CurrencyInput';
@@ -34,6 +34,7 @@ export default function AdminParcelParticipantsPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -44,7 +45,12 @@ export default function AdminParcelParticipantsPage() {
   const [collectionParticipant, setCollectionParticipant] = useState(null);
   const [collectionForm, setCollectionForm] = useState({ amount: '', paidAt: new Date().toISOString().slice(0, 10), note: '' });
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [programFilter, setProgramFilter] = useState('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [regions, setRegions] = useState([]);
+  const [selectedRegion, setSelectedRegion] = useState(null);
+  const [participantDetail, setParticipantDetail] = useState(null);
   const currentUser = (() => {
     try { return JSON.parse(localStorage.getItem('glosir_user') || 'null'); } catch { return null; }
   })();
@@ -132,12 +138,30 @@ export default function AdminParcelParticipantsPage() {
       participants.filter((item) =>
         `${item.name} ${item.customerName || ''} ${item.parcelName || ''} ${item.programName || ''}`
           .toLowerCase()
-          .includes(search.toLowerCase())
+         .includes(deferredSearch.toLowerCase())
       ),
-    [participants, search]
+    [participants, deferredSearch]
   );
   const allSelected = filtered.length > 0 && filtered.every((item) => selectedIds.includes(item.id));
-  const visibleParticipants = filtered.filter((item) => statusFilter === 'ALL' || item.collectionStatus === statusFilter || item.status === statusFilter);
+  const visibleParticipants = filtered.filter((item) => {
+    const startDate = new Date(item.startDate || item.createdAt);
+    const dateKey = Number.isNaN(startDate.getTime()) ? '' : startDate.toLocaleDateString('en-CA');
+    return (!selectedRegion || (item.regionId || 'unassigned') === selectedRegion.id)
+      && (statusFilter === 'ALL' || item.collectionStatus === statusFilter || item.status === statusFilter)
+      && (programFilter === 'ALL' || item.programId === programFilter)
+      && (!dateFrom || dateKey >= dateFrom) && (!dateTo || dateKey <= dateTo);
+  });
+  const regionCards = useMemo(() => {
+    const grouped = participants.reduce((result, item) => {
+      const key = item.regionId || 'unassigned';
+      if (!result[key]) result[key] = { id: key, name: item.regionName || 'Belum ditentukan', items: [] };
+      result[key].items.push(item);
+      return result;
+    }, {});
+    regions.forEach((region) => { if (!grouped[region.id]) grouped[region.id] = { id: region.id, name: region.name, items: [] }; });
+    return Object.values(grouped);
+  }, [participants, regions]);
+  const regionVisibleParticipants = selectedRegion ? visibleParticipants.filter((item) => (item.regionId || 'unassigned') === selectedRegion.id) : [];
   const summary = useMemo(() => ({
     total: participants.length,
     collected: participants.reduce((sum, item) => sum + item.paidAmount, 0),
@@ -406,7 +430,9 @@ export default function AdminParcelParticipantsPage() {
             </button>
           </form>
 
-          <section className="crud-table-panel">
+          <section className="crud-table-panel participant-browser-panel">
+            {!selectedRegion ? <div className="participant-region-browser"><div className="panel-heading"><div><span className="panel-kicker">Pilih wilayah</span><h2>Daftar peserta per wilayah</h2></div><span className="dashboard-panel-total">{participants.length} peserta</span></div><div className="participant-region-grid">{regionCards.map((region) => { const paid = region.items.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0); const overdue = region.items.filter((item) => item.collectionStatus === 'OVERDUE').length; return <button type="button" className="participant-region-card" key={region.id} onClick={() => setSelectedRegion(region)}><strong>{region.name}</strong><span>{region.items.length} peserta</span><small>{money(paid)} terkumpul{overdue ? ` · ${overdue} perlu ditagih` : ''}</small><b>Lihat peserta →</b></button>; })}{!regionCards.length && <div className="table-empty">Belum ada wilayah peserta.</div>}</div></div> : <>
+            <div className="participant-list-heading"><button type="button" className="text-button" onClick={() => setSelectedRegion(null)}>← Semua wilayah</button><div><span className="panel-kicker">Wilayah terpilih</span><h2>{selectedRegion.name}</h2></div><span className="dashboard-panel-total">{regionVisibleParticipants.length} peserta</span></div>
             <BulkTableActions selectedCount={selectedIds.length} totalCount={filtered.length} allSelected={allSelected} onToggleAll={(checked) => setSelectedIds(checked ? filtered.map((item) => item.id) : [])} onDelete={deleteSelected} deleting={bulkDeleting} />
             <div className="crud-toolbar-actions">
               <label className="crud-search">
@@ -414,6 +440,9 @@ export default function AdminParcelParticipantsPage() {
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari peserta atau program..." />
               </label>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter status tagihan"><option value="ALL">Semua status</option><option value="OVERDUE">Perlu ditagih</option><option value="DUE">Jadwal berikutnya</option><option value="COMPLETED">Lunas</option></select>
+              <select value={programFilter} onChange={(event) => setProgramFilter(event.target.value)} aria-label="Filter program"><option value="ALL">Semua program</option>{programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}</select>
+              <label className="date-filter"><span>Mulai dari</span><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
+              <label className="date-filter"><span>Sampai</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
               <button type="button" className="bulk-refresh-btn" onClick={exportReport}><FileText size={14} /> Export CSV</button>
             </div>
             <div className="product-table-wrap">
@@ -433,7 +462,7 @@ export default function AdminParcelParticipantsPage() {
                     <tr key={item.id}>
                       <td className="bulk-check-column"><BulkRowCheckbox checked={selectedIds.includes(item.id)} onChange={(checked) => setSelectedIds((current) => checked ? [...new Set([...current, item.id])] : current.filter((id) => id !== item.id))} label={`Pilih ${item.name}`} /></td>
                       <td>
-                        <strong>{item.name}</strong>
+                        <button type="button" className="participant-name-button" onClick={() => setParticipantDetail(item)}><strong>{item.name}</strong></button>
                         <small>
                           {item.name}
                           {item.programName ? ` · Program: ${item.programName}` : ''}
@@ -469,8 +498,10 @@ export default function AdminParcelParticipantsPage() {
               {loading && <div className="table-empty">Memuat peserta parsel...</div>}
               {!loading && !visibleParticipants.length && <div className="table-empty">Belum ada peserta parsel pada filter ini.</div>}
             </div>
+            </>}
           </section>
         </section>
+        {participantDetail && <div className="parcel-collection-modal"><section className="parcel-collection-card participant-detail-panel"><div className="panel-heading"><div><span className="panel-kicker">Detail peserta</span><h2>{participantDetail.name}</h2></div><button type="button" className="text-button" onClick={() => setParticipantDetail(null)}>Tutup</button></div><div className="participant-detail-grid"><span>Wilayah<strong>{participantDetail.regionName || 'Belum ditentukan'}</strong></span><span>Program<strong>{participantDetail.programName || '-'}</strong></span><span>Target<strong>{money(participantDetail.targetAmount)}</strong></span><span>Terkumpul<strong>{money(participantDetail.paidAmount)}</strong></span><span>Sisa<strong>{money(participantDetail.remainingAmount)}</strong></span><span>Setoran<strong>{money(participantDetail.contributionAmount)} / {participantDetail.frequency === 'WEEKLY' ? 'minggu' : 'hari'}</strong></span></div><div className="collection-entry-details">{(participantDetail.contributions || []).map((entry) => <div key={entry.id}><span>{new Date(entry.paidAt).toLocaleDateString('id-ID')}</span><strong>{money(entry.amount)}</strong></div>)}</div></section></div>}
       </AdminShell>
   );
 }

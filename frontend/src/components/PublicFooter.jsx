@@ -66,7 +66,6 @@ export default function PublicFooter() {
             <strong>Katalog Belanja</strong>
             <Link to="/products">Katalog Produk</Link>
             <Link to="/parsel">Parsel Lebaran</Link>
-            <Link to="/paket-acara">Paket Acara</Link>
             <Link to="/promo">Promo Spesial</Link>
           </div>
           <div>
@@ -91,4 +90,3 @@ export default function PublicFooter() {
     </footer>
   );
 }
-

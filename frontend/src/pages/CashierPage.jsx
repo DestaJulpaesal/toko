@@ -12,18 +12,7 @@ import { apiFetch } from '../services/api';
 import { printReceipt } from '../utils/printReceipt';
 
 const formatMoney = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
-
-// Hitung poin loyalitas:
-// - Minimal 100rb dapat 10 poin (setiap kelipatan 100rb = 10 poin)
-// - Minimal 50rb dapat 2 poin (sisa >= 50rb = +2 poin)
-export const calculateEarnedPoints = (total) => {
-  const amount = Number(total) || 0;
-  if (amount < 50000) return 0;
-  const ratusan = Math.floor(amount / 100000);
-  const sisa = amount % 100000;
-  const bonusSisa = sisa >= 50000 ? 2 : 0;
-  return ratusan * 10 + bonusSisa;
-};
+const isParcelProduct = (product) => String(product?.category || '').trim().toLowerCase() === 'parsel';
 
 // Daftar Promo Campaign Aktif
 export const availablePromos = [
@@ -128,7 +117,7 @@ export default function CashierPage() {
             stock: variant.stock,
           }))
           : [product]));
-        setProducts(catalogProducts.filter((p) => p.stock > 0 || p.stock === undefined));
+        setProducts(catalogProducts.filter((p) => !isParcelProduct(p) && (p.stock > 0 || p.stock === undefined)));
       } else {
         setProducts([]);
         setNotice(prodRes?.message || 'Produk tidak bisa dimuat dari database.');
@@ -281,7 +270,7 @@ export default function CashierPage() {
   // Compute categories
   const categories = useMemo(() => {
     const productCategories = products.map((p) => p.category).filter(Boolean);
-    const list = ['Semua', ...new Set([...databaseCategories, ...productCategories])];
+    const list = ['Semua', ...new Set([...databaseCategories, ...productCategories].filter((category) => String(category).trim().toLowerCase() !== 'parsel'))];
     return list;
   }, [databaseCategories, products]);
 
@@ -300,9 +289,9 @@ export default function CashierPage() {
       return customers.find((c) => c.id === selectedCustomerId) || null;
     }
     if (selectedCustomerId === 'NEW' && customCustomerName.trim()) {
-      return { name: customCustomerName.trim(), points: 0 };
+      return { name: customCustomerName.trim() };
     }
-    return { name: 'Pelanggan Umum', points: 0 };
+    return { name: 'Pelanggan Umum' };
   }, [customerEnabled, selectedCustomerId, customCustomerName, customers]);
 
   // Active Promo
@@ -334,64 +323,6 @@ export default function CashierPage() {
   // Final Total to pay
   const finalTotal = Math.max(subtotal - totalDiscount, 0);
 
-  const earnedPoints = 0;
-
-  // Gamified progress to next point tier
-  const nextPointProgress = useMemo(() => {
-    if (finalTotal <= 0) {
-      return {
-        status: 'empty',
-        title: 'Mulai Kumpulkan Poin',
-        message: 'Belanja minimal Rp 50.000 untuk dapatkan 2 Poin pertama!',
-        percent: 0,
-        badge: '0 Poin',
-      };
-    }
-    if (finalTotal < 50000) {
-      const remaining = 50000 - finalTotal;
-      const pct = Math.min(Math.round((finalTotal / 50000) * 100), 100);
-      return {
-        status: 'tier-0',
-        title: 'Tinggal Sedikit Lagi!',
-        message: `Tambah belanja ${formatMoney(remaining)} lagi untuk dapatkan 2 Poin pertama! ✨`,
-        percent: pct,
-        badge: 'Target 50rb',
-      };
-    }
-    if (finalTotal < 100000) {
-      const remaining = 100000 - finalTotal;
-      const pct = Math.min(Math.round(((finalTotal - 50000) / 50000) * 100), 100);
-      return {
-        status: 'tier-50',
-        title: '🎉 Kamu Mendapat +2 Poin!',
-        message: `Tinggal tambah ${formatMoney(remaining)} lagi untuk langsung tembus 10 Poin! 🚀`,
-        percent: pct,
-        badge: '+2 Poin Aktif',
-      };
-    }
-    const sisa = finalTotal % 100000;
-    const ratusan = Math.floor(finalTotal / 100000);
-    if (sisa < 50000) {
-      const toNext50 = 50000 - sisa;
-      return {
-        status: 'tier-100',
-        title: `🔥 Mantap! Kamu Dapat +${ratusan * 10} Poin!`,
-        message: `Tambah ${formatMoney(toNext50)} lagi untuk dapat bonus +2 Poin tambahan!`,
-        percent: Math.round((sisa / 50000) * 100),
-        badge: `+${ratusan * 10} Poin`,
-      };
-    } else {
-      const toNext100 = 100000 - sisa;
-      return {
-        status: 'tier-100-plus',
-        title: `⭐ Luar Biasa! Kamu Dapat +${ratusan * 10 + 2} Poin!`,
-        message: `Tambah ${formatMoney(toNext100)} lagi untuk naik ke +${(ratusan + 1) * 10} Poin!`,
-        percent: Math.round(((sisa - 50000) / 50000) * 100),
-        badge: `+${ratusan * 10 + 2} Poin`,
-      };
-    }
-  }, [finalTotal]);
-
   // Effective amount paid
   const effectivePaid = useMemo(() => {
     return Number(paidAmount) || 0;
@@ -421,6 +352,10 @@ export default function CashierPage() {
   }, [customerSearch, customers]);
 
   const addProduct = (product) => {
+    if (isParcelProduct(product)) {
+      setNotice('Parsel tidak dijual melalui kasir. Gunakan halaman Parsel untuk memesannya.');
+      return;
+    }
     const availableStock = Number(product.stock ?? 999);
     if (availableStock <= 0) {
       setNotice(`Stok ${product.name} sudah habis, tidak bisa ditambahkan ke keranjang.`);
@@ -664,7 +599,7 @@ export default function CashierPage() {
       const proceed = await confirmAction(`Nominal ini jauh lebih besar dari biasanya. Rata-rata 30 hari: ${formatMoney(averageTransaction)}. Tetap lanjutkan?`);
       if (!proceed) return;
     }
-    if (!await confirmAction(`Yakin menyelesaikan transaksi sebesar ${formatMoney(finalTotal)}?`)) return;
+    if (!await confirmAction(`Yakin menyelesaikan transaksi sebesar ${formatMoney(finalTotal)}? Stok akan langsung dikurangi dan transaksi tidak dapat diubah tanpa void/refund.`)) return;
 
     setSaving(true);
     checkoutInFlightRef.current = true;
@@ -707,16 +642,12 @@ export default function CashierPage() {
         throw new Error(data.message || 'Transaksi gagal diproses.');
       }
 
-      const previousCustomerPoints = 0;
-      const currentCustomerPoints = 0;
-
       const receipt = {
         orderNumber: data.orderNumber || `POS-${Date.now()}`,
         items: [...items],
         subtotal,
         promoName: activePromo.id !== 'none' ? activePromo.name : null,
         promoDiscount,
-        pointDiscount: 0,
         discount: totalDiscount,
         total: finalTotal,
         paidAmount: data.paidAmount ?? (paymentMethod === 'DEBT' ? 0 : effectivePaid),
@@ -727,9 +658,6 @@ export default function CashierPage() {
         paymentReference: null,
         customer: activeCustomer,
         cashierName: 'Kasir Glosir',
-        earnedPoints,
-        previousPoints: previousCustomerPoints,
-        currentPoints: currentCustomerPoints,
         createdAt: new Date().toISOString(),
       };
 
@@ -750,7 +678,6 @@ export default function CashierPage() {
         }, 400);
       }
 
-      // Update customer list points locally
       // Decrement stock
       setProducts((current) =>
         current.map((product) => {
@@ -817,15 +744,6 @@ export default function CashierPage() {
       (order.paymentReference ? `Keterangan: ${order.paymentReference}\n` : '') +
       `Status: LUNAS\n` +
       `================================\n` +
-      `*★ PROGRAM POIN MEMBER GLOSIR ★*\n` +
-      `Poin Transaksi Ini: +${order.earnedPoints} Poin\n` +
-      (order.redeemedPoints > 0 ? `Poin Ditukar: -${order.redeemedPoints} Poin\n` : '') +
-      `Total Saldo Poin: ⭐ ${order.currentPoints} Poin ⭐\n` +
-      `--------------------------------\n` +
-      `💡 TIPS HEMAT MEMBER:\n` +
-      `• Belanja ≥ 100rb = 10 Poin\n` +
-      `• Belanja ≥ 50rb  = 2 Poin\n` +
-      `Tukarkan 10 Poin = Diskon Rp 5.000 di kasir!\n` +
       `Terima kasih telah berbelanja di Glosir 💚`;
 
     const phone = order.customer?.phone
@@ -921,12 +839,6 @@ export default function CashierPage() {
                 </div>
               )}
 
-              {completedOrder.pointDiscount > 0 && (
-                <div className="receipt-sum-row" style={{ color: '#c73d3d' }}>
-                  <span>Diskon Poin ({completedOrder.redeemedPoints} Pts)</span>
-                  <span>-{formatMoney(completedOrder.pointDiscount)}</span>
-                </div>
-              )}
 
               <div className="receipt-sum-row total-row">
                 <strong>TOTAL BELANJA</strong>
@@ -1301,12 +1213,9 @@ export default function CashierPage() {
           <div className="pos-title-block">
             <div className="pos-badge-row">
               <span className="pos-badge-live">● POS Online</span>
-              <span className="pos-badge-points">
-                ⭐ Promo & Poin: Belanja ≥ 100rb = 10 Poin | ≥ 50rb = 2 Poin
-              </span>
             </div>
             <h1>Kasir Toko (POS)</h1>
-            <p>Pilih produk, terapkan promo Lebaran/voucher, kumpulkan poin member, dan selesaikan transaksi.</p>
+            <p>Pilih produk, terapkan promo Lebaran/voucher, dan selesaikan transaksi.</p>
           </div>
 
           <div className="pos-header-actions">
@@ -1449,7 +1358,7 @@ export default function CashierPage() {
             </div>
           </section>
 
-          {/* SISI KANAN: Keranjang, Poin, & Pembayaran */}
+          {/* SISI KANAN: Keranjang & Pembayaran */}
           <aside className="pos-cart-panel">
             <div className="pos-cart-header">
               <div>
@@ -1482,14 +1391,14 @@ export default function CashierPage() {
                     }
                   }}
                 />
-                <span>Tambahkan pelanggan/member (opsional)</span>
+                <span>Tambahkan pelanggan (opsional)</span>
               </label>
               {customerEnabled && (
                 <>
-                  <input className="pos-custom-name-input" placeholder="Cari nama / nomor HP member..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
+                  <input className="pos-custom-name-input" placeholder="Cari nama / nomor HP pelanggan..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
                   <select className="pos-cust-select" value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)}>
                     <option value="">Pilih pelanggan umum</option>
-                    {filteredCustomers.map((c) => <option key={c.id} value={c.id}>{c.name} {c.points ? `(⭐ ${c.points} Poin)` : ''}</option>)}
+                    {filteredCustomers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     <option value="NEW">+ Input Nama Pembeli Baru...</option>
                   </select>
                   {selectedCustomerId === 'NEW' && <input className="pos-custom-name-input" placeholder="Ketik nama pelanggan..." value={customCustomerName} onChange={(e) => setCustomCustomerName(e.target.value)} />}
@@ -1567,7 +1476,7 @@ export default function CashierPage() {
               )}
             </div>
 
-            {/* Rincian Subtotal, Diskon, Poin, dan Total */}
+            {/* Rincian Subtotal, Diskon, dan Total */}
             {items.length > 0 && (
               <div className="pos-totals-container">
                 <div className="pos-price-lines">

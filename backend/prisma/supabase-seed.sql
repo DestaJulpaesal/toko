@@ -22,6 +22,61 @@ on conflict ("id") do update set
   "description" = excluded."description",
   "updatedAt" = now();
 
+-- Tambahan katalog demo: hanya memakai kategori yang sudah ada.
+insert into "Product" ("id", "sku", "name", "slug", "description", "categoryId", "status", "isFeatured", "isParcel", "stockWarning")
+select
+  'prod-demo-' || lpad(n::text, 2, '0'),
+  'GLS-DEMO-' || lpad(n::text, 2, '0'),
+  'Produk Demo ' || lpad(n::text, 2, '0'),
+  'produk-demo-' || lpad(n::text, 2, '0'),
+  'Produk demo untuk katalog kasir dan publik.',
+  (array['cat-glosir','cat-bahan-pokok','cat-dapur','cat-minuman'])[((n - 1) % 4) + 1],
+  'ACTIVE', false, false, 5
+from generate_series(1, 30) as n
+on conflict ("id") do update set
+  "sku" = excluded."sku",
+  "name" = excluded."name",
+  "slug" = excluded."slug",
+  "description" = excluded."description",
+  "categoryId" = excluded."categoryId",
+  "status" = excluded."status",
+  "isFeatured" = excluded."isFeatured",
+  "isParcel" = excluded."isParcel",
+  "stockWarning" = excluded."stockWarning",
+  "updatedAt" = now();
+
+insert into "ProductVariant" ("id", "productId", "name", "sku", "barcode", "basePrice", "sellPrice", "stockQty", "unit", "isDefault", "isActive")
+select
+  'var-demo-' || lpad(n::text, 2, '0'),
+  'prod-demo-' || lpad(n::text, 2, '0'),
+  'Kemasan utama',
+  'GLS-DEMO-' || lpad(n::text, 2, '0') || '-DEFAULT',
+  '890123457' || lpad(n::text, 3, '0'),
+  5000 + (n * 500),
+  7500 + (n * 750),
+  30, 'pcs', true, true
+from generate_series(1, 30) as n
+on conflict ("id") do update set
+  "productId" = excluded."productId",
+  "name" = excluded."name",
+  "barcode" = excluded."barcode",
+  "basePrice" = excluded."basePrice",
+  "sellPrice" = excluded."sellPrice",
+  "stockQty" = excluded."stockQty",
+  "unit" = excluded."unit",
+  "isDefault" = excluded."isDefault",
+  "isActive" = excluded."isActive",
+  "updatedAt" = now();
+
+insert into "StockMovement" ("id", "productId", "variantId", "type", "quantity", "note", "reference")
+select
+  'move-demo-' || lpad(n::text, 2, '0'),
+  'prod-demo-' || lpad(n::text, 2, '0'),
+  'var-demo-' || lpad(n::text, 2, '0'),
+  'IN', 30, 'Stok awal demo', 'SEED-DEMO-2026'
+from generate_series(1, 30) as n
+on conflict ("id") do nothing;
+
 insert into "Product" ("id", "sku", "name", "slug", "description", "categoryId", "status", "isFeatured", "isParcel", "stockWarning") values
   ('prod-kopi', 'GLS-KOPI-001', 'Kopi Bubuk Premium', 'kopi-bubuk-premium', 'Kopi bubuk pilihan dengan aroma kuat untuk menemani aktivitas harian.', 'cat-glosir', 'ACTIVE', true, false, 5),
   ('prod-beras', 'GLS-BRS-005', 'Beras 5 Kg', 'beras-5-kg', 'Beras pilihan dalam kemasan praktis untuk kebutuhan keluarga.', 'cat-bahan-pokok', 'ACTIVE', true, false, 5),

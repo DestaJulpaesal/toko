@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, Package, ShoppingCart, WalletCards } from 'lucide-react';
+import { Archive, ArrowUpRight, CircleDollarSign, Package, ShoppingCart, TriangleAlert, WalletCards } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import { apiFetch } from '../services/api';
 
@@ -38,10 +38,10 @@ export default function AdminSimpleDashboard() {
   }, []);
 
   const cards = [
-    { label: 'Omzet Hari Ini', value: money(summary.income), className: 'simple-card-green', to: '/admin/finance' },
-    { label: 'Stok Menipis', value: `${summary.lowStock} barang`, className: summary.lowStock ? 'simple-card-alert' : 'simple-card-yellow', to: '/admin/products' },
-    { label: 'Piutang Jatuh Tempo', value: `${summary.dueDebts} orang`, className: summary.dueDebts ? 'simple-card-alert' : 'simple-card-yellow', to: '/admin/finance' },
-    { label: 'Pesanan Baru', value: `${summary.newOrders} pesanan`, className: summary.newOrders ? 'simple-card-blue simple-card-attention' : 'simple-card-blue', to: '/kasir/riwayat' },
+    { label: 'Omzet Hari Ini', value: money(summary.income), hint: 'Pemasukan tercatat hari ini', icon: CircleDollarSign, className: 'simple-card-green', to: '/admin/finance' },
+    { label: 'Stok Menipis', value: `${summary.lowStock} barang`, hint: 'Perlu segera diperiksa', icon: TriangleAlert, className: summary.lowStock ? 'simple-card-alert' : 'simple-card-yellow', to: '/admin/products' },
+    { label: 'Piutang Jatuh Tempo', value: `${summary.dueDebts} orang`, hint: 'Jatuh tempo dalam 7 hari', icon: TriangleAlert, className: summary.dueDebts ? 'simple-card-alert' : 'simple-card-yellow', to: '/admin/finance' },
+    { label: 'Pesanan Baru', value: `${summary.newOrders} pesanan`, hint: 'Pesanan yang perlu diproses', icon: ShoppingCart, className: summary.newOrders ? 'simple-card-blue simple-card-attention' : 'simple-card-blue', to: '/kasir/riwayat' },
   ];
 
   const quickActions = [
@@ -51,5 +51,5 @@ export default function AdminSimpleDashboard() {
     { label: 'Kelola Parsel', hint: 'Peserta, setoran, dan program', to: '/admin/parcels', icon: Archive, className: 'quick-action-orange' },
   ];
 
-  return <AdminShell active="Dashboard" className="admin-simple-shell" mainClassName="simple-dashboard-main"><header className="simple-dashboard-header"><div><span className="eyebrow light">Ringkasan mudah</span><h1>Halo, cek toko hari ini</h1><p>Lihat kondisi toko dan pilih pekerjaan yang ingin dilakukan.</p></div><Link className="btn btn-secondary large-touch" to="/admin/detail">Lihat tampilan lengkap</Link></header>{error && <div className="crud-notice" role="alert">{error}</div>}<section className="simple-dashboard-grid">{cards.map((card) => <Link key={card.label} to={card.to} className={`simple-dashboard-card ${card.className}`}><span>{card.label}</span><strong>{loading ? '...' : card.value}</strong><small>Ketuk untuk melihat detail <b>→</b></small></Link>)}</section><section className="simple-quick-actions" aria-labelledby="quick-actions-title"><div className="simple-section-heading"><div><span className="eyebrow light">Pekerjaan utama</span><h2 id="quick-actions-title">Mau melakukan apa?</h2></div><span className="simple-section-note">Pilih satu tombol besar</span></div><div className="simple-quick-actions-grid">{quickActions.map(({ label, hint, to, icon: Icon, className }) => <Link key={label} to={to} className={`simple-quick-action ${className}`}><span className="simple-quick-action-icon"><Icon size={27} strokeWidth={2} aria-hidden="true" /></span><span><strong>{label}</strong><small>{hint}</small></span><b aria-hidden="true">→</b></Link>)}</div></section><div className="simple-dashboard-help"><strong>Butuh bantuan?</strong><span>Mulai dari kotak di atas. Angka akan diperbarui saat halaman dibuka.</span><Link to="/admin/detail">Buka laporan lengkap →</Link></div></AdminShell>;
+  return <AdminShell active="Dashboard" className="admin-simple-shell" mainClassName="simple-dashboard-main"><header className="simple-dashboard-header"><div><span className="eyebrow light">Ringkasan mudah</span><h1>Halo, cek toko hari ini</h1><p>Lihat kondisi toko dan pilih pekerjaan yang ingin dilakukan.</p></div><Link className="btn btn-secondary large-touch" to="/admin/detail">Lihat tampilan lengkap <ArrowUpRight size={16} /></Link></header>{error && <div className="crud-notice" role="alert">{error}</div>}<section className="simple-dashboard-grid">{cards.map(({ label, value, hint, icon: Icon, className, to }) => <Link key={label} to={to} className={`simple-dashboard-card ${className}`}><div className="simple-card-top"><span>{label}</span><span className="simple-card-icon"><Icon size={19} /></span></div><strong>{loading ? '...' : value}</strong><div className="simple-card-bottom"><small>{hint}</small><b aria-hidden="true"><ArrowUpRight size={17} /></b></div></Link>)}</section><section className="simple-quick-actions" aria-labelledby="quick-actions-title"><div className="simple-section-heading"><div><span className="eyebrow light">Pekerjaan utama</span><h2 id="quick-actions-title">Mau melakukan apa?</h2></div><span className="simple-section-note">Pilih satu tombol besar</span></div><div className="simple-quick-actions-grid">{quickActions.map(({ label, hint, to, icon: Icon, className }) => <Link key={label} to={to} className={`simple-quick-action ${className}`}><span className="simple-quick-action-icon"><Icon size={27} strokeWidth={2} aria-hidden="true" /></span><span><strong>{label}</strong><small>{hint}</small></span><b aria-hidden="true">→</b></Link>)}</div></section><div className="simple-dashboard-help"><strong>Butuh bantuan?</strong><span>Mulai dari kotak di atas. Angka akan diperbarui saat halaman dibuka.</span><Link to="/admin/detail">Buka laporan lengkap →</Link></div></AdminShell>;
 }

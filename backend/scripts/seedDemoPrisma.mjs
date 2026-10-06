@@ -210,6 +210,66 @@ async function seed() {
     }
   ];
 
+  const demoProducts = [
+    ['Biskuit Cokelat 120g', 'cat-glosir', 8500, 12000, 'pack'],
+    ['Sabun Mandi Aloe 80g', 'cat-glosir', 4500, 6500, 'pcs'],
+    ['Sampo Keluarga 170ml', 'cat-glosir', 18000, 24000, 'botol'],
+    ['Pasta Gigi Herbal 120g', 'cat-glosir', 11000, 15000, 'tube'],
+    ['Tisu Wajah  tissue 250 sheets', 'cat-glosir', 9000, 13000, 'box'],
+    ['Tepung Terigu Serbaguna 1kg', 'cat-bahan-pokok', 11000, 14500, 'kg'],
+    ['Tepung Tapioka 500g', 'cat-bahan-pokok', 6500, 9000, 'pack'],
+    ['Garam Halus 500g', 'cat-bahan-pokok', 3000, 4500, 'pack'],
+    ['Kecap Manis 600ml', 'cat-dapur', 13000, 17500, 'botol'],
+    ['Saus Sambal 335ml', 'cat-dapur', 10500, 14500, 'botol'],
+    ['Santan Instan 200ml', 'cat-dapur', 4500, 6500, 'pcs'],
+    ['Bumbu Nasi Goreng 20g', 'cat-dapur', 2500, 4000, 'sachet'],
+    ['Mie Instan Goreng', 'cat-bahan-pokok', 2500, 3500, 'pcs'],
+    ['Mie Instan Kari Ayam', 'cat-bahan-pokok', 2500, 3500, 'pcs'],
+    ['Susu UHT Cokelat 1L', 'cat-minuman', 17000, 22000, 'kotak'],
+    ['Air Mineral 600ml', 'cat-minuman', 2500, 4000, 'botol'],
+    ['Kopi Instan 10 Sachet', 'cat-minuman', 12000, 16500, 'box'],
+    ['Teh Tubruk 100g', 'cat-minuman', 9000, 13000, 'pack'],
+    ['Sirup Melon 460ml', 'cat-minuman', 19000, 24000, 'botol'],
+    ['Minuman Isotonik 500ml', 'cat-minuman', 5000, 7500, 'botol'],
+    ['Piring Melamin 8 inch', 'cat-dapur', 9000, 14000, 'pcs'],
+    ['Gelas Plastik 10 pcs', 'cat-dapur', 7000, 11000, 'pack'],
+    ['Sendok Plastik 10 pcs', 'cat-dapur', 5000, 8000, 'pack'],
+    ['Kantong Sampah 20L', 'cat-glosir', 8000, 12000, 'roll'],
+    ['Spons Cuci Piring 2 pcs', 'cat-dapur', 4500, 7000, 'pack'],
+    ['Detergen Bubuk 800g', 'cat-glosir', 12000, 17000, 'pack'],
+    ['Pewangi Pakaian 900ml', 'cat-glosir', 13000, 18500, 'botol'],
+    ['Lampu LED 9 Watt', 'cat-glosir', 18000, 26000, 'pcs'],
+    ['Baterai AA 2 pcs', 'cat-glosir', 9000, 14000, 'pack'],
+    ['Korek Api Gas', 'cat-glosir', 3500, 5500, 'pcs'],
+  ].map(([name, categoryId, basePrice, sellPrice, unit], index) => {
+    const number = String(index + 1).padStart(2, '0');
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return {
+      id: `prod-demo-${number}`,
+      sku: `GLS-DEMO-${number}`,
+      name,
+      slug: `demo-${slug}`,
+      description: `${name} untuk kebutuhan harian pelanggan Glosir.`,
+      categoryId,
+      status: 'ACTIVE',
+      isFeatured: false,
+      isParcel: false,
+      stockWarning: 5,
+      imageUrl: null,
+      variant: {
+        id: `var-demo-${number}`,
+        name: 'Kemasan utama',
+        sku: `GLS-DEMO-${number}-DEFAULT`,
+        barcode: `890123456${String(100 + index).padStart(4, '0')}`,
+        basePrice,
+        sellPrice,
+        stockQty: 30,
+        unit,
+      },
+    };
+  });
+  productsData.push(...demoProducts);
+
   for (const p of productsData) {
     const { variant, ...productFields } = p;
     await prisma.product.upsert({

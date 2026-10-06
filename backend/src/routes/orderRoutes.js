@@ -6,6 +6,7 @@ import { checkoutLimiter, checkoutSchema, holdCartSchema, onlineOrderSchema, val
 import { sendWhatsappMessage } from '../services/whatsappService.js';
 import { validateStockAvailability, calculateStockDecrease } from '../utils/stockCalculation.js';
 import { getActiveLoyaltyRule, calculatePoints, awardPoints, revokePoints, checkSellBelowCost } from '../services/loyaltyService.js';
+import { writeAuditLog } from '../services/auditLogService.js';
 
 const router = express.Router();
 
@@ -67,9 +68,7 @@ router.get('/', authenticateToken, async (req, res) => {
   const { method, search } = req.query;
 
   try {
-    const where = {
-      type: 'STORE',
-    };
+    const where = {};
 
     if (method && method !== 'ALL') {
       where.financeEntries = {
@@ -107,6 +106,9 @@ router.get('/', authenticateToken, async (req, res) => {
         status: o.status,
         subtotal: Number(o.subtotal),
         discount: Number(o.discount || 0),
+        shippingCost: Number(o.shippingCost || 0),
+        fulfillmentMethod: o.fulfillmentMethod || 'PICKUP',
+        distanceKm: o.distanceKm === null ? null : Number(o.distanceKm),
         total: Number(o.total),
         paidAmount: Number(o.paidAmount || finance?.amount || 0),
         change: 0,
@@ -114,7 +116,7 @@ router.get('/', authenticateToken, async (req, res) => {
         paymentStatus: o.paymentStatus || (o.debtRecord ? 'UNPAID' : 'PAID'),
         remainingAmount: Math.max(Number(o.total) - Number(o.paidAmount || finance?.amount || 0), 0),
         paymentReference: finance?.description?.includes('Ref:') ? finance.description.split('Ref:')[1]?.trim() : null,
-        customer: o.customer ? { id: o.customer.id, name: o.customer.name, phone: o.customer.phone } : null,
+        customer: o.customer ? { id: o.customer.id, name: o.customer.name, phone: o.customer.phone, address: o.customer.address } : null,
         cashierName: o.user?.name || 'Kasir Glosir',
         earnedPoints,
         items: o.items.map((it) => ({
@@ -162,7 +164,10 @@ router.get('/average-transaction', authenticateToken, async (req, res) => {
 
 router.post('/online', checkoutLimiter, validateBody(onlineOrderSchema), async (req, res) => {
   try {
-    const { customerName, customerPhone, address, note, promoCode, shippingCost, items } = req.body;
+    const { customerName, customerPhone, note, promoCode, items } = req.body;
+    const address = 'Ambil langsung di toko';
+    const fulfillmentMethod = 'PICKUP';
+    const distanceKm = null;
     const variantIds = items.filter((item) => item.variantId).map((item) => item.variantId);
     const parcelIds = items.filter((item) => item.parcelId).map((item) => item.parcelId);
     const eventPackageIds = items.filter((item) => item.eventPackageId).map((item) => item.eventPackageId);
@@ -188,19 +193,46 @@ router.post('/online', checkoutLimiter, validateBody(onlineOrderSchema), async (
       return { eventPackageId: eventPackage.id, name: eventPackage.name, quantity, unitPrice: Number(eventPackage.price), total: Number(eventPackage.price) * quantity };
     });
     const subtotal = lines.reduce((sum, line) => sum + line.total, 0);
+    const shippingCost = 0;
     const promoDiscount = promoCode === 'LEBARAN15' ? Math.round(subtotal * 0.15) : promoCode === 'GLOSIR10' ? Math.round(subtotal * 0.1) : promoCode === 'HEMAT25' ? Math.min(25000, subtotal) : promoCode === 'PARSEL20' ? Math.round(subtotal * 0.2) : 0;
     const total = Math.max(subtotal - promoDiscount + Number(shippingCost || 0), 0);
     const orderNumber = `WEB-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
     const normalizedPhone = customerPhone.replace(/\D/g, '').replace(/^0/, '62');
     const storeNumber = String(process.env.STORE_WHATSAPP_NUMBER || process.env.OWNER_WHATSAPP_NUMBER || '').replace(/\D/g, '');
     if (!storeNumber) return res.status(503).json({ success: false, message: 'Nomor WhatsApp toko belum dikonfigurasi' });
-    const whatsappText = `Halo Glosir, saya ingin konfirmasi pesanan ${orderNumber}.\nNama: ${customerName}\nWhatsApp: ${normalizedPhone}\nAlamat: ${address}\n\n${lines.map((line) => `${line.name} x${line.quantity} - Rp ${line.total.toLocaleString('id-ID')}`).join('\n')}\n\nSubtotal: Rp ${subtotal.toLocaleString('id-ID')}\nDiskon: Rp ${promoDiscount.toLocaleString('id-ID')}\nOngkir: Rp ${Number(shippingCost || 0).toLocaleString('id-ID')}\nTotal: Rp ${total.toLocaleString('id-ID')}\nPromo: ${promoCode || '-'}`;
+    const fulfillmentLabel = fulfillmentMethod === 'DELIVERY' ? 'Antar ke alamat' : 'Ambil langsung di toko';
+    const distanceLabel = fulfillmentMethod === 'DELIVERY' ? `\nJarak perkiraan : ${Number(distanceKm).toLocaleString('id-ID')} km` : '';
+    const itemLines = lines
+      .map((line, index) => `${index + 1}. ${line.name}\n   ${line.quantity} x Rp ${line.unitPrice.toLocaleString('id-ID')} = Rp ${line.total.toLocaleString('id-ID')}`)
+      .join('\n');
+    const noteLine = note?.trim() ? `\nCatatan          : ${note.trim()}` : '';
+    const whatsappText = [
+      '*KONFIRMASI PESANAN GLOSIR*',
+      '━━━━━━━━━━━━━━━━━━━━',
+      `No. Pesanan      : ${orderNumber}`,
+      `Nama             : ${customerName}`,
+      `WhatsApp         : ${normalizedPhone}`,
+      `Pengambilan      : ${fulfillmentLabel}${distanceLabel}`,
+      noteLine,
+      '',
+      '*DAFTAR BELANJA*',
+      itemLines,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━',
+      `Subtotal         : Rp ${subtotal.toLocaleString('id-ID')}`,
+      `Diskon           : Rp ${promoDiscount.toLocaleString('id-ID')}`,
+      'Ongkir           : Rp 0',
+      `*TOTAL           : Rp ${total.toLocaleString('id-ID')}*`,
+      `Promo            : ${promoCode || '-'}`,
+      '',
+      'Mohon konfirmasi pesanan saya. Terima kasih.',
+    ].join('\n').replace(/\n\n\n+/g, '\n\n');
     const whatsappLink = `https://wa.me/${storeNumber}?text=${encodeURIComponent(whatsappText)}`;
     const existingCustomer = await prisma.customer.findFirst({ where: { phone: normalizedPhone } });
     const customer = existingCustomer
       ? await prisma.customer.update({ where: { id: existingCustomer.id }, data: { name: customerName, address } })
       : await prisma.customer.create({ data: { name: customerName, phone: normalizedPhone, address } });
-    const order = await prisma.order.create({ data: { orderNumber, type: 'ONLINE', status: 'PENDING', customer: { connect: { id: customer.id } }, subtotal, discount: promoDiscount, shippingCost: Number(shippingCost || 0), total, notes: note || null, whatsappLink, items: { create: lines.map((line) => ({ product: line.productId ? { connect: { id: line.productId } } : undefined, variant: line.variantId ? { connect: { id: line.variantId } } : undefined, parcel: line.parcelId ? { connect: { id: line.parcelId } } : undefined, eventPackage: line.eventPackageId ? { connect: { id: line.eventPackageId } } : undefined, name: line.name, quantity: line.quantity, unitPrice: line.unitPrice, total: line.total })) } } });
+    const order = await prisma.order.create({ data: { orderNumber, type: 'ONLINE', status: 'PENDING', customer: { connect: { id: customer.id } }, subtotal, discount: promoDiscount, shippingCost, fulfillmentMethod, distanceKm: fulfillmentMethod === 'DELIVERY' ? Number(distanceKm) : null, total, notes: note || null, whatsappLink, items: { create: lines.map((line) => ({ product: line.productId ? { connect: { id: line.productId } } : undefined, variant: line.variantId ? { connect: { id: line.variantId } } : undefined, parcel: line.parcelId ? { connect: { id: line.parcelId } } : undefined, eventPackage: line.eventPackageId ? { connect: { id: line.eventPackageId } } : undefined, name: line.name, quantity: line.quantity, unitPrice: line.unitPrice, total: line.total })) } } });
     return res.status(201).json({ success: true, order: { id: order.id, orderNumber, whatsappLink } });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Pesanan online gagal dibuat' });
@@ -391,7 +423,7 @@ router.patch('/:id/status', authenticateToken, requireRole('OWNER', 'ADMIN'), as
           const variant = await transaction.productVariant.findUnique({ where: { id: item.variantId } });
           if (!variant || variant.stockQty < item.quantity) throw new Error(`Stok ${item.name} tidak mencukupi`);
           await transaction.productVariant.update({ where: { id: variant.id }, data: { stockQty: { decrement: item.quantity } } });
-          await transaction.stockMovement.create({ data: { productId: variant.productId, variantId: variant.id, type: 'OUT', quantity: item.quantity, note: `Pesanan online ${order.orderNumber}`, reference: order.orderNumber } });
+          await transaction.stockMovement.create({ data: { productId: variant.productId, variantId: variant.id, type: 'OUT', quantity: item.quantity, note: `Pesanan online ${order.orderNumber}`, reference: order.orderNumber, changedById: req.user?.id || null } });
         }
       }
       const updated = await transaction.order.update({ where: { id: order.id }, data: { status: nextStatus } });
@@ -402,6 +434,7 @@ router.patch('/:id/status', authenticateToken, requireRole('OWNER', 'ADMIN'), as
       }
       return updated;
     });
+    await writeAuditLog({ entityType: 'Order', entityId: result.id, field: 'STATUS', newValue: nextStatus, changedById: req.user.id });
     return res.json({ success: true, order: { id: result.id, orderNumber: result.orderNumber, status: result.status } });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Status pesanan gagal diperbarui' });
@@ -439,10 +472,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
         status: order.status,
         subtotal: Number(order.subtotal),
         discount: Number(order.discount || 0),
+        shippingCost: Number(order.shippingCost || 0),
+        fulfillmentMethod: order.fulfillmentMethod || 'PICKUP',
+        distanceKm: order.distanceKm === null ? null : Number(order.distanceKm),
         total: Number(order.total),
         paidAmount: finance ? Number(finance.amount) : Number(order.total),
         paymentMethod: finance?.paymentMethod || 'CASH',
-        customer: order.customer ? { id: order.customer.id, name: order.customer.name, phone: order.customer.phone } : null,
+        customer: order.customer ? { id: order.customer.id, name: order.customer.name, phone: order.customer.phone, address: order.customer.address } : null,
         cashierName: order.user?.name || 'Kasir Glosir',
         earnedPoints,
         items: order.items.map((it) => ({
@@ -464,7 +500,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-router.patch('/:id/void', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+router.patch('/:id/void', authenticateToken, requireRole('OWNER', 'ADMIN', 'CASHIER'), async (req, res) => {
   const reason = String(req.body?.reason || '').trim();
   if (!reason) return res.status(400).json({ success: false, message: 'Alasan pembatalan wajib diisi' });
   try {
@@ -475,7 +511,7 @@ router.patch('/:id/void', authenticateToken, requireRole('OWNER', 'ADMIN'), asyn
       const movements = await transaction.stockMovement.findMany({ where: { reference: order.orderNumber, type: 'OUT', variantId: { not: null } } });
       for (const movement of movements) {
         await transaction.productVariant.update({ where: { id: movement.variantId }, data: { stockQty: { increment: movement.quantity } } });
-        await transaction.stockMovement.create({ data: { productId: movement.productId, variantId: movement.variantId, type: 'RETURN', quantity: movement.quantity, note: `Void transaksi: ${reason}`, reference: order.orderNumber } });
+        await transaction.stockMovement.create({ data: { productId: movement.productId, variantId: movement.variantId, type: 'RETURN', quantity: movement.quantity, note: `Void transaksi: ${reason}`, reference: order.orderNumber, changedById: req.user?.id || null } });
       }
       await transaction.financeTransaction.updateMany({ where: { orderId: order.id, deletedAt: null }, data: { deletedAt: new Date() } });
 
@@ -495,6 +531,64 @@ router.patch('/:id/void', authenticateToken, requireRole('OWNER', 'ADMIN'), asyn
           pointsRedeemed: order.pointsRedeemed + pointsRevoked,
         },
       });
+
+      // A refund is a cashier-facing, auditable reversal of a completed sale.  It
+      // intentionally reverses the whole order; partial refunds need a separate
+      // line-level settlement model and must not silently alter inventory.
+      router.patch('/:id/refund', authenticateToken, requireRole('OWNER', 'ADMIN', 'CASHIER'), async (req, res) => {
+        const reason = String(req.body?.reason || '').trim();
+        if (!reason) return res.status(400).json({ success: false, message: 'Alasan refund wajib diisi' });
+        try {
+          const result = await prisma.$transaction(async (transaction) => {
+            const order = await transaction.order.findUnique({
+              where: { id: req.params.id },
+              include: { financeEntries: true, customer: true, items: true },
+            });
+            if (!order) throw Object.assign(new Error('Transaksi tidak ditemukan'), { statusCode: 404 });
+            if (order.status !== 'COMPLETED') throw Object.assign(new Error('Hanya transaksi selesai yang dapat direfund'), { statusCode: 409 });
+
+            const movements = await transaction.stockMovement.findMany({
+              where: { reference: order.orderNumber, type: 'OUT', variantId: { not: null } },
+            });
+            for (const movement of movements) {
+              await transaction.productVariant.update({ where: { id: movement.variantId }, data: { stockQty: { increment: movement.quantity } } });
+              await transaction.stockMovement.create({
+                data: { productId: movement.productId, variantId: movement.variantId, type: 'RETURN', quantity: movement.quantity, note: `Refund transaksi: ${reason}`, reference: order.orderNumber },
+              });
+            }
+            await transaction.financeTransaction.updateMany({ where: { orderId: order.id, deletedAt: null }, data: { deletedAt: new Date() } });
+
+            let pointsRevoked = 0;
+            if (order.customerId && order.pointsAwarded > 0) {
+              await revokePoints(order.customerId, order.pointsAwarded, order.id, transaction);
+              pointsRevoked = order.pointsAwarded;
+            }
+            const updated = await transaction.order.update({
+              where: { id: order.id },
+              data: { status: 'VOIDED', voidReason: `REFUND: ${reason}`, voidedById: req.user.id, pointsRedeemed: order.pointsRedeemed + pointsRevoked },
+            });
+            await writeAuditLog({
+              client: transaction,
+              entityType: 'Order',
+              entityId: updated.id,
+              field: 'REFUND',
+              oldValue: { status: order.status, total: order.total },
+              newValue: { status: updated.status, reason, total: order.total },
+              changedById: req.user.id,
+            });
+            return { ...updated, pointsRevoked };
+          });
+          return res.json({
+            success: true,
+            order: { id: result.id, status: result.status, voidReason: result.voidReason },
+            pointsRevoked: result.pointsRevoked || 0,
+            message: 'Refund berhasil dicatat dan stok dikembalikan.',
+          });
+        } catch (error) {
+          return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Refund gagal diproses' });
+        }
+      });
+      await writeAuditLog({ client: transaction, entityType: 'Order', entityId: updated.id, field: 'VOID', oldValue: { status: order.status, total: order.total }, newValue: { status: updated.status, reason }, changedById: req.user.id });
 
       return { ...updated, pointsRevoked };
     });
@@ -784,6 +878,7 @@ router.post('/checkout', authenticateToken, checkoutLimiter, validateBody(checko
             quantity,
             note: 'Penjualan kasir POS',
             reference: orderNumber,
+            changedById: req.user.id,
           });
         }
         if (stockMovements.length) {
@@ -809,18 +904,13 @@ router.post('/checkout', authenticateToken, checkoutLimiter, validateBody(checko
           if (updateResult.count === 0) throw new Error(`Stok unit berubah. Silakan ulangi checkout.`);
           
           // Create audit log for unit stock decrease
-          await transaction.auditLog.create({
-            data: {
-              action: 'STOCK_DECREASE_CHECKOUT',
-              entityType: 'ProductUnit',
-              entityId: unitId,
-              changes: {
-                quantityDecreased: quantity,
-                orderNumber,
-              },
-              userId: req.user.id,
-              ipAddress: req.ip,
-            },
+          await writeAuditLog({
+            client: transaction,
+            entityType: 'ProductUnit',
+            entityId: unitId,
+            field: 'STOCK_DECREASE_CHECKOUT',
+            newValue: { quantityDecreased: quantity, orderNumber },
+            changedById: req.user.id,
           });
         }
 
