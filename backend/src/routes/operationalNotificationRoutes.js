@@ -16,14 +16,6 @@ router.get('/', async (req, res) => {
           select: { id: true, stockQty: true, product: { select: { name: true, stockWarning: true } } },
         })
         : Promise.resolve([]),
-      canOperate
-        ? prisma.order.findMany({
-          where: { status: 'PENDING' },
-          select: { id: true, orderNumber: true, total: true, createdAt: true },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        })
-        : Promise.resolve([]),
       ['OWNER', 'ADMIN'].includes(role)
         ? prisma.debtRecord.findMany({
           where: { status: 'OPEN', deletedAt: null, dueDate: { lt: new Date() } },
@@ -49,7 +41,7 @@ router.get('/', async (req, res) => {
         })
         : Promise.resolve([]),
     ];
-    const [variants, orders, debts, approvals, reminders] = await Promise.all(requests);
+    const [variants, debts, approvals, reminders] = await Promise.all(requests);
     const notifications = [
       ...variants
         .filter((variant) => Number(variant.stockQty) <= Number(variant.product.stockWarning || 0))
@@ -61,14 +53,6 @@ router.get('/', async (req, res) => {
           href: '/admin/restock',
           createdAt: new Date().toISOString(),
         })),
-      ...orders.map((order) => ({
-        id: `order:${order.id}`,
-        type: 'NEW_ORDER',
-        title: `Pesanan baru #${order.orderNumber}`,
-        detail: `Rp${Number(order.total).toLocaleString('id-ID')}`,
-        href: '/kasir/riwayat',
-        createdAt: order.createdAt,
-      })),
       ...debts.map((debt) => ({
         id: `debt:${debt.id}`,
         type: 'OVERDUE_DEBT',

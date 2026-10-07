@@ -45,6 +45,7 @@ const AdminStockLedgerPage = lazy(() => import('./pages/AdminStockLedgerPage'));
 const AdminRestockPage = lazy(() => import('./pages/AdminRestockPage'));
 const AdminEventPackagesPage = lazy(() => import('./pages/AdminEventPackagesPage'));
 const AdminProductPerformancePage = lazy(() => import('./pages/AdminProductPerformancePage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -110,6 +111,7 @@ export default function App() {
             {/* Menu Bersama: Kasir, Riwayat Kasir, dan Data Pelanggan */}
             <Route path="/kasir" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><CashierPage /></AuthRoute>} />
             <Route path="/kasir/riwayat" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><CashierHistoryPage /></AuthRoute>} />
+            <Route path="/notifikasi" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><NotificationsPage /></AuthRoute>} />
             <Route path="/admin/customers" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminCustomersPage /></AuthRoute>} />
             <Route path="/pelanggan" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminCustomersPage /></AuthRoute>} />
 
