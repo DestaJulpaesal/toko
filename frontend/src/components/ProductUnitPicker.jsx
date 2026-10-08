@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../services/api';
 
 const formatMoney = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
+const unitsCache = new Map();
 
 /**
  * ProductUnitPicker Component
@@ -17,14 +18,23 @@ export default function ProductUnitPicker({ product, onSelectUnit, selectedUnitI
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!product?.id) return;
+    const productId = product?.productId || product?.id;
+    if (!productId) return undefined;
+    let active = true;
 
     const loadUnits = async () => {
+      if (unitsCache.has(productId)) {
+        const cachedUnits = unitsCache.get(productId);
+        setUnits(cachedUnits);
+        if (!selectedUnitId && cachedUnits.length > 0) onSelectUnit(cachedUnits[0]);
+        return;
+      }
       setLoading(true);
       try {
-        const response = await apiFetch(`/products/${product.id}/units`);
+        const response = await apiFetch(`/products/${productId}/units`, { silentNotify: true });
         const data = await response.json();
-        if (data.success && Array.isArray(data.units)) {
+        if (active && data.success && Array.isArray(data.units)) {
+          unitsCache.set(productId, data.units);
           setUnits(data.units);
           // Auto-select first unit if none selected
           if (!selectedUnitId && data.units.length > 0) {
@@ -34,12 +44,15 @@ export default function ProductUnitPicker({ product, onSelectUnit, selectedUnitI
       } catch (error) {
         console.error('Failed to load units:', error);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     loadUnits();
-  }, [product?.id, onSelectUnit, selectedUnitId]);
+    return () => {
+      active = false;
+    };
+  }, [product?.productId, product?.id]);
 
   if (units.length === 0) return null;
 

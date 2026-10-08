@@ -215,8 +215,8 @@ export async function runDailyPreflightCheck() {
       });
 
       const expectedStock = 50 - cashQty; // 48
-      const stockAccurate = currentVariant && currentVariant.stockQty === expectedStock;
-      const movementAccurate = stockMovement && stockMovement.quantity === cashQty;
+      const stockAccurate = currentVariant && Number(currentVariant.stockQty) === expectedStock;
+      const movementAccurate = stockMovement && Number(stockMovement.quantity) === cashQty;
 
       const pass = stockAccurate && movementAccurate;
       results.push({

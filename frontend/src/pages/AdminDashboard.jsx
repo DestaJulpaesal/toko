@@ -31,6 +31,7 @@ export default function AdminDashboard() {
   const [transactions, setTransactions] = useState([]);
   const [restockSuggestions, setRestockSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState('');
   const [backupLoading, setBackupLoading] = useState(false);
   const [widgets, setWidgets] = useState(['cashflow', 'networth', 'budget', 'debts', 'approvals', 'reminders']);
@@ -56,17 +57,23 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    const loadDashboard = async () => {
+    let active = true;
+    let loadingRequest = false;
+    const loadDashboard = async (initial = false) => {
+      if (loadingRequest) return;
+      loadingRequest = true;
+      if (initial) setLoading(true);
       try {
         const [summaryRes, txRes, restockRes] = await Promise.all([
-          apiFetch('/finance/summary'),
-          apiFetch('/finance/transactions?limit=200'),
-          apiFetch('/products/restock-suggestions'),
+          apiFetch('/finance/summary', { silentNotify: true }),
+          apiFetch('/finance/transactions?limit=200', { silentNotify: true }),
+          apiFetch('/products/restock-suggestions', { silentNotify: true }),
         ]);
 
         const summaryData = await summaryRes.json();
         const txData = await txRes.json();
 
+        if (!active) return;
         if (summaryData.success) {
           setSummary(summaryData.summary || summaryData);
         }
@@ -76,15 +83,22 @@ export default function AdminDashboard() {
         }
         const restockData = await restockRes.json();
         if (restockData.success) setRestockSuggestions(restockData.suggestions || []);
+        setLastUpdated(new Date());
       } catch (error) {
-        setError('Gagal memuat sebagian data dashboard dari server.');
+        if (initial) setError('Gagal memuat sebagian data dashboard dari server.');
       } finally {
-        setLoading(false);
+        loadingRequest = false;
+        if (active && initial) setLoading(false);
       }
     };
 
-    loadDashboard();
+    loadDashboard(true);
+    const timer = window.setInterval(() => loadDashboard(), 60000);
     apiFetch('/auth/me').then((response) => response.json()).then((result) => { if (Array.isArray(result.user?.dashboardLayout)) setWidgets(result.user.dashboardLayout); }).catch(() => {});
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, []);
   const saveWidgets = (next) => { setWidgets(next); apiFetch('/auth/me/dashboard-layout', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ layout: next }) }).catch(() => {}); };
 
@@ -124,7 +138,7 @@ export default function AdminDashboard() {
             <h1>Ringkasan bisnis</h1>
             <p className="admin-subtitle">Pantau arus uang dan aktivitas toko dalam satu ruang kerja.</p>
           </div>
-          <div className="admin-header-actions"><span className="live-status"><i /> {loading ? 'Memuat data...' : 'Terhubung database'}</span><Link to="/admin" className="btn btn-secondary" onClick={() => localStorage.setItem(`glosir_display_mode_${JSON.parse(localStorage.getItem('glosir_user') || '{}').id}`, 'simple')}>Mode Simpel</Link><Link to="/admin/products" className="btn btn-primary">+ Kelola Produk</Link></div>
+          <div className="admin-header-actions"><span className="live-status"><i /> {loading ? 'Memuat data...' : `Database aktif${lastUpdated ? ` · ${lastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}` : ''}`}</span><Link to="/admin" className="btn btn-secondary" onClick={() => localStorage.setItem(`glosir_display_mode_${JSON.parse(localStorage.getItem('glosir_user') || '{}').id}`, 'simple')}>Mode Simpel</Link><Link to="/admin/products" className="btn btn-primary">+ Kelola Produk</Link></div>
         </header>
 
         {/* Indikator & Kontrol Backup Database Otomatis */}

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../services/api';
 import { clearStaffCaches } from '../utils/catalogStorage';
 import ReminderBell from './ReminderBell';
-import { Archive, CalendarRange, Check, ChevronDown, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Search, Settings, ShoppingCart, Tags, Users, WalletCards, BarChart3, Landmark, Receipt, ShieldCheck, Truck } from 'lucide-react';
+import { Archive, CalendarRange, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Search, Settings, ShoppingCart, Tags, Users, WalletCards, BarChart3, Landmark, Receipt, ShieldCheck, Truck } from 'lucide-react';
 
 const ownerPrimaryGroups = [
   { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Data Pelanggan', '/admin/customers'], ['06', 'Keuangan', '/admin/finance']] },
@@ -32,7 +32,6 @@ export default function AdminSidebar({ active = '' }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState('');
-  const [secondaryOpen, setSecondaryOpen] = useState(false);
   const [pendingOrderCount, setPendingOrderCount] = useState(0);
   const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('glosir_display_mode') || 'simple');
   const [largeText, setLargeText] = useState(() => localStorage.getItem('glosir_large_text') === 'true');
@@ -52,7 +51,6 @@ export default function AdminSidebar({ active = '' }) {
         setCurrentUser(user);
         const mode = localStorage.getItem(`glosir_display_mode_${user.id}`) || (user.role === 'OWNER' ? 'simple' : 'complete');
         setDisplayMode(mode);
-        setSecondaryOpen(mode === 'complete');
         setLargeText(localStorage.getItem(`glosir_large_text_${user.id}`) === 'true');
       } else {
         // Default fallback if no stored user
@@ -87,7 +85,7 @@ export default function AdminSidebar({ active = '' }) {
 
     const activeLink = nav.querySelector('a.active');
     activeLink?.scrollIntoView({ block: 'nearest' });
-  }, [location.pathname, currentUser?.id, displayMode, secondaryOpen]);
+  }, [location.pathname, currentUser?.id, displayMode]);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -125,13 +123,9 @@ export default function AdminSidebar({ active = '' }) {
   const isOwner = !isCashier && !isParcelManager;
   const visibleGroups = filterGroups(isParcelManager ? parcelManagerGroups : isCashier ? cashierGroups : ownerPrimaryGroups);
   const visibleSecondaryGroups = isOwner && displayMode === 'complete' ? filterGroups(ownerSecondaryGroups) : [];
-  const hasSecondarySearch = sidebarSearch.trim() && visibleSecondaryGroups.length > 0;
-  const isSecondaryRoute = ownerSecondaryGroups.some((group) => group.links.some(([, , to]) => to === location.pathname));
-  const secondaryMenuOpen = secondaryOpen || hasSecondarySearch || isSecondaryRoute;
   const toggleDisplayMode = () => {
     const nextMode = displayMode === 'simple' ? 'complete' : 'simple';
     setDisplayMode(nextMode);
-    setSecondaryOpen(nextMode === 'complete');
     if (currentUser?.id) localStorage.setItem(`glosir_display_mode_${currentUser.id}`, nextMode);
     localStorage.setItem('glosir_display_mode', nextMode);
     navigate(nextMode === 'simple' ? '/admin' : '/admin/detail');
@@ -166,13 +160,7 @@ export default function AdminSidebar({ active = '' }) {
           <input value={sidebarSearch} onChange={(event) => setSidebarSearch(event.target.value)} placeholder="Cari menu" aria-label="Cari menu sidebar" />
         </label>
         {isOwner && (
-          <div className={`mobile-sidebar-actions${displayMode === 'simple' ? '' : ' mobile-sidebar-actions-single'}`}>
-            {displayMode === 'simple' && (
-              <button type="button" className="mobile-sidebar-more" onClick={(event) => { event.stopPropagation(); toggleDisplayMode(); }}>
-                <span><Check size={16} aria-hidden="true" /> Menu Lainnya</span>
-                <span aria-hidden="true">→</span>
-              </button>
-            )}
+          <div className="mobile-sidebar-actions mobile-sidebar-actions-single">
             <button type="button" className="mobile-sidebar-logout" onClick={(event) => { event.stopPropagation(); handleLogout(); }}>
               <LogOut size={17} aria-hidden="true" />
               <span>Keluar / Logout</span>
@@ -189,14 +177,10 @@ export default function AdminSidebar({ active = '' }) {
               </Link>
             ))}
           </div>
-        ))}
+        )        )}
         {isOwner && visibleSecondaryGroups.length > 0 && (
-          <div className={`sidebar-secondary-section${secondaryMenuOpen ? ' is-open' : ''}`}>
-            <button type="button" className="sidebar-layer-toggle" onClick={(event) => { event.stopPropagation(); setSecondaryOpen((open) => !open); }} aria-expanded={secondaryMenuOpen}>
-              <span><span className="sidebar-layer-mark"><Check size={13} /></span> Menu Lainnya</span>
-              <ChevronDown size={15} aria-hidden="true" />
-            </button>
-            {secondaryMenuOpen && visibleSecondaryGroups.map((group) => (
+          <div className="sidebar-secondary-section is-open">
+            {visibleSecondaryGroups.map((group) => (
               <div className="sidebar-nav-group sidebar-secondary-group" key={group.label}>
                 <span className="nav-label">{group.label}</span>
                 {group.links.map(([number, label, to]) => (
@@ -212,17 +196,12 @@ export default function AdminSidebar({ active = '' }) {
       </nav>
 
       <div className="sidebar-upgrade">
-        <strong>{isParcelManager ? 'Wilayah Parsel' : isCashier ? 'Workspace Kasir' : 'Menu Lainnya'} <span aria-hidden="true">✦</span></strong>
-        <small>{isParcelManager ? 'Pantau peserta wilayah' : isCashier ? 'Operasional siap digunakan' : 'Akses fitur lanjutan toko'}</small>
+        <strong>{isParcelManager ? 'Wilayah Parsel' : isCashier ? 'Workspace Kasir' : 'Mode tampilan'} <span aria-hidden="true">✦</span></strong>
+        <small>{isParcelManager ? 'Pantau peserta wilayah' : isCashier ? 'Operasional siap digunakan' : 'Atur jumlah menu yang ditampilkan'}</small>
         {isOwner ? (
-          <>
-            <button type="button" onClick={() => setSecondaryOpen(true)} aria-expanded={secondaryOpen}>
-              {secondaryOpen ? 'Menu terbuka' : 'Buka menu'} <span aria-hidden="true">→</span>
-            </button>
-            <button type="button" onClick={toggleDisplayMode}>
-              Mode {displayMode === 'simple' ? 'Lengkap' : 'Simpel'} <span aria-hidden="true">↔</span>
-            </button>
-          </>
+          <button type="button" onClick={toggleDisplayMode}>
+            Mode {displayMode === 'simple' ? 'Lengkap' : 'Simpel'} <span aria-hidden="true">↔</span>
+          </button>
         ) : (
           <Link to={isParcelManager ? '/parcel-manager' : '/kasir'}>{isParcelManager ? 'Buka wilayah' : 'Buka kasir'} <span aria-hidden="true">→</span></Link>
         )}

@@ -362,16 +362,19 @@ export default function CashierPage() {
       return;
     }
 
-    // FASE 4: Check if product has units and if one is selected
-    const unit = selectedUnits[product.productId || product.id];
-    if (!unit) {
-      setNotice(`Pilih unit untuk ${product.name} terlebih dahulu.`);
+    // A catalog variant is already a sellable base unit. Use it directly when
+    // the optional unit list has not loaded yet; selected alternate units
+    // still use their own stock and price.
+    const unit = selectedUnits[product.productId || product.id] || null;
+    const unitStock = unit ? Number(unit.baseStockQty ?? availableStock) : availableStock;
+    if (unitStock <= 0) {
+      setNotice(`Stok ${product.name} sudah habis, tidak bisa ditambahkan ke keranjang.`);
       return;
     }
 
     setItems((current) => {
-      const existing = current.find((item) => item.id === product.id && item.unitId === unit.id);
-      const maxStock = product.stock !== undefined ? product.stock : 999;
+      const existing = current.find((item) => item.id === product.id && item.unitId === (unit?.id || null));
+      const maxStock = unit ? unitStock : availableStock;
       if (existing) {
         const nextQty = Math.min(existing.qty + 1, maxStock);
         if (nextQty <= existing.qty) {
@@ -379,18 +382,18 @@ export default function CashierPage() {
           return current;
         }
         return current.map((item) =>
-          item.id === product.id && item.unitId === unit.id ? { ...item, qty: nextQty } : item
+          item.id === product.id && item.unitId === (unit?.id || null) ? { ...item, qty: nextQty } : item
         );
       }
       return [...current, {
         ...product,
-        unitId: unit.id,
-        unitName: unit.name,
+        unitId: unit?.id,
+        unitName: unit?.name,
         price: getSellingPrice(product),
         qty: 1,
-        availableStock: unit.baseStockQty,
-        minimumStock: unit.minimumStock,
-        maximumStock: unit.maximumStock,
+        availableStock: unit?.baseStockQty ?? product.stock,
+        minimumStock: unit?.minimumStock,
+        maximumStock: unit?.maximumStock,
       }];
     });
   };

@@ -74,7 +74,7 @@ export default function AdminProductPerformancePage() {
   );
 
   return (
-    <AdminShell active="Performa Produk">
+    <AdminShell active="Performa Produk" className="product-performance-shell">
       <PageHeader
         title="Laporan Performa Produk"
         subtitle="Analisis produk paling untung, paling laku, dan potensi penjualan rugi."
@@ -95,10 +95,10 @@ export default function AdminProductPerformancePage() {
       {error && <div className="crud-notice" role="alert">{error}</div>}
 
       {report?.summary && <div className="g-summary-grid">
-        <SummaryCard label="Pendapatan" value={report.summary.revenue} />
-        <SummaryCard label="Laba kotor" value={report.summary.grossProfit} />
-        <SummaryCard label="Pengeluaran" value={report.summary.operatingExpense} />
-        <SummaryCard label="Laba bersih" value={report.summary.netProfit} />
+        <SummaryCard label="Pendapatan" value={report.summary.revenue} tone="revenue" hint="Total penjualan" />
+        <SummaryCard label="Laba kotor" value={report.summary.grossProfit} tone="profit" hint="Sebelum pengeluaran" />
+        <SummaryCard label="Pengeluaran" value={report.summary.operatingExpense} tone="expense" hint="Biaya operasional" />
+        <SummaryCard label="Laba bersih" value={report.summary.netProfit} tone={Number(report.summary.netProfit) >= 0 ? 'profit' : 'loss'} hint="Hasil akhir periode" />
       </div>}
 
       <div className="g-tabs" role="tablist">
@@ -129,8 +129,14 @@ export default function AdminProductPerformancePage() {
   );
 }
 
-function SummaryCard({ label, value }) {
-  return <div className="g-panel"><small>{label}</small><h3>{rp(value)}</h3></div>;
+function SummaryCard({ label, value, tone, hint }) {
+  return (
+    <article className={`g-summary-card g-summary-card--${tone}`}>
+      <div className="g-summary-card__top"><span>{label}</span><i /></div>
+      <strong>{rp(value)}</strong>
+      <small>{hint}</small>
+    </article>
+  );
 }
 
 function DimensionTable({ items, nameKey }) {

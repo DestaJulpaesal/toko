@@ -3,7 +3,9 @@ import { z } from 'zod';
 
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 600,
+  // Read-heavy dashboards and multiple cashier tabs share the same device IP.
+  // Keep a broad application guard while checkout has its own stricter limiter below.
+  limit: 1800,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { success: false, message: 'Terlalu banyak permintaan dari perangkat ini. Coba lagi beberapa menit.' },
