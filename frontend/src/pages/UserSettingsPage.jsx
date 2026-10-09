@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { apiFetch, monitorSessionExpiry } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
+import { clearStaffCaches } from '../utils/catalogStorage';
 
 export default function UserSettingsPage() {
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const [user, setUser] = useState(null);
   const [preferences, setPreferences] = useState({
@@ -17,6 +20,11 @@ export default function UserSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [passwordFormOpen, setPasswordFormOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ newPassword: '', passwordConfirmation: '' });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [logoutAllLoading, setLogoutAllLoading] = useState(false);
+  const [logoutOthersLoading, setLogoutOthersLoading] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -73,6 +81,81 @@ export default function UserSettingsPage() {
       console.error('Save preferences error:', error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (event) => {
+    event.preventDefault();
+    setPasswordSaving(true);
+    setMessage('');
+    try {
+      const response = await apiFetch('/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(passwordForm),
+        silentNotify: true,
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setMessage(`✗ ${data.message || 'Password belum berhasil diganti.'}`);
+        return;
+      }
+      if (data.token) localStorage.setItem('glosir_token', data.token);
+      setPasswordForm({ newPassword: '', passwordConfirmation: '' });
+      setPasswordFormOpen(false);
+      setMessage('✓ Password berhasil diganti.');
+    } catch (error) {
+      console.error('Change password error:', error);
+      setMessage('✗ Tidak bisa menghubungi server. Coba lagi.');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    if (!window.confirm('Keluarkan semua perangkat yang sedang login? Perangkat ini juga akan keluar.')) return;
+    setLogoutAllLoading(true);
+    setMessage('');
+    try {
+      const response = await apiFetch('/auth/logout-all', { method: 'POST', silentNotify: true });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setMessage(`✗ ${data.message || 'Belum berhasil mengeluarkan semua perangkat.'}`);
+        return;
+      }
+      localStorage.removeItem('glosir_token');
+      localStorage.removeItem('glosir_user');
+      clearStaffCaches();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Logout all error:', error);
+      setMessage('✗ Tidak bisa menghubungi server. Coba lagi.');
+    } finally {
+      setLogoutAllLoading(false);
+    }
+  };
+
+  const handleLogoutOthers = async () => {
+    if (!window.confirm('Keluarkan semua perangkat lain? Perangkat ini tetap masuk.')) return;
+    setLogoutOthersLoading(true);
+    setMessage('');
+    try {
+      const response = await apiFetch('/auth/logout-others', { method: 'POST', silentNotify: true });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setMessage(`✗ ${data.message || 'Belum berhasil mengeluarkan perangkat lain.'}`);
+        return;
+      }
+      if (data.token) {
+        localStorage.setItem('glosir_token', data.token);
+        monitorSessionExpiry();
+      }
+      setMessage('✓ Semua perangkat lain sudah dikeluarkan. Perangkat ini tetap aktif.');
+    } catch (error) {
+      console.error('Logout other devices error:', error);
+      setMessage('✗ Tidak bisa menghubungi server. Coba lagi.');
+    } finally {
+      setLogoutOthersLoading(false);
     }
   };
 
@@ -209,17 +292,33 @@ export default function UserSettingsPage() {
               <h3 style={styles.securityLabel}>Ubah Password</h3>
               <p style={styles.securityDesc}>Ganti password akun Anda untuk keamanan lebih</p>
             </div>
-            <button style={styles.secondaryButton}>
-              Ubah Password
+            <button type="button" style={styles.secondaryButton} onClick={() => setPasswordFormOpen((open) => !open)}>
+              {passwordFormOpen ? 'Batal' : 'Ubah Password'}
+            </button>
+          </div>
+          {passwordFormOpen && (
+            <form style={styles.passwordForm} onSubmit={handlePasswordChange}>
+              <input type="password" minLength="8" required placeholder="Password baru (min. 8 karakter)" value={passwordForm.newPassword} onChange={(event) => setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))} />
+              <input type="password" minLength="8" required placeholder="Ulangi password baru" value={passwordForm.passwordConfirmation} onChange={(event) => setPasswordForm((current) => ({ ...current, passwordConfirmation: event.target.value }))} />
+              <button type="submit" style={styles.saveButton} disabled={passwordSaving}>{passwordSaving ? 'Menyimpan...' : 'Simpan Password'}</button>
+            </form>
+          )}
+          <div style={styles.securityItem}>
+            <div>
+              <h3 style={styles.securityLabel}>Logout Perangkat Lain</h3>
+              <p style={styles.securityDesc}>Keluarkan semua sesi di perangkat lain, perangkat ini tetap masuk</p>
+            </div>
+            <button type="button" style={styles.secondaryButton} onClick={handleLogoutOthers} disabled={logoutOthersLoading || logoutAllLoading}>
+              {logoutOthersLoading ? 'Memproses...' : 'Logout Perangkat Lain'}
             </button>
           </div>
           <div style={styles.securityItem}>
             <div>
               <h3 style={styles.securityLabel}>Logout Semua Device</h3>
-              <p style={styles.securityDesc}>Keluarkan semua sesi login di device lain (emergency)</p>
+              <p style={styles.securityDesc}>Keluarkan semua sesi login termasuk perangkat ini</p>
             </div>
-            <button style={styles.dangerButton}>
-              Logout Semua
+            <button type="button" style={styles.dangerButton} onClick={handleLogoutAll} disabled={logoutAllLoading}>
+              {logoutAllLoading ? 'Memproses...' : 'Logout Semua'}
             </button>
           </div>
         </section>
@@ -366,6 +465,13 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingBottom: '20px',
+    borderBottom: '1px solid #f0f0f0',
+  },
+  passwordForm: {
+    display: 'grid',
+    gap: '10px',
+    paddingBottom: '20px',
+    marginBottom: '20px',
     borderBottom: '1px solid #f0f0f0',
   },
   securityLabel: {

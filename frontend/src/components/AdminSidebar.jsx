@@ -6,7 +6,7 @@ import ReminderBell from './ReminderBell';
 import { Archive, CalendarRange, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Search, Settings, ShoppingCart, Tags, Users, WalletCards, BarChart3, Landmark, Receipt, ShieldCheck, Truck } from 'lucide-react';
 
 const ownerPrimaryGroups = [
-  { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Data Pelanggan', '/admin/customers'], ['06', 'Keuangan', '/admin/finance']] },
+  { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Data Pelanggan', '/admin/customers'], ['06', 'Keuangan', '/admin/finance'], ['25', 'Pengaturan', '/pengaturan']] },
 ];
 
 const ownerSecondaryGroups = [
@@ -18,11 +18,11 @@ const ownerSecondaryGroups = [
 ];
 
 const cashierGroups = [
-  { label: 'Operasional', links: [['01', 'Kasir', '/kasir'], ['02', 'Riwayat Transaksi', '/kasir/riwayat']] },
+  { label: 'Operasional', links: [['01', 'Kasir', '/kasir'], ['02', 'Riwayat Transaksi', '/kasir/riwayat'], ['03', 'Pengaturan', '/pengaturan']] },
 ];
 
 const parcelManagerGroups = [
-  { label: 'Wilayah Saya', links: [['01', 'Peserta Parsel', '/parcel-manager'], ['02', 'Penagihan Wilayah', '/parcel-manager/collections']] },
+  { label: 'Wilayah Saya', links: [['01', 'Peserta Parsel', '/parcel-manager'], ['02', 'Penagihan Wilayah', '/parcel-manager/collections'], ['03', 'Pengaturan', '/pengaturan']] },
 ];
 
 export default function AdminSidebar({ active = '' }) {
@@ -260,6 +260,7 @@ function getSidebarIcon(label, fallback) {
     'Stok Opname': ClipboardCheck,
     Restock: PackagePlus,
     'Paket Acara': Package,
+    Pengaturan: Settings,
   };
   const Icon = icons[label];
   return Icon ? <Icon size={16} strokeWidth={1.9} aria-hidden="true" /> : fallback;

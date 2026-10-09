@@ -46,6 +46,7 @@ const AdminRestockPage = lazy(() => import('./pages/AdminRestockPage'));
 const AdminEventPackagesPage = lazy(() => import('./pages/AdminEventPackagesPage'));
 const AdminProductPerformancePage = lazy(() => import('./pages/AdminProductPerformancePage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const UserSettingsPage = lazy(() => import('./pages/UserSettingsPage'));
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -112,6 +113,7 @@ export default function App() {
             <Route path="/kasir" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><CashierPage /></AuthRoute>} />
             <Route path="/kasir/riwayat" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><CashierHistoryPage /></AuthRoute>} />
             <Route path="/notifikasi" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><NotificationsPage /></AuthRoute>} />
+            <Route path="/pengaturan" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER', 'PARCEL_MANAGER']}><UserSettingsPage /></AuthRoute>} />
             <Route path="/admin/customers" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminCustomersPage /></AuthRoute>} />
             <Route path="/pelanggan" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminCustomersPage /></AuthRoute>} />
 
