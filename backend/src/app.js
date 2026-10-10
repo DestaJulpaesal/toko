@@ -46,6 +46,8 @@ import { initializeEmailService } from './services/emailService.js';
 import { startEmailNotificationJob } from './jobs/emailNotificationJob.js';
 import { startExpiryNotificationJob } from './jobs/expiryNotificationJob.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
+import operationalNotificationRoutes from './routes/operationalNotificationRoutes.js';
+import stockMovementRoutes from './routes/stockMovementRoutes.js';
 
 const app = express();
 
@@ -58,7 +60,7 @@ app.set('trust proxy', 1);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5174,http://localhost:5175')
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5174,http://localhost:5175,http://127.0.0.1:5174,http://127.0.0.1:5175')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -110,6 +112,7 @@ app.use('/api/parcel-regions', parcelRegionRoutes);
 app.use('/api/parcel-managers', parcelManagerRoutes);
 app.use('/api/parcel-collections', parcelCollectionRoutes);
 app.use('/api/stock-opnames', stockOpnameRoutes);
+app.use('/api/stock-movements', stockMovementRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/event-packages', eventPackageRoutes);
 app.use('/api/whatsapp/webhook', whatsappWebhookLimiter, whatsappWebhookRoutes);
@@ -117,11 +120,13 @@ app.use('/api/restock', restockRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/notifications/operational', operationalNotificationRoutes);
 
-// Initialize email service & notification jobs
-initializeEmailService();
-startEmailNotificationJob();
-startExpiryNotificationJob();
+if (process.env.NODE_ENV !== 'test') {
+  initializeEmailService();
+  startEmailNotificationJob();
+  startExpiryNotificationJob();
+}
 
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError || /Hanya file CSV|Gunakan gambar/.test(err?.message || '')) {

@@ -93,8 +93,6 @@ export function printReceipt(elementId) {
           .receipt-items-list { gap: 4px !important; }
           .receipt-summary { gap: 2px !important; }
           .receipt-sum-row.total-row { font-size: 15px !important; }
-          .receipt-point-summary,
-          .receipt-point-summary-box,
           .receipt-footer small { display: none !important; }
           .receipt-footer {
             display: block !important;

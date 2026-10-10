@@ -19,7 +19,7 @@ export default function NoticeToast() {
 
   useEffect(() => {
     if (!current) return undefined;
-    const duration = current.type === 'error' ? 4200 : 2800;
+    const duration = current.type === 'error' ? 2000 : 1800;
     const timer = window.setTimeout(() => {
       setQueue((q) => q.slice(1));
     }, duration);

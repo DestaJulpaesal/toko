@@ -21,7 +21,6 @@ router.get('/status', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Gagal memeriksa status backup database.',
-      error: error.message,
     });
   }
 });
@@ -48,7 +47,6 @@ router.post('/run', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req
     res.status(500).json({
       success: false,
       message: 'Gagal membuat backup database.',
-      error: error.message,
     });
   }
 });

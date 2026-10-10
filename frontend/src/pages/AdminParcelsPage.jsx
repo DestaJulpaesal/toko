@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import AdminSidebar from '../components/AdminSidebar';
+import { Search } from 'lucide-react';
+import AdminShell from '../layouts/AdminShell';
 import { Link } from 'react-router-dom';
 import CurrencyInput from '../components/CurrencyInput';
 import CatalogImageField from '../components/CatalogImageField';
@@ -107,9 +108,7 @@ export default function AdminParcelsPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Parsel" />
-      <main className="admin-main">
+    <AdminShell active="Parsel" className="admin-crud-shell">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Parcel management</p>
@@ -170,7 +169,7 @@ export default function AdminParcelsPage() {
             <BulkTableActions selectedCount={selectedIds.length} totalCount={visibleParcels.length} allSelected={allSelected} onToggleAll={(checked) => setSelectedIds(checked ? visibleParcels.map((parcel) => parcel.id) : [])} onDelete={deleteSelected} deleting={bulkDeleting} />
             <div className="crud-toolbar">
               <label className="crud-search">
-                <span>cari</span>
+                <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama atau kode..." />
               </label>
             </div>
@@ -234,7 +233,6 @@ export default function AdminParcelsPage() {
         </section>
 
         <footer className="admin-footer">Glosir Owner Workspace <span>Data parsel sinkron dari database</span></footer>
-      </main>
-    </div>
+      </AdminShell>
   );
 }

@@ -3,7 +3,9 @@ import { z } from 'zod';
 
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 600,
+  // Read-heavy dashboards and multiple cashier tabs share the same device IP.
+  // Keep a broad application guard while checkout has its own stricter limiter below.
+  limit: 1800,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { success: false, message: 'Terlalu banyak permintaan dari perangkat ini. Coba lagi beberapa menit.' },
@@ -79,6 +81,14 @@ export const resetPasswordSchema = z.object({
   message: 'Password baru dan ulangi password harus sama',
   path: ['passwordConfirmation'],
 });
+export const directPasswordResetSchema = z.object({
+  email: emailSchema,
+  newPassword: strongPasswordSchema,
+  passwordConfirmation: z.string().min(8, 'Ulangi password minimal 8 karakter'),
+}).refine((value) => value.newPassword === value.passwordConfirmation, {
+  message: 'Password baru dan ulangi password harus sama',
+  path: ['passwordConfirmation'],
+});
 
 export const inviteUserSchema = z.object({
   name: z.string().trim().min(1, 'Nama karyawan wajib diisi'),
@@ -134,10 +144,11 @@ export const holdCartSchema = z.object({
 export const onlineOrderSchema = z.object({
   customerName: z.string().trim().min(2, 'Nama pelanggan wajib diisi'),
   customerPhone: z.string().trim().min(8, 'Nomor WhatsApp wajib diisi'),
-  address: z.string().trim().min(5, 'Alamat wajib diisi'),
+  address: z.string().trim().optional().default('Ambil langsung di toko'),
   note: z.string().trim().optional().default(''),
   promoCode: z.string().trim().optional().default(''),
-  shippingCost: z.coerce.number().nonnegative().default(25000),
+  fulfillmentMethod: z.enum(['DELIVERY', 'PICKUP']).default('DELIVERY'),
+  distanceKm: z.coerce.number().positive().optional(),
   items: z.array(z.object({
     variantId: z.string().min(1).optional(),
     parcelId: z.string().min(1).optional(),
@@ -367,6 +378,7 @@ export const productCreateSchema = z.object({
   purchasePrice: z.coerce.number().optional().nullable(),
   originalPrice: z.coerce.number().optional().nullable(),
   stock: z.coerce.number('Stok wajib diisi'),
+  stockWarning: z.coerce.number().int().nonnegative().optional(),
   status: z.string().optional().default('Aktif'),
 }).passthrough();
 export const productUpdateSchema = productCreateSchema;

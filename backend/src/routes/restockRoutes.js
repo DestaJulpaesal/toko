@@ -23,7 +23,7 @@ function serializeItem(item) {
     stockWarning: item.stockWarning,
     suggestedQty: item.suggestedQty,
     requestedQty: item.requestedQty,
-    purchaseUnit: item.purchaseUnit || item.unit,
+    purchaseUnit: item.unit || 'unit',
     purchasePrice: item.purchasePrice == null ? null : Number(item.purchasePrice),
     status: item.status,
   };
@@ -55,7 +55,7 @@ router.get('/', async (req, res) => {
         stockWarning: variant.product.stockWarning,
         suggestedQty: Math.max(variant.product.stockWarning * 2 - variant.stockQty, 0),
         requestedQty: saved?.requestedQty || 0,
-        purchaseUnit: saved?.purchaseUnit || variant.unit || 'unit',
+        purchaseUnit: variant.unit || 'unit',
         purchasePrice: saved?.purchasePrice == null ? Number(variant.basePrice || 0) : Number(saved.purchasePrice),
         status: saved?.status || 'OPEN',
       };
@@ -92,7 +92,7 @@ router.post('/', async (req, res) => {
           stockWarning: Number(item.stockWarning || item.product?.stockWarning || 0),
           suggestedQty: Number(item.suggestedQty || 0),
           requestedQty: Number(item.requestedQty ?? 0),
-            purchaseUnit: String(item.purchaseUnit || item.unit || 'unit'),
+            purchaseUnit: String(item.unit || 'unit'),
             purchasePrice: item.purchasePrice == null ? null : Number(item.purchasePrice),
         })) },
       },

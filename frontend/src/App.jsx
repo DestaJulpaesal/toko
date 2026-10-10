@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
 // Halaman publik: tetap eager-loaded karena ini yang paling sering diakses pengunjung pertama kali.
 import HomePage from './pages/HomePage';
 import ProductPage from './pages/ProductPage';
@@ -40,9 +41,12 @@ const AdminParcelProgramsPage = lazy(() => import('./pages/AdminParcelProgramsPa
 const AdminParcelRegionsPage = lazy(() => import('./pages/AdminParcelRegionsPage'));
 const ParcelCollectionPage = lazy(() => import('./pages/ParcelCollectionPage'));
 const AdminStockOpnamePage = lazy(() => import('./pages/AdminStockOpnamePage'));
+const AdminStockLedgerPage = lazy(() => import('./pages/AdminStockLedgerPage'));
 const AdminRestockPage = lazy(() => import('./pages/AdminRestockPage'));
 const AdminEventPackagesPage = lazy(() => import('./pages/AdminEventPackagesPage'));
 const AdminProductPerformancePage = lazy(() => import('./pages/AdminProductPerformancePage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const UserSettingsPage = lazy(() => import('./pages/UserSettingsPage'));
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -80,8 +84,9 @@ export default function App() {
           <FirstTimeGuide />
           <SupportButton />
           <QuickAddFab />
-          <Suspense fallback={<div className="page-loading">Memuat halaman...</div>}>
-          <Routes>
+          <ThemeProvider>
+            <Suspense fallback={<div className="page-loading">Memuat halaman...</div>}>
+              <Routes>
             {/* Toko Publik */}
             <Route path="/" element={<HomePage />} />
             <Route path="/products" element={<ProductPage />} />
@@ -107,6 +112,8 @@ export default function App() {
             {/* Menu Bersama: Kasir, Riwayat Kasir, dan Data Pelanggan */}
             <Route path="/kasir" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><CashierPage /></AuthRoute>} />
             <Route path="/kasir/riwayat" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><CashierHistoryPage /></AuthRoute>} />
+            <Route path="/notifikasi" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER']}><NotificationsPage /></AuthRoute>} />
+            <Route path="/pengaturan" element={<AuthRoute roles={['OWNER', 'ADMIN', 'CASHIER', 'PARCEL_MANAGER']}><UserSettingsPage /></AuthRoute>} />
             <Route path="/admin/customers" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminCustomersPage /></AuthRoute>} />
             <Route path="/pelanggan" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminCustomersPage /></AuthRoute>} />
 
@@ -124,6 +131,7 @@ export default function App() {
             <Route path="/admin/debts" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminDebtsPage /></AuthRoute>} />
             <Route path="/admin/finance/reports" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinanceReportsPage /></AuthRoute>} />
             <Route path="/admin/finance/calendar" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinanceCalendarPage /></AuthRoute>} />
+            <Route path="/admin/finance/calendar/:date" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinanceCalendarPage /></AuthRoute>} />
             <Route path="/admin/finance/networth" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminNetWorthPage /></AuthRoute>} />
             <Route path="/admin/finance/approvals" element={<AuthRoute roles={['OWNER']}><AdminApprovalsPage /></AuthRoute>} />
             <Route path="/admin/finance/audit" element={<AuthRoute roles={['OWNER']}><FinanceAuditLogPage /></AuthRoute>} />
@@ -132,6 +140,7 @@ export default function App() {
             <Route path="/admin/parcel-regions" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelRegionsPage /></AuthRoute>} />
             <Route path="/admin/parcel-collections" element={<AuthRoute roles={['OWNER', 'ADMIN']}><ParcelCollectionPage /></AuthRoute>} />
             <Route path="/admin/stock-opname" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminStockOpnamePage /></AuthRoute>} />
+            <Route path="/admin/stock-ledger" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminStockLedgerPage /></AuthRoute>} />
             <Route path="/admin/restock" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminRestockPage /></AuthRoute>} />
             <Route path="/admin/event-packages" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminEventPackagesPage /></AuthRoute>} />
             <Route path="/admin/product-performance" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminProductPerformancePage /></AuthRoute>} />
@@ -141,7 +150,8 @@ export default function App() {
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          </Suspense>
+            </Suspense>
+          </ThemeProvider>
         </Router>
       </CartProvider>
     </FavoritesProvider>

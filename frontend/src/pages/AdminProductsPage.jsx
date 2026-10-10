@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+<<<<<<< HEAD
 import { Eye, PackagePlus, Pencil, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
+=======
+import { Eye, PackagePlus, Pencil, Search, ShoppingBag, Trash2 } from 'lucide-react';
+import AdminShell from '../layouts/AdminShell';
+>>>>>>> 1269403bf23387faac28fbe9b9d1c3a919191dce
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import BulkProductModal from '../components/BulkProductModal';
@@ -27,6 +32,7 @@ const emptyForm = {
   purchasePrice: '',
   originalPrice: '',
   stock: '',
+  stockWarning: 5,
   status: 'Aktif',
   imageUrl: '',
   isQuickAccess: false,
@@ -39,6 +45,7 @@ export default function AdminProductsPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState('Semua');
   const [categoryFilter, setCategoryFilter] = useState('Semua');
   const [sortBy, setSortBy] = useState('nameAsc');
@@ -123,7 +130,7 @@ export default function AdminProductsPage() {
   useEffect(() => () => window.clearTimeout(scannerTimerRef.current), []);
 
   const visibleProducts = products.filter((product) => {
-    const matchesSearch = `${product.name} ${product.sku} ${product.category}`.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = `${product.name} ${product.sku} ${product.barcode || ''} ${product.category}`.toLowerCase().includes(deferredSearch.toLowerCase());
     const matchesStatus = statusFilter === 'Semua' || product.status === statusFilter;
     const matchesCategory = categoryFilter === 'Semua' || product.category === categoryFilter;
     return matchesSearch && matchesStatus && matchesCategory;
@@ -391,6 +398,7 @@ export default function AdminProductsPage() {
         purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : Number(form.price),
         originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
         stock: Number(form.stock),
+        stockWarning: Number(form.stockWarning ?? 0),
         isQuickAccess: Boolean(form.isQuickAccess),
       };
       const discountPercent = payload.originalPrice && payload.originalPrice > payload.price
@@ -458,6 +466,7 @@ export default function AdminProductsPage() {
       purchasePrice: product.purchasePrice ?? '',
       originalPrice: product.originalPrice ?? '',
       stock: product.stock ?? '',
+      stockWarning: product.stockWarning ?? 5,
       packages: (product.variants || []).filter((variant) => !variant.isDefault).map((variant) => ({
         id: variant.id,
         name: variant.name || '',
@@ -507,8 +516,7 @@ export default function AdminProductsPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Produk" />
+    <AdminShell active="Produk" className="admin-crud-shell">
 
       {/* Camera Barcode Scanner Modal */}
       <BarcodeScannerModal
@@ -552,8 +560,6 @@ export default function AdminProductsPage() {
         onClose={() => setPrintModalProduct(null)}
         product={printModalProduct}
       />
-
-      <main className="admin-main">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Product management</p>
@@ -691,6 +697,11 @@ export default function AdminProductsPage() {
               Stok
               <input name="stock" value={form.stock ?? ''} onChange={updateField} type="number" min="0" placeholder="25" />
             </label>
+            <label>
+              Stok minimum (batas restock)
+              <input name="stockWarning" value={form.stockWarning ?? 0} onChange={updateField} type="number" min="0" step="1" placeholder="5" />
+              <small className="field-help">Peringatan muncul saat stok sama atau di bawah angka ini.</small>
+            </label>
 
             <section className="product-packages-panel">
               <div className="panel-heading">
@@ -724,7 +735,7 @@ export default function AdminProductsPage() {
           <section className="crud-table-panel">
             <div className="crud-toolbar">
               <label className="crud-search">
-                <span>cari</span>
+                <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama atau barcode SKU..." />
               </label>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -818,7 +829,6 @@ export default function AdminProductsPage() {
         </section>
 
         <footer className="admin-footer">Glosir Owner Workspace <span>Sistem Barcode & Inventory Terintegrasi</span></footer>
-      </main>
-    </div>
+    </AdminShell>
   );
 }
