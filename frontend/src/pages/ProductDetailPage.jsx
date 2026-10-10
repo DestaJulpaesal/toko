@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
+import { showSuccess } from '../utils/noticeService';
 
 const products = [
   { id: '1', name: 'Kopi Bubuk Premium', category: 'Glosir', price: 48000, originalPrice: 60000, discountPercent: 20, stock: 25, badge: 'Diskon 20%', description: 'Kopi bubuk pilihan dengan rasa kuat dan aroma yang cocok untuk menemani aktivitas harian.' },
@@ -25,6 +26,7 @@ export default function ProductDetailPage() {
 
   const addToCart = () => {
     for (let index = 0; index < quantity; index += 1) addItem(product);
+    showSuccess(`${quantity} ${product.name} dimasukkan ke keranjang`);
   };
 
   return (

@@ -908,6 +908,11 @@
 .profile-photo-preview { width: 110px; height: 110px; object-fit: cover; border-radius: 14px; border: 1px solid #e0d9cf; margin: -4px 0 14px; }
 .database-status.loading i { animation: database-pulse 1s infinite; }
 @keyframes database-pulse { 50% { opacity: 0.35; } }
+@keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalScaleIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes drawerSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.crud-layout-full { display: block; width: 100%; }
+.crud-layout-full .crud-table-panel { width: 100%; }
 .crud-form-panel .btn:disabled { cursor: wait; opacity: 0.55; transform: none; }
 .crud-layout { display: grid; grid-template-columns: minmax(280px, 0.7fr) minmax(0, 1.3fr); gap: 18px; align-items: start; }
 .crud-form-panel, .crud-table-panel { padding: 24px; border: 1px solid #e4ded4; border-radius: 18px; background: white; }

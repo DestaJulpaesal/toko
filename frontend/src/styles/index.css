@@ -111,66 +111,336 @@ a:focus-visible {
   padding: 24px 20px 80px;
 }
 
-.topbar {
+/* Public Topbar Info */
+.public-topbar-info {
+  background: #135b35;
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.topbar-info-container {
+  max-width: 1200px;
+  margin: 0 auto;
   display: flex;
-  gap: 16px;
   justify-content: space-between;
   align-items: center;
-  padding: 18px 22px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  backdrop-filter: blur(8px);
-  position: sticky;
-  top: 18px;
-  z-index: 20;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.brand {
-  font-size: 1.5rem;
-  font-weight: 900;
-  letter-spacing: -0.06em;
+.info-badge,
+.info-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.nav {
+.icon-inline {
+  flex-shrink: 0;
+}
+
+/* Header Glosir Utama */
+.topbar-glosir {
   display: flex;
-  flex: 1 1 auto;
-  justify-content: center;
-  gap: clamp(12px, 1.6vw, 24px);
-  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5dfd4;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
-.mobile-menu-button { display: none; }
+.header-brand-wrap {
+  display: flex;
+  flex-direction: column;
+}
 
-.nav a {
+.brand-title {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #1f7a4a;
   text-decoration: none;
-  color: var(--text);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.brand-sub {
+  font-size: 0.72rem;
+  color: #69645d;
   font-weight: 600;
+}
+
+/* Form Search Header */
+.header-search-form {
+  display: flex;
+  align-items: center;
+  flex: 1 1 320px;
+  max-width: 440px;
+  gap: 6px;
+}
+
+.search-input-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-wrap input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px 0 40px;
+  border: 1px solid #dcd6cd;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  background: #fcfbfa;
+  transition: all 0.2s;
+}
+
+.search-input-wrap input:focus {
+  outline: none;
+  border-color: #1f7a4a;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(31, 122, 74, 0.15);
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  color: #8c857b;
+  pointer-events: none;
+}
+
+.btn-search {
+  height: 44px;
+  padding: 0 16px;
+  background: #1f7a4a;
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: 12px;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-search:hover {
+  background: #135b35;
+}
+
+/* Nav Menu Header */
+.nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-menu a {
+  text-decoration: none;
+  color: #2d2b29;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 6px 4px;
+  position: relative;
+  transition: color 0.2s;
+}
+
+.nav-menu a:hover,
+.nav-menu a.active-link {
+  color: #1f7a4a;
+}
+
+.nav-menu a.active-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #1f7a4a;
+  border-radius: 2px;
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-portal {
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: #edf7ef;
+  color: #1f7a4a;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-decoration: none;
+  border: 1px solid #bce3c9;
+}
+
+.btn-wa-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px;
+  background: #25d366;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border-radius: 12px;
+  text-decoration: none;
+  box-shadow: 0 4px 10px rgba(37, 211, 102, 0.2);
+}
+
+.btn-wa-header:hover {
+  background: #1eb856;
+}
+
+.btn-cart-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 16px;
+  background: #1f7a4a;
+  color: #ffffff;
+  border-radius: 12px;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(31, 122, 74, 0.25);
+  transition: background 0.2s;
+}
+
+.btn-cart-header:hover {
+  background: #135b35;
+}
+
+.cart-label-wrap {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.cart-label-wrap strong {
   font-size: 0.88rem;
+}
+
+.cart-label-wrap small {
+  font-size: 0.76rem;
+  opacity: 0.9;
+  font-weight: 600;
+}
+
+.mobile-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  padding: 6px;
+  color: #2d2b29;
+  cursor: pointer;
+}
+
+/* Floating Bottom Bar Keranjang di HP */
+.mobile-floating-cart {
+  display: none;
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 999;
+  background: #1f7a4a;
+  color: #ffffff;
+  border-radius: 16px;
+  padding: 12px 16px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+}
+
+.floating-cart-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.floating-qty {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.floating-price {
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.btn-floating-checkout {
+  background: #ffffff;
+  color: #1f7a4a;
+  font-weight: 800;
+  font-size: 0.88rem;
+  padding: 10px 16px;
+  border-radius: 10px;
+  text-decoration: none;
   white-space: nowrap;
 }
 
-.actions {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 8px;
-  align-items: center;
+/* Mobile Responsive */
+@media (max-width: 860px) {
+  .public-topbar-info {
+    font-size: 0.78rem;
+    padding: 6px 12px;
+  }
+  .topbar-info-container {
+    justify-content: center;
+    gap: 8px;
+  }
+  .topbar-glosir {
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .header-search-form {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+  .nav-menu {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    order: 4;
+    background: #ffffff;
+    border-top: 1px solid #eee;
+    padding: 12px 0;
+    gap: 12px;
+  }
+  .nav-menu.is-active {
+    display: flex;
+  }
+  .mobile-toggle {
+    display: block;
+  }
+  .wa-text {
+    display: none;
+  }
+  .btn-wa-header {
+    padding: 0 10px;
+  }
+  .btn-cart-header {
+    display: none; /* Diganti oleh Floating Mobile Cart */
+  }
+  .mobile-floating-cart {
+    display: flex;
+  }
 }
-
-.actions .btn {
-  padding-left: 13px;
-  padding-right: 13px;
-  font-size: 0.78rem;
-}
-
-.cart-nav-link { display: inline-flex; align-items: center; gap: 5px; color: var(--text); text-decoration: none; }
-.cart-icon { display: inline-grid; place-items: center; width: 31px; height: 31px; border: 1px solid var(--border); border-radius: 9px; background: white; color: var(--primary-dark); font-size: 0.58rem; font-weight: 900; text-transform: uppercase; }
-.cart-nav-link b { display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 4px; border-radius: 20px; color: white; background: var(--primary); font-size: 0.68rem; }
-.cart-nav-link:hover .cart-icon { border-color: rgba(31, 122, 74, 0.35); background: #edf7ef; }
-.favorite-nav-link { display: inline-flex; align-items: center; gap: 5px; color: #806344; text-decoration: none; }
-.favorite-nav-link span { display: inline-grid; place-items: center; width: 31px; height: 31px; border: 1px solid #ead9c3; border-radius: 9px; background: #fff9f1; font-size: 0.58rem; font-weight: 900; text-transform: uppercase; }
-.favorite-nav-link b { display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 4px; border-radius: 20px; color: white; background: #b67536; font-size: 0.68rem; }
-.favorite-nav-link:hover span { background: #fff0dd; border-color: #e1bd91; }
 
 .hero {
   display: grid;
@@ -1087,6 +1357,499 @@ a:focus-visible {
   font-weight: 700;
   text-decoration: none;
 }
+
+/* =========================================================
+   DESAIN FRESHMART / GLOSIR PUBLIK (MOBILE FIRST)
+   ========================================================= */
+
+.glosir-public-page {
+  min-height: 100vh;
+  background: #fbf9f5;
+  color: #1f2937;
+  padding-bottom: 80px;
+}
+
+.glosir-home-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+}
+
+/* 1. HERO SEDERHANA */
+.glosir-hero {
+  background: linear-gradient(135deg, #e8f5ed 0%, #f4faf6 100%);
+  border: 1px solid #cce8d5;
+  border-radius: 24px;
+  margin: 16px 0 24px;
+  padding: 36px 24px;
+  box-shadow: 0 4px 20px rgba(31, 122, 74, 0.06);
+}
+
+.glosir-hero-inner {
+  max-width: 680px;
+}
+
+.hero-eyebrow {
+  display: inline-block;
+  background: #1f7a4a;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hero-title {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 900;
+  color: #0f4024;
+  line-height: 1.15;
+  margin: 0 0 14px;
+  letter-spacing: -0.03em;
+}
+
+.hero-subtitle {
+  font-size: 1.05rem;
+  color: #4b5563;
+  line-height: 1.5;
+  margin: 0 0 24px;
+}
+
+.hero-cta-wrap {
+  display: flex;
+}
+
+.btn-hero-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 28px;
+  background: #1f7a4a;
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 800;
+  border-radius: 14px;
+  text-decoration: none;
+  box-shadow: 0 8px 18px rgba(31, 122, 74, 0.25);
+  transition: all 0.2s;
+}
+
+.btn-hero-primary:hover {
+  background: #135b35;
+  transform: translateY(-2px);
+}
+
+/* 2. BANNER PROMO SATU BARIS */
+.glosir-promo-strip {
+  background: #fff8e6;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  padding: 12px 18px;
+  margin-bottom: 28px;
+}
+
+.promo-strip-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.95rem;
+  color: #92400e;
+}
+
+.promo-icon {
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+.promo-strip-link {
+  font-weight: 800;
+  color: #b45309;
+  text-decoration: underline;
+  margin-left: auto;
+}
+
+/* 3. KATEGORI FOTO/IKON BESAR (2 KOLOM DI HP) */
+.glosir-category-section {
+  margin-bottom: 36px;
+}
+
+.section-title-wrap {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-title-wrap h2 {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0;
+}
+
+.view-all-link {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1f7a4a;
+  text-decoration: none;
+}
+
+.category-big-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .category-big-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.category-big-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 20px 14px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s;
+}
+
+.category-big-card:hover {
+  border-color: #1f7a4a;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 14px rgba(31, 122, 74, 0.1);
+}
+
+.category-icon-big {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+.category-card-text h3 {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1f2937;
+  margin: 0 0 4px;
+}
+
+.category-card-text span {
+  font-size: 0.78rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* 4. PRODUK LARIS / PROMO MINGGU INI (HORIZONTAL SCROLL DI HP) */
+.glosir-products-section {
+  margin-bottom: 40px;
+}
+
+.section-desc {
+  font-size: 0.88rem;
+  color: #6b7280;
+  margin: 4px 0 0;
+}
+
+.products-scroll-container {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 8px 4px 16px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fresh-product-card {
+  flex: 0 0 220px;
+  scroll-snap-align: start;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s;
+}
+
+@media (max-width: 640px) {
+  .fresh-product-card {
+    flex: 0 0 170px;
+    padding: 12px;
+  }
+}
+
+.fresh-product-card:hover {
+  transform: translateY(-2px);
+  border-color: #1f7a4a;
+}
+
+.product-badge-fresh {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  z-index: 2;
+}
+
+.product-photo-box {
+  width: 100%;
+  height: 130px;
+  background: #f3f4f6;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.product-real-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-placeholder-icon {
+  font-size: 3rem;
+}
+
+.product-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-category-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.product-card-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 4px;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.5em;
+}
+
+.product-unit-label {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+
+.product-price-fresh {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #1f7a4a;
+  margin-top: auto;
+  margin-bottom: 12px;
+}
+
+.btn-add-cart-fresh {
+  min-height: 48px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #1f7a4a;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-add-cart-fresh:hover {
+  background: #135b35;
+}
+
+/* 5. CARA PESAN 3 LANGKAH */
+.glosir-how-to-order {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 24px;
+  padding: 32px 20px;
+  margin-bottom: 40px;
+}
+
+.how-title-wrap {
+  text-align: center;
+  max-width: 580px;
+  margin: 0 auto 30px;
+}
+
+.how-eyebrow {
+  display: inline-block;
+  color: #1f7a4a;
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.how-title-wrap h2 {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #111827;
+  margin: 0 0 8px;
+}
+
+.how-title-wrap p {
+  font-size: 0.95rem;
+  color: #4b5563;
+  margin: 0;
+}
+
+.how-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .how-steps-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.how-step-card {
+  background: #f9fafb;
+  border: 1px solid #f3f4f6;
+  border-radius: 18px;
+  padding: 24px 18px;
+  text-align: center;
+  position: relative;
+}
+
+.how-step-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 28px;
+  height: 28px;
+  background: #1f7a4a;
+  color: #ffffff;
+  border-radius: 50%;
+  font-weight: 900;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.how-step-icon {
+  width: 64px;
+  height: 64px;
+  background: #e8f5ed;
+  color: #1f7a4a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.how-step-card h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 8px;
+}
+
+.how-step-card p {
+  font-size: 0.9rem;
+  color: #4b5563;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* 6. INFO TOKO */
+.glosir-store-info-section {
+  margin-bottom: 30px;
+}
+
+.store-info-card {
+  background: #ffffff;
+  border: 2px dashed #bce3c9;
+  border-radius: 20px;
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.store-info-text h2 {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #111827;
+  margin: 0 0 10px;
+}
+
+.store-address,
+.store-hours {
+  font-size: 0.95rem;
+  color: #374151;
+  margin: 0 0 6px;
+}
+
+.store-pickup-note {
+  font-size: 0.85rem;
+  color: #1f7a4a;
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+.btn-store-wa {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 20px;
+  background: #25d366;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border-radius: 14px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);
+}
+
+.btn-store-wa:hover {
+  background: #1eb856;
+}
+
 
 @media (max-width: 760px) {
   .login-shell { grid-template-columns: 1fr; }

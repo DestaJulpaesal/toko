@@ -82,6 +82,49 @@ export default function AdminProfilePage() {
     if (data.success) setNotificationPreferences(data.preferences);
   };
 
+  const logoutOtherDevices = async () => {
+    if (!await confirmAction('Keluarkan semua akun di perangkat lain?')) return;
+    try {
+      const response = await apiFetch('/auth/me/logout-other-devices', { method: 'POST' });
+      const data = await response.json();
+      if (data.success) setNotice('Berhasil keluar dari semua perangkat lain.');
+    } catch {
+      setNotice('Gagal melakukan logout perangkat lain.');
+    }
+  };
+
+  const inviteEmployee = async (event) => {
+    event.preventDefault();
+    try {
+      const response = await apiFetch('/auth/me/invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inviteForm) });
+      const data = await response.json();
+      if (data.success) setNotice('Undangan karyawan berhasil dikirim.');
+      else setNotice(data.message || 'Gagal mengirim undangan.');
+    } catch {
+      setNotice('Gagal mengirim undangan karyawan.');
+    }
+  };
+
+  return (
+    <div className="admin-shell">
+      <AdminSidebar active="profile" />
+      <main className="admin-main">
+        <header className="admin-header">
+          <div><span className="panel-kicker">Profil Toko</span><h1>Pengaturan Profil & Keamanan</h1></div>
+        </header>
+
+        {notice && <div className="admin-notice">{notice}</div>}
+
+        <form className="crud-form-panel profile-settings-form" onSubmit={submitForm}>
+          <div className="panel-heading"><div><span className="panel-kicker">Info Publik</span><h2>Profil Pemilik</h2></div></div>
+          <div className="form-two-columns">
+            <label>Nama Pemilik<input name="name" value={form.name || ''} onChange={updateField} required /></label>
+            <label>Headline<input name="headline" value={form.headline || ''} onChange={updateField} /></label>
+          </div>
+          <label>Cerita Singkat Toko<textarea name="story" value={form.story || ''} onChange={updateField} rows={3} /></label>
+          <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Profil'}</button>
+        </form>
+
         <section className="crud-form-panel profile-settings-form">
           <div className="panel-heading"><div><span className="panel-kicker">Keamanan</span><h2>Keluar dari perangkat lain</h2></div></div>
           <p>Kalau HP atau komputer pernah hilang, dipinjam, atau lupa logout, tekan tombol ini. Semua perangkat lain harus masuk lagi dengan password.</p>

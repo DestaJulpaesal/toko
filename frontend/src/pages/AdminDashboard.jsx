@@ -117,10 +117,8 @@ export default function AdminDashboard() {
   return (
     <div className="admin-shell">
       <AdminSidebar active="Dashboard" />
-      <div className="admin-main">
-        <ExpiryAlertWidget />
-
       <main className="admin-main">
+        <ExpiryAlertWidget />
         {error && <div className="crud-notice" role="alert">{error}</div>}
         <header className="admin-header dashboard-hero">
           <div>
