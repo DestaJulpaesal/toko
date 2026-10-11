@@ -1782,9 +1782,31 @@ a:focus-visible {
   display: flex;
   gap: 16px;
   overflow-x: auto;
-  padding: 8px 4px 16px;
+  overflow-y: hidden;
+  padding: 12px 0 20px;
   scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(31, 122, 74, 0.3) transparent;
+}
+
+/* Custom scrollbar for webkit browsers */
+.products-scroll-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.products-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.products-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(31, 122, 74, 0.3);
+  border-radius: 3px;
+}
+
+.products-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(31, 122, 74, 0.5);
 }
 
 .fresh-product-card {
@@ -1909,53 +1931,17 @@ a:focus-visible {
   background: #135b35;
 }
 
+/* Scroll arrows hidden - using native horizontal scroll instead */
 .scroll-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  color: #1f7a4a;
-  transition: all 0.2s;
-}
-
-.scroll-arrow:hover {
-  background: #1f7a4a;
-  color: #ffffff;
-  border-color: #1f7a4a;
-  box-shadow: 0 6px 16px rgba(31, 122, 74, 0.2);
+  display: none !important;
 }
 
 .scroll-arrow-left {
-  left: -22px;
+  display: none !important;
 }
 
 .scroll-arrow-right {
-  right: -22px;
-}
-
-@media (max-width: 768px) {
-  .scroll-arrow {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .scroll-arrow-left {
-    left: 8px;
-  }
-  
-  .scroll-arrow-right {
-    right: 8px;
-  }
+  display: none !important;
 }
 
 /* 5. CARA PESAN 3 LANGKAH */
