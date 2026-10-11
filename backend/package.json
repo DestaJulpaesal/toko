@@ -14,7 +14,7 @@
     "test:catalog": "node tests/catalog-data-exposure.test.js",
     "test:session": "node tests/session-auth.test.js",
     "test:webhook": "node tests/webhook-security.test.js",
-    "seed:demo": "node scripts/seedDemo.mjs",
+    "seed:demo": "node scripts/seedDemoPrisma.mjs && node scripts/seedDemoData.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "finance:migrate-data": "node scripts/migrateFinanceData.js",

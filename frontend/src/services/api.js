@@ -81,8 +81,11 @@ export function apiFetch(path, options = {}) {
   const cleanPath = String(path).replace(/^\//, '');
   const method = String(fetchOptions.method || 'GET').toUpperCase();
   const shouldNotify = ACTION_METHODS.has(method) && !isSilentPath(cleanPath) && !silentNotify;
+  const requestOptions = method === 'GET' && fetchOptions.cache === undefined
+    ? { ...fetchOptions, cache: 'no-store' }
+    : fetchOptions;
 
-  return fetch(apiUrl(path), { ...fetchOptions, headers })
+  return fetch(apiUrl(path), { ...requestOptions, headers })
     .then((response) => {
       const isLoginRequest = cleanPath === 'auth/login';
       const sessionIsInvalid = hasStoredToken && response.status === 401;

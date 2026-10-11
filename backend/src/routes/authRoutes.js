@@ -13,6 +13,7 @@ import {
 } from '../services/authService.js';
 import {
   changePasswordSchema,
+  directPasswordResetSchema,
   emailActionLimiter,
   googleLoginSchema,
   inviteUserSchema,
@@ -28,6 +29,13 @@ import { appUrl, getNotificationPreferences, renderActionEmail, sendEmail } from
 import prisma from '../config/db.js';
 
 const router = express.Router();
+
+// Preserve the current token lifetime when a password/session revocation
+// rotates it; otherwise a logout-from-other-devices action unexpectedly
+// shortens a still-valid session.
+function remainingSessionSeconds(user) {
+  return Math.max(60, Number(user.exp || 0) - Math.floor(Date.now() / 1000));
+}
 
 router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res) => {
   try {
@@ -93,7 +101,7 @@ router.post('/google', loginLimiter, validateBody(googleLoginSchema), async (req
 router.post('/change-password', authenticateToken, validateBody(changePasswordSchema), async (req, res) => {
   try {
     const user = await changePassword(req.user.id, req.body.newPassword);
-    const token = generateToken(user, false, Math.max(60, Number(req.user.exp || 0) - Math.floor(Date.now() / 1000)));
+    const token = generateToken(user, false, remainingSessionSeconds(req.user));
     return res.json({ success: true, message: 'Password berhasil diganti.', token });
   } catch (error) {
     console.error('Change password error:', error);
@@ -162,6 +170,28 @@ router.post('/request-password-reset', emailActionLimiter, validateBody(requestP
   }
 });
 
+router.post('/development-password-reset', emailActionLimiter, validateBody(directPasswordResetSchema), async (req, res) => {
+  if (process.env.NODE_ENV !== 'development') {
+    return res.status(404).json({ success: false, message: 'Reset password langsung tidak tersedia.' });
+  }
+
+  try {
+    const user = await prisma.user.findFirst({ where: { email: req.body.email, isActive: true } });
+    if (!user) return res.status(404).json({ success: false, message: 'Akun aktif dengan email tersebut tidak ditemukan.' });
+
+    await changePassword(user.id, req.body.newPassword);
+    if (!user.emailVerifiedAt) {
+      await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+    }
+    await prisma.auditLog.create({ data: { entityType: 'User', entityId: user.id, field: 'password', newValue: 'development_reset', changedById: user.id } });
+
+    return res.json({ success: true, message: 'Password berhasil direset.' });
+  } catch (error) {
+    console.error('Development password reset failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Password belum berhasil direset. Coba lagi.' });
+  }
+});
+
 router.post('/reset-password', emailActionLimiter, validateBody(resetPasswordSchema), async (req, res) => {
   try {
     const user = await consumePasswordResetToken(req.body.token, req.body.newPassword);
@@ -216,11 +246,23 @@ router.post('/logout-others', authenticateToken, async (req, res) => {
   try {
     const user = await revokeOtherSessions(req.user.id);
     await prisma.auditLog.create({ data: { entityType: 'User', entityId: user.id, field: 'sessions', newValue: 'logout_others', changedById: user.id } });
-    const remainingSeconds = Math.max(60, Number(req.user.exp || 0) - Math.floor(Date.now() / 1000));
-    const token = generateToken(user, false, remainingSeconds);
+    const token = generateToken(user, false, remainingSessionSeconds(req.user));
     return res.json({ success: true, message: 'Semua perangkat lain sudah dikeluarkan.', token });
   } catch (error) {
     console.error('Logout others failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Belum berhasil. Coba lagi sebentar.' });
+  }
+});
+
+// Emergency action: revoke every session, including this device. The client
+// must discard its token and return to the login page.
+router.post('/logout-all', authenticateToken, async (req, res) => {
+  try {
+    await revokeOtherSessions(req.user.id);
+    await prisma.auditLog.create({ data: { entityType: 'User', entityId: req.user.id, field: 'sessions', newValue: 'logout_all', changedById: req.user.id } });
+    return res.json({ success: true, message: 'Semua perangkat sudah dikeluarkan.' });
+  } catch (error) {
+    console.error('Logout all failed:', error.message);
     return res.status(503).json({ success: false, message: 'Belum berhasil. Coba lagi sebentar.' });
   }
 });

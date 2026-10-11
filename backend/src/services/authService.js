@@ -11,6 +11,14 @@ const getJwtSecret = () => {
 
 const googleClient = new OAuth2Client();
 
+function sessionLifetimeSeconds(user, rememberMe) {
+  const configuredHours = Number(process.env.SESSION_TIMEOUT_HOURS || 8);
+  const hours = Number.isFinite(configuredHours) && configuredHours > 0 ? configuredHours : 8;
+  const normalLifetime = Math.min(hours * 60 * 60, 24 * 60 * 60);
+  const rememberedLifetime = 30 * 24 * 60 * 60;
+  return user.role === 'OWNER' && rememberMe ? rememberedLifetime : normalLifetime;
+}
+
 // `tv` = nomor versi token. Saat password diganti atau "keluar dari perangkat lain", nomor di database naik
 // sehingga token lama otomatis ditolak (lihat sessionService.js).
 // `expiresInSeconds` dipakai untuk token pengganti agar masa sesinya tidak berubah.
@@ -25,7 +33,7 @@ export function generateToken(user, rememberMe = false, expiresInSeconds = null)
       tv: Number(user.tokenVersion ?? 0),
     },
     getJwtSecret(),
-    { expiresIn: expiresInSeconds || (user.role === 'OWNER' && rememberMe ? '30d' : '8h') }
+    { expiresIn: expiresInSeconds || sessionLifetimeSeconds(user, rememberMe) }
   );
 }
 

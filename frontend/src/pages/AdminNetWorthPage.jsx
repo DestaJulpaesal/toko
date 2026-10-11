@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminShell from '../layouts/AdminShell';
 import { apiFetch } from '../services/api';
 import CurrencyInput from '../components/CurrencyInput';
 
@@ -64,9 +64,7 @@ export default function AdminNetWorthPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell finance-workspace">
-      <AdminSidebar active="Net Worth" />
-      <main className="admin-main">
+    <AdminShell active="Total Kekayaan" className="admin-crud-shell finance-workspace">
         <header className="finance-page-hero">
           <div><span className="finance-kicker">Gambaran kekayaan</span><h1>Kekayaan Bersih</h1><p>Pantau aset, liabilitas, dan posisi finansial toko dalam satu tempat.</p></div>
           <div className="finance-hero-mark">NW</div>
@@ -93,7 +91,6 @@ export default function AdminNetWorthPage() {
           {!items.length ? <div className="finance-empty"><span className="finance-empty-icon">+</span><strong>Belum ada item manual</strong><p>Tambahkan aset atau liabilitas untuk melengkapi perhitungan.</p></div>
             : <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Nama item</th><th>Jenis</th><th>Nilai</th><th>Tanggal dicatat</th><th>Aksi</th></tr></thead><tbody>{items.map((item) => <><tr key={item.id}><td><strong>{item.name}</strong></td><td><span className={`finance-badge ${item.kind === 'ASSET' ? 'asset' : 'liability'}`}>{item.kind === 'ASSET' ? 'Aset' : 'Liabilitas'}</span></td><td><strong className={item.kind === 'ASSET' ? 'finance-amount positive' : 'finance-amount negative'}>{money(item.value)}</strong></td><td>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</td><td><div className="finance-action-group"><button type="button" className="btn btn-secondary small" onClick={() => setHistoryItemId(historyItemId === item.id ? null : item.id)}>{historyItemId === item.id ? 'Tutup riwayat' : 'Riwayat'}</button><button type="button" className="btn btn-danger small" onClick={() => remove(item).catch((error) => setNotice(error.message))}>Hapus</button></div></td></tr>{historyItemId === item.id && <tr key={`${item.id}-history`}><td colSpan="5"><div className="networth-history"><div className="networth-history-heading"><div><span className="finance-kicker">Catatan perubahan</span><strong>Riwayat penambahan</strong></div><span>{item.history?.length || 0} kali penambahan</span></div><div className="networth-history-list">{(item.history || []).map((entry, index) => { const balance = Number(item.value) - (item.history || []).slice(0, index).reduce((sum, row) => sum + Number(row.amount || 0), 0); return <div className="networth-history-entry" key={entry.id}><span className="networth-history-index">{(item.history.length - index).toString().padStart(2, '0')}</span><div className="networth-history-date"><strong>{new Date(entry.addedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</strong><small>Penambahan saldo</small></div><strong className="networth-history-amount">+{money(entry.amount)}</strong><div className="networth-history-balance"><small>Total setelah penambahan</small><strong>{money(balance)}</strong></div></div>; })}</div></div></td></tr>}</>)}</tbody></table></div>}
         </section>
-      </main>
-    </div>
+      </AdminShell>
   );
 }

@@ -116,3 +116,18 @@ Create a public Supabase Storage bucket named `catalog-images`. The backend requ
 - Parsel now uses `ProductVariant` contents, supports automatic/manual pricing, shows contents publicly, and deducts component stock during POS checkout.
 
 WhatsApp provider integration, error monitoring, and scheduled database backups still require deployment-specific credentials and infrastructure.
+## Backup dan keamanan akun
+
+Backup terjadwal aktif melalui `startBackupJob` (default 02:00 Asia/Jakarta) dan
+backup manual tersedia untuk OWNER/ADMIN di `/api/backup/run`. Export JSON dibuat
+atomik, diberi SHA-256, tidak menyertakan `passwordHash`, dan operasi dibatalkan
+sepenuhnya bila salah satu tabel gagal dibaca (tidak ada backup palsu/parsial).
+File lokal tetap harus dipindahkan ke storage terenkripsi dengan akses terbatas;
+repo ini tidak mengklaim menyediakan off-site backup atau restore otomatis.
+Restore belum diaktifkan karena export JSON bukan dump relasional yang aman untuk
+ditulis kembali tanpa prosedur migrasi dan verifikasi operator.
+
+Sesi normal dibatasi `SESSION_TIMEOUT_HOURS` (default 8 jam). Password reset
+email memakai token satu kali yang kedaluwarsa; perubahan/reset password
+mencabut seluruh token lama. `/api/auth/logout-all` mencabut semua perangkat,
+sedangkan `/api/auth/logout-others` mempertahankan perangkat saat ini.
