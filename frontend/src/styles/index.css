@@ -1918,7 +1918,7 @@ a:focus-visible {
   background: #135b35;
 }
 
-/* Scroll arrows hidden - using native horizontal scroll instead */
+/* Scroll arrow buttons - < > style */
 .scroll-arrow {
   display: none !important;
 }
@@ -1929,6 +1929,77 @@ a:focus-visible {
 
 .scroll-arrow-right {
   display: none !important;
+}
+
+/* Override: Show arrow buttons with < > style */
+.glosir-products-section .scroll-arrow {
+  display: flex !important;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  color: #1f7a4a;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.glosir-products-section .scroll-arrow:hover {
+  background: #1f7a4a;
+  color: #ffffff;
+  border-color: #1f7a4a;
+  box-shadow: 0 4px 16px rgba(31, 122, 74, 0.2);
+}
+
+.glosir-products-section .scroll-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.glosir-products-section .scroll-arrow-left {
+  left: -24px;
+}
+
+.glosir-products-section .scroll-arrow-right {
+  right: -24px;
+}
+
+/* Mobile - tombol lebih dekat */
+@media (max-width: 768px) {
+  .glosir-products-section .scroll-arrow {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+  }
+  
+  .glosir-products-section .scroll-arrow-left {
+    left: 8px;
+  }
+  
+  .glosir-products-section .scroll-arrow-right {
+    right: 8px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .glosir-products-section .scroll-arrow {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .glosir-products-section .scroll-arrow svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 /* 5. CARA PESAN 3 LANGKAH */
