@@ -32,8 +32,17 @@ function formatPromo(promo) {
 router.get('/', async (req, res) => {
   try {
     const { activeOnly } = req.query || {};
+    const now = new Date();
     const promos = await prisma.promoCampaign.findMany({
-      where: activeOnly === 'true' ? { isActive: true } : undefined,
+      where: activeOnly === 'true'
+        ? {
+          isActive: true,
+          AND: [
+            { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+            { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+          ],
+        }
+        : undefined,
       orderBy: { createdAt: 'desc' },
     });
 

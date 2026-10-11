@@ -63,79 +63,91 @@ export default function PublicHeader() {
 
       {/* Header Utama */}
       <header className={`topbar-glosir ${menuOpen ? 'menu-open' : ''}`}>
-        <div className="header-brand-wrap">
-          <Link to="/" className="brand-title">
-            Glosir
-          </Link>
-          <span className="brand-sub">Sembako & Grosir</span>
-        </div>
-
-        {/* Form Pencarian Header */}
-        <form className="header-search-form" onSubmit={handleSearchSubmit}>
-          <div className="search-input-wrap">
-            <Search size={18} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Cari barang harian..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="Cari produk"
-            />
-          </div>
-          <button type="submit" className="btn-search">
-            Cari
-          </button>
-        </form>
-
-        {/* Navigasi Utama (Maksimal 4 item) */}
-        <nav className={`nav-menu ${menuOpen ? 'is-active' : ''}`} onClick={() => setMenuOpen(false)}>
-          {mainNavigation.map((item) => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? 'active-link' : '')}>
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Action Buttons Header */}
-        <div className="header-actions">
-          {currentUser && (
-            <Link to={portalLink} className="btn-portal" title={portalLabel}>
-              {portalLabel}
+        <div className="header-inner">
+          <div className="header-brand-wrap">
+            <span className="brand-mark" aria-hidden="true"><Store size={21} strokeWidth={2.5} /></span>
+            <Link to="/" className="brand-title">
+              Glosir
             </Link>
-          )}
+            <span className="brand-sub">Sembako & Grosir</span>
+          </div>
 
-          {/* Tombol Chat WhatsApp */}
-          <a
-            href={`https://wa.me/${storeWaNumber}?text=${encodeURIComponent('Halo Glosir, saya ingin bertanya tentang produk toko.')}`}
-            target="_blank"
-            rel="noreferrer"
-            className="btn-wa-header"
+          {/* Form Pencarian Header */}
+          <form className="header-search-form" role="search" aria-label="Cari produk di katalog" onSubmit={handleSearchSubmit}>
+            <div className="search-input-wrap">
+              <Search size={19} className="search-icon" aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Cari beras, minyak, dan lainnya"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Cari nama barang"
+              />
+            </div>
+            <button type="submit" className="btn-search">
+              Cari
+            </button>
+          </form>
+
+          {/* Navigasi Utama (Maksimal 4 item) */}
+          <nav
+            id="public-main-navigation"
+            aria-label="Navigasi utama"
+            className={`nav-menu ${menuOpen ? 'is-active' : ''}`}
+            onClick={() => setMenuOpen(false)}
           >
-            <MessageCircle size={18} />
-            <span className="wa-text">Chat WA</span>
-          </a>
+            {mainNavigation.map((item) => (
+              <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? 'active-link' : '')}>
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
 
-          {/* Tombol Keranjang Besar Hijau Solid */}
-          <Link to="/cart" className="btn-cart-header" aria-label={`Keranjang, ${totalItems} item`}>
-            <ShoppingBag size={20} />
-            <span className="cart-label-wrap">
-              <strong>Keranjang</strong>
-              <small>
-                {totalItems > 0
-                  ? `${totalItems} item • Rp ${totalPrice.toLocaleString('id-ID')}`
-                  : '0 item'}
-              </small>
-            </span>
-          </Link>
+          {/* Action Buttons Header */}
+          <div className="header-actions">
+            {currentUser && (
+              <Link to={portalLink} className="btn-portal" title={portalLabel}>
+                {portalLabel}
+              </Link>
+            )}
 
-          {/* Hamburger Mobile Menu */}
-          <button
-            className="mobile-toggle"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-label="Menu navigasi"
-          >
-            {menuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+            {/* Tombol Chat WhatsApp */}
+            <a
+              href={`https://wa.me/${storeWaNumber}?text=${encodeURIComponent('Halo Glosir, saya ingin bertanya tentang produk toko.')}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-wa-header"
+              aria-label="Hubungi toko lewat WhatsApp"
+            >
+              <MessageCircle size={18} aria-hidden="true" />
+              <span className="wa-text">Chat WA</span>
+            </a>
+
+            {/* Tombol Keranjang Besar Hijau Solid */}
+            <Link to="/cart" className="btn-cart-header" aria-label={`Keranjang, ${totalItems} item`}>
+              <ShoppingBag size={20} aria-hidden="true" />
+              <span className="cart-label-wrap">
+                <strong>Keranjang</strong>
+                <small>
+                  {totalItems > 0
+                    ? `${totalItems} item • Rp ${totalPrice.toLocaleString('id-ID')}`
+                    : '0 item'}
+                </small>
+              </span>
+            </Link>
+
+            {/* Hamburger Mobile Menu */}
+            <button
+              type="button"
+              className="mobile-toggle"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'}
+              aria-expanded={menuOpen}
+              aria-controls="public-main-navigation"
+            >
+              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -155,4 +167,3 @@ export default function PublicHeader() {
     </>
   );
 }
-

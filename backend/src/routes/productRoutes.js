@@ -247,5 +247,104 @@ router.delete('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (r
   }
 });
 
+router.get('/public/flash-sale', async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { 
+        status: 'ACTIVE',
+        isFlashSale: true,
+      },
+      include: { 
+        category: true,
+        variants: { 
+          where: { isActive: true, isDefault: true },
+          take: 1,
+        }
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' }
+    });
+    return res.json({ 
+      success: true, 
+      products: products.map(p => ({
+        id: p.id,
+        name: p.name,
+        category: p.category.name,
+        imageUrl: p.imageUrl,
+        price: p.variants[0]?.sellPrice || 0,
+        originalPrice: p.variants[0]?.basePrice || 0,
+      }))
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Flash sale produk gagal dimuat' });
+  }
+});
+
+router.get('/public/bestseller', async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { 
+        status: 'ACTIVE',
+        isBestseller: true,
+      },
+      include: { 
+        category: true,
+        variants: { 
+          where: { isActive: true, isDefault: true },
+          take: 1,
+        }
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' }
+    });
+    return res.json({ 
+      success: true, 
+      products: products.map(p => ({
+        id: p.id,
+        name: p.name,
+        category: p.category.name,
+        imageUrl: p.imageUrl,
+        price: p.variants[0]?.sellPrice || 0,
+        originalPrice: p.variants[0]?.basePrice || 0,
+      }))
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Produk terlaris gagal dimuat' });
+  }
+});
+
+router.get('/public/recommended', async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { 
+        status: 'ACTIVE',
+        isRecommended: true,
+      },
+      include: { 
+        category: true,
+        variants: { 
+          where: { isActive: true, isDefault: true },
+          take: 1,
+        }
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' }
+    });
+    return res.json({ 
+      success: true, 
+      products: products.map(p => ({
+        id: p.id,
+        name: p.name,
+        category: p.category.name,
+        imageUrl: p.imageUrl,
+        price: p.variants[0]?.sellPrice || 0,
+        originalPrice: p.variants[0]?.basePrice || 0,
+      }))
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Produk rekomendasi gagal dimuat' });
+  }
+});
+
 router.get('/:id', softAuth, catalog.getProduct);
 export default router;

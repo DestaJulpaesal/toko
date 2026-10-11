@@ -7,19 +7,11 @@ import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import CatalogImage from '../components/CatalogImage';
 import ProductCard from '../components/ProductCard';
-import { PUBLIC_CATALOG_CACHE_KEY, stripSensitive } from '../utils/catalogStorage';
+import { PUBLIC_CATALOG_CACHE_KEY, categoriesFromProducts, stripSensitive } from '../utils/catalogStorage';
 import { showSuccess } from '../utils/noticeService';
-import { Search } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 
 const CATEGORY_META = {
-  'Semua': {
-    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=64&q=80',
-    icon: '🏪',
-  },
-  'Promo': {
-    image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=64&q=80',
-    icon: '🏷️',
-  },
   'Glosir': {
     image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=64&q=80',
     icon: '🛒',
@@ -28,6 +20,12 @@ const CATEGORY_META = {
     image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=64&q=80',
     icon: '🍳',
   },
+  'Buah & Sayuran': { icon: '🍎' },
+  'Buah dan Sayuran': { icon: '🍎' },
+  'Sayur & Buah': { icon: '🥬' },
+  'Susu & Telur': { icon: '🥛' },
+  'Roti & Kue': { icon: '🥐' },
+  'Daging & Ikan': { icon: '🐟' },
   'Minuman': {
     image: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=64&q=80',
     icon: '☕',
@@ -36,6 +34,11 @@ const CATEGORY_META = {
     image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=64&q=80',
     icon: '🌾',
   },
+  'Camilan': { icon: '🍪' },
+  'Makanan Ringan': { icon: '🍿' },
+  'Perawatan Rumah': { icon: '🧹' },
+  'Rumah Tangga': { icon: '🧹' },
+  'Sabun & Kebersihan': { icon: '🧼' },
   'Acara': {
     image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=64&q=80',
     icon: '🎉',
@@ -53,34 +56,80 @@ const CATEGORY_META = {
 export default function ProductPage() {
   const [searchParams] = useSearchParams();
   const { addItem, totalItems } = useCart();
-  const [activeFilter, setActiveFilter] = useState('Semua');
+  const [activeFilter, setActiveFilter] = useState(searchParams.get('category') || '');
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [sort, setSort] = useState('default');
   const { toggleFavorite, isFavorite } = useFavorites();
-  const filters = ['Semua', 'Promo', ...new Set(products.map((product) => product.category).filter(Boolean))];
+  const filters = categories.map((cat) => cat.name);
 
   useEffect(() => {
     const query = searchParams.get('search');
-    if (query !== null) {
-      setSearch(query);
-    }
+    setSearch(query || '');
+    setActiveFilter(searchParams.get('category') || '');
   }, [searchParams]);
 
   useEffect(() => {
+    let cancelled = false;
+    let categoriesLoaded = false;
+    let catalogForCategories = [];
+
     try {
       const cachedProducts = JSON.parse(localStorage.getItem(PUBLIC_CATALOG_CACHE_KEY) || '[]');
-      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) setProducts(stripSensitive(cachedProducts));
+      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
+        catalogForCategories = stripSensitive(cachedProducts);
+        setProducts(catalogForCategories);
+      }
     } catch {
       // Ignore an invalid local cache and use the API response.
     }
 
-    Promise.all([apiFetch('/products'), apiFetch('/parcels'), apiFetch('/event-packages')])
-      .then(async ([productResponse, parcelResponse, eventResponse]) => {
-        const [productData, parcelData, eventData] = await Promise.all([productResponse.json(), parcelResponse.json(), eventResponse.json()]);
-        const catalogProducts = productData.success && Array.isArray(productData.products) ? productData.products : [];
-        const catalogParcels = parcelData.success && Array.isArray(parcelData.parcels) ? parcelData.parcels.map((parcel) => ({
+    const fetchJson = async (path) => {
+      const response = await apiFetch(path);
+      if (!response.ok) throw new Error(`${path} gagal dimuat (${response.status})`);
+      return response.json();
+    };
+
+    fetchJson('/categories/public/list')
+      .then((data) => {
+        if (!cancelled) {
+          const remoteCategories = data?.success && Array.isArray(data.categories) ? data.categories : [];
+          categoriesLoaded = true;
+          setCategories(remoteCategories.length > 0 ? remoteCategories : categoriesFromProducts(catalogForCategories));
+        }
+      })
+      .catch((error) => {
+        console.error('Catalog category list failed:', error);
+        categoriesLoaded = true;
+        if (!cancelled) setCategories(categoriesFromProducts(catalogForCategories));
+      })
+      .finally(() => {
+        if (!cancelled) setCategoriesLoading(false);
+      });
+
+    Promise.allSettled([
+      fetchJson('/products'),
+      fetchJson('/parcels'),
+      fetchJson('/event-packages'),
+    ])
+      .then((results) => {
+        if (cancelled) return;
+
+        const [productResult, parcelResult, eventResult] = results;
+        const productData = productResult.status === 'fulfilled' ? productResult.value : null;
+        const parcelData = parcelResult.status === 'fulfilled' ? parcelResult.value : null;
+        const eventData = eventResult.status === 'fulfilled' ? eventResult.value : null;
+
+        if (!productData && !parcelData && !eventData) {
+          console.error('Catalog products, parcels, and event packages failed to load.', results);
+          return;
+        }
+
+        const catalogProducts = productData?.success && Array.isArray(productData.products) ? productData.products : [];
+        const catalogParcels = parcelData?.success && Array.isArray(parcelData.parcels) ? parcelData.parcels.map((parcel) => ({
           id: `parcel-${parcel.id}`,
           parcelId: parcel.id,
           name: parcel.name,
@@ -96,7 +145,7 @@ export default function ProductPage() {
           detailPath: '/parsel',
           imageUrl: parcel.imageUrl || null,
         })) : [];
-        const catalogEvents = eventData.success && Array.isArray(eventData.packages) ? eventData.packages.map((item) => ({
+        const catalogEvents = eventData?.success && Array.isArray(eventData.packages) ? eventData.packages.map((item) => ({
           id: `event-${item.id}`,
           eventPackageId: item.id,
           name: item.name,
@@ -112,23 +161,26 @@ export default function ProductPage() {
           detailPath: '/paket-acara',
           imageUrl: item.imageUrl || null,
         })) : [];
+
         const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
+        catalogForCategories = merged;
         setProducts(merged);
+        if (!categoriesLoaded) setCategories(categoriesFromProducts(merged));
         localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));
       })
-      .catch(() => setProducts([]))
+      .catch((error) => console.error('Catalog content failed:', error))
       .finally(() => setLoading(false));
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const visibleProducts = products
     .filter((product) => {
       const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase()) || product.category.toLowerCase().includes(search.toLowerCase());
       if (!matchesSearch) return false;
-      if (activeFilter === 'Semua') return true;
-      if (activeFilter === 'Promo') {
-        const hasDiscount = (product.originalPrice && product.originalPrice > product.price) || (product.discountPercent && product.discountPercent > 0);
-        return hasDiscount || product.badge?.toLowerCase().includes('promo') || product.badge?.toLowerCase().includes('diskon');
-      }
+      if (!activeFilter) return true;
       return product.category === activeFilter;
     })
     .sort((first, second) => sort === 'low' ? first.price - second.price : sort === 'high' ? second.price - first.price : 0);
@@ -141,7 +193,7 @@ export default function ProductPage() {
   return (
     <div className="glosir-public-page">
       <PublicHeader />
-      <div className="catalog-shell" style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 16px' }}>
+      <main className="catalog-shell" style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 16px' }}>
         <header style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <span style={{ fontSize: '0.85rem', color: '#1f7a4a', fontWeight: 800, textTransform: 'uppercase' }}>Katalog Produk</span>
@@ -154,76 +206,50 @@ export default function ProductPage() {
           </div>
         </header>
 
-        {/* Filter Kategori Tabs */}
-        <div className="filter-row flex gap-2 overflow-x-auto pb-3 mb-4" style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '16px' }}>
-          {filters.map((filter) => {
-            const meta = CATEGORY_META[filter] || { icon: '🛍️' };
-            const isActive = filter === activeFilter;
+        <section className="glosir-category-section catalog-category-section" aria-labelledby="catalog-category-heading">
+          <div className="section-title-wrap">
+            <h2 id="catalog-category-heading">Kategori Belanja</h2>
+            <button type="button" className="view-all-link catalog-view-all" onClick={() => setActiveFilter('')}>
+              Lihat Semua <ChevronRight size={16} />
+            </button>
+          </div>
+          <div className="category-browse-grid" aria-label="Pilih kategori produk">
+            {categoriesLoading && <p className="category-loading" role="status">Memuat kategori...</p>}
+            {!categoriesLoading && filters.map((filter) => {
+              const meta = CATEGORY_META[filter] || { icon: '🛍️' };
+              const isActive = filter === activeFilter;
 
-            return (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setActiveFilter(filter)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all border-none cursor-pointer ${
-                  isActive ? 'bg-[#1f7a4a] text-white font-bold shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
-                  borderRadius: '999px',
-                  fontSize: '0.92rem',
-                  fontWeight: isActive ? 800 : 600,
-                  background: isActive ? '#1f7a4a' : '#f3f4f6',
-                  color: isActive ? '#ffffff' : '#374151',
-                  border: 'none',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s',
-                  boxShadow: isActive ? '0 2px 6px rgba(31, 122, 74, 0.25)' : 'none',
-                }}
-              >
-                {/* Thumbnail Gambar / Ikon Bulat */}
-                <span
-                  className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center bg-gray-200"
-                  style={{
-                    width: '22px',
-                    height: '22px',
-                    borderRadius: '50%',
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: isActive ? 'rgba(255, 255, 255, 0.25)' : '#e5e7eb',
-                    fontSize: '0.8rem',
-                  }}
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  className={`category-big-card${isActive ? ' is-active' : ''}`}
+                  onClick={() => setActiveFilter(isActive ? '' : filter)}
+                  aria-pressed={isActive}
+                  aria-label={`Tampilkan produk kategori ${filter}`}
                 >
-                  {meta.image ? (
-                    <img
-                      src={meta.image}
-                      alt=""
-                      className="w-full h-full object-cover rounded-full"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        if (e.currentTarget.nextElementSibling) {
-                          e.currentTarget.nextElementSibling.style.display = 'inline';
-                        }
-                      }}
-                    />
-                  ) : null}
-                  <span style={{ display: meta.image ? 'none' : 'inline', lineHeight: 1 }}>
-                    {meta.icon || '🛍️'}
+                  <span className="category-icon-big">
+                    {meta.image ? (
+                      <img
+                        src={meta.image}
+                        alt=""
+                        loading="lazy"
+                        onError={(event) => {
+                          event.currentTarget.style.display = 'none';
+                          event.currentTarget.nextElementSibling?.classList.remove('is-hidden');
+                        }}
+                      />
+                    ) : null}
+                    <span className={meta.image ? 'category-icon-fallback is-hidden' : 'category-icon-fallback'}>
+                      {meta.icon}
+                    </span>
                   </span>
-                </span>
-                <span>{filter}</span>
-              </button>
-            );
-          })}
-        </div>
+                  <span className="category-card-name">{filter}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {/* Pencarian & Urutan */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -287,9 +313,8 @@ export default function ProductPage() {
             Belum ada produk yang cocok dengan pencarian.
           </div>
         )}
-      </div>
+      </main>
       <PublicFooter />
     </div>
   );
 }
-

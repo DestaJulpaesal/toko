@@ -21,6 +21,20 @@ export function stripSensitive(value) {
   return value;
 }
 
+export function categoriesFromProducts(products) {
+  const counts = new Map();
+  products.forEach((product) => {
+    const name = String(product.category || '').trim();
+    if (name) counts.set(name, (counts.get(name) || 0) + 1);
+  });
+
+  return Array.from(counts, ([name, productCount]) => ({
+    id: `cached-${name}`,
+    name,
+    productCount,
+  }));
+}
+
 export function readJsonStorage(storage, key, fallback) {
   try {
     const saved = storage.getItem(key);

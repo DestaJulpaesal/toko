@@ -21,6 +21,20 @@ function formatCategory(category) {
   };
 }
 
+// Endpoint publik untuk kategori (tanpa auth)
+router.get('/public/list', async (req, res) => {
+  try {
+    const categories = await prisma.category.findMany({
+      include: { _count: { select: { products: true } } },
+      orderBy: { name: 'asc' },
+    });
+    return res.json({ success: true, categories: categories.map(formatCategory) });
+  } catch (error) {
+    console.error('Public category list failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Kategori gagal dimuat' });
+  }
+});
+
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const categories = await prisma.category.findMany({

@@ -14,6 +14,7 @@ import FavoritesPage from './pages/FavoritesPage';
 import PublicInfoPage from './pages/PublicInfoPage';
 import EventPackagePage from './pages/EventPackagePage';
 import AuthActionPage from './pages/AuthActionPage';
+import PublicScrollReveal from './components/PublicScrollReveal';
 
 // Halaman kasir & admin: lazy-loaded (code-splitting) supaya bundle publik tidak ikut membawa kode admin.
 const CashierPage = lazy(() => import('./pages/CashierPage'));
@@ -80,6 +81,7 @@ export default function App() {
           <FirstTimeGuide />
           <SupportButton />
           <QuickAddFab />
+          <PublicScrollReveal />
           <Suspense fallback={<div className="page-loading">Memuat halaman...</div>}>
           <Routes>
             {/* Toko Publik */}
