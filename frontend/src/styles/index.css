@@ -1787,26 +1787,13 @@ a:focus-visible {
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(31, 122, 74, 0.3) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-/* Custom scrollbar for webkit browsers */
+/* Hide scrollbar for all browsers */
 .products-scroll-container::-webkit-scrollbar {
-  height: 6px;
-}
-
-.products-scroll-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.products-scroll-container::-webkit-scrollbar-thumb {
-  background: rgba(31, 122, 74, 0.3);
-  border-radius: 3px;
-}
-
-.products-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(31, 122, 74, 0.5);
+  display: none;
 }
 
 .fresh-product-card {
