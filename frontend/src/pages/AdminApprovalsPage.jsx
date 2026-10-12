@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import AdminShell from '../layouts/AdminShell';
+import AdminSidebar from '../components/AdminSidebar';
 import { apiFetch } from '../services/api';
 
 const money = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
@@ -49,7 +49,9 @@ export default function AdminApprovalsPage() {
   };
 
   return (
-    <AdminShell active="Persetujuan Keuangan" className="admin-crud-shell finance-workspace">
+    <div className="admin-shell admin-crud-shell finance-workspace">
+      <AdminSidebar active="Approval Keuangan" />
+      <main className="admin-main">
         <header className="finance-page-hero">
           <div>
             <span className="finance-kicker">Kontrol keuangan</span>
@@ -73,6 +75,7 @@ export default function AdminApprovalsPage() {
             : !rows.length ? <div className="finance-empty"><span className="finance-empty-icon">✓</span><strong>Semua sudah beres</strong><p>Tidak ada pengeluaran yang menunggu persetujuan.</p></div>
               : <div className="finance-table-wrap"><table className="finance-table"><thead><tr><th>Pengajuan</th><th>Pengaju</th><th>Nominal</th><th>Waktu</th><th>Aksi</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.description}</strong><small>{row.reason || 'Pengeluaran operasional'}</small></td><td>{row.requestedBy?.name || '—'}</td><td><strong className="finance-amount">{money(row.amount)}</strong></td><td>{row.createdAt ? new Date(row.createdAt).toLocaleDateString('id-ID') : '—'}</td><td><div className="finance-action-group"><button type="button" className="btn btn-primary small" disabled={Boolean(approvingId || rejectingId)} onClick={() => decide(row.id, 'approve').catch((error) => setNotice(error.message))}>{approvingId === row.id ? 'Menyetujui...' : 'Setujui'}</button><button type="button" className="btn btn-danger small" disabled={Boolean(approvingId || rejectingId)} onClick={() => decide(row.id, 'reject').catch((error) => setNotice(error.message))}>{rejectingId === row.id ? 'Menolak...' : 'Tolak'}</button></div></td></tr>)}</tbody></table></div>}
         </section>
-      </AdminShell>
+      </main>
+    </div>
   );
 }

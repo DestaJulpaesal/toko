@@ -1,6 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
-import AdminShell from '../layouts/AdminShell';
+import AdminSidebar from '../components/AdminSidebar';
 import { Link } from 'react-router-dom';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
@@ -118,7 +117,9 @@ export default function AdminPromosPage() {
   };
 
   return (
-    <AdminShell active="Promo" className="admin-crud-shell">
+    <div className="admin-shell admin-crud-shell">
+      <AdminSidebar active="Promo" />
+      <main className="admin-main">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Campaign management</p>
@@ -172,7 +173,7 @@ export default function AdminPromosPage() {
           <section className="crud-table-panel">
             <div className="crud-toolbar">
               <label className="crud-search">
-                <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
+                <span>cari</span>
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama atau kode..." />
               </label>
             </div>
@@ -217,6 +218,7 @@ export default function AdminPromosPage() {
         </section>
 
         <footer className="admin-footer">Glosir Owner Workspace <span>Data promo terhubung ke database</span></footer>
-      </AdminShell>
+      </main>
+    </div>
   );
 }

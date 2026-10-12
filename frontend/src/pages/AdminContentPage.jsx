@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
-import AdminShell from '../layouts/AdminShell';
+import AdminSidebar from '../components/AdminSidebar';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
@@ -149,7 +148,9 @@ export default function AdminContentPage() {
   };
 
   return (
-    <AdminShell active="Konten Publik" className="admin-crud-shell">
+    <div className="admin-shell admin-crud-shell">
+      <AdminSidebar active="Konten Publik" />
+      <main className="admin-main">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Public content</p>
@@ -207,7 +208,7 @@ export default function AdminContentPage() {
           <section className="crud-table-panel">
             <div className="crud-toolbar">
               <label className="crud-search">
-                <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
+                <span>cari</span>
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari judul atau isi..." />
               </label>
             </div>
@@ -249,6 +250,7 @@ export default function AdminContentPage() {
             </div>
           </section>
         </section>
-      </AdminShell>
+      </main>
+    </div>
   );
 }

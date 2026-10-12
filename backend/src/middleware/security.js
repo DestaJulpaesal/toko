@@ -27,6 +27,14 @@ export const emailActionLimiter = rateLimit({
   message: { success: false, message: 'Terlalu banyak permintaan. Coba lagi beberapa menit.' },
 });
 
+export const contactMessageLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, message: 'Terlalu banyak pesan dikirim. Coba lagi beberapa menit.' },
+});
+
 export const checkoutLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 120,
@@ -419,6 +427,12 @@ export const siteContentCreateSchema = z.object({
   isPublished: z.coerce.boolean().optional().default(true),
 });
 export const siteContentUpdateSchema = siteContentCreateSchema.partial();
+
+export const contactMessageSchema = z.object({
+  name: z.string().trim().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
+  phone: z.string().trim().min(8, 'Nomor WhatsApp minimal 8 karakter').max(30, 'Nomor WhatsApp maksimal 30 karakter'),
+  message: z.string().trim().min(3, 'Pesan minimal 3 karakter').max(2000, 'Pesan maksimal 2000 karakter'),
+});
 
 // ---- Profil situs ----
 export const siteProfileUpdateSchema = z.object({

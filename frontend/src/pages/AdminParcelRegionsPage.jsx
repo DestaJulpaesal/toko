@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { KeyRound, MapPinned, Pencil, RefreshCw, Trash2, UserPlus, Users, WalletCards, X } from 'lucide-react';
-import AdminShell from '../layouts/AdminShell';
+import AdminSidebar from '../components/AdminSidebar';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
 
@@ -80,7 +80,9 @@ export default function AdminParcelRegionsPage() {
   };
 
   return (
-    <AdminShell active="Wilayah Parsel">
+    <div className="admin-shell">
+      <AdminSidebar active="Wilayah Parsel" />
+      <main className="admin-main">
         <header className="admin-header">
           <div><p className="eyebrow light">Parcel operations</p><h1>Wilayah Parsel</h1><p className="admin-subtitle">Pantau peserta, setoran, progress, dan komisi manager per wilayah.</p></div>
           <button type="button" className="btn btn-secondary" onClick={loadRegions}><RefreshCw size={15} /> Refresh</button>
@@ -109,6 +111,7 @@ export default function AdminParcelRegionsPage() {
             {!loading && !managers.length && <div className="dashboard-empty-state">Belum ada akun operasional. Buat akun manager dari form di atas.</div>}
           </div>
         </section>
-      </AdminShell>
+      </main>
+    </div>
   );
 }

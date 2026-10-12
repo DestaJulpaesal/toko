@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import AdminShell from '../layouts/AdminShell';
+import AdminSidebar from '../components/AdminSidebar';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
@@ -136,7 +136,9 @@ export default function AdminParcelProgramsPage() {
   };
 
   return (
-    <AdminShell active="Program Parsel" className="admin-crud-shell">
+    <div className="admin-shell admin-crud-shell">
+      <AdminSidebar active="Program Parsel" />
+      <main className="admin-main">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Parcel program catalog</p>
@@ -244,6 +246,7 @@ export default function AdminParcelProgramsPage() {
             </div>
           </section>
         </section>
-      </AdminShell>
+      </main>
+    </div>
   );
 }

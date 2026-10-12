@@ -1,7 +1,13 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
-import { validateBody, siteContentCreateSchema, siteContentUpdateSchema } from '../middleware/security.js';
+import {
+  contactMessageLimiter,
+  validateBody,
+  contactMessageSchema,
+  siteContentCreateSchema,
+  siteContentUpdateSchema,
+} from '../middleware/security.js';
 
 const router = express.Router();
 
@@ -162,6 +168,19 @@ router.get('/public', async (req, res) => {
   } catch (error) {
     console.error('Public site content load failed:', error.message);
     return res.status(500).json({ success: false, message: 'Konten publik gagal dimuat.' });
+  }
+});
+
+router.post('/messages', contactMessageLimiter, validateBody(contactMessageSchema), async (req, res) => {
+  try {
+    const { name, phone, message } = req.body;
+    await prisma.contactMessage.create({
+      data: { name, phone, message },
+    });
+    return res.status(201).json({ success: true, message: 'Pesan berhasil dikirim. Tim Glosir akan segera menghubungi Anda.' });
+  } catch (error) {
+    console.error('Contact message submission failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Pesan belum bisa disimpan. Silakan coba lagi.' });
   }
 });
 

@@ -25,12 +25,7 @@ export default function CartPage() {
   }, []);
 
   const subtotal = totalPrice;
-<<<<<<< HEAD
   const total = Math.max(0, subtotal - discount);
-=======
-  const ongkir = 0;
-  const total = subtotal - discount + ongkir;
->>>>>>> 1269403bf23387faac28fbe9b9d1c3a919191dce
 
   const confirmRemoveItem = async (item) => {
     if (await confirmAction(`Hapus "${item.name}" dari keranjang belanja?`)) {
@@ -129,7 +124,6 @@ export default function CartPage() {
               ))
             )}
           </div>
-<<<<<<< HEAD
 
           <aside className="cart-summary" style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '20px', padding: '24px', height: 'fit-content' }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 16px', color: '#111827' }}>Ringkasan Belanja</h3>
@@ -205,37 +199,7 @@ export default function CartPage() {
               Lanjut ke Checkout <ArrowRight size={20} />
             </Link>
           </aside>
-=======
-          <div className="summary-row">
-            <span>Ongkir</span>
-            <strong>{ongkir ? `Rp ${ongkir.toLocaleString('id-ID')}` : 'Gratis'}</strong>
-          </div>
-          <div className="pickup-summary"><strong>Pengambilan: Ambil langsung di toko</strong><small>Ongkir Rp0 · Pesanan disiapkan setelah konfirmasi WhatsApp.</small></div>
-          <form className="promo-form" onSubmit={handlePromo}><input value={promoInput} onChange={(event) => setPromoInput(event.target.value)} placeholder="Kode promo" aria-label="Kode promo" /><button type="submit">Pakai</button></form>
-          {promo && <div className="applied-promo"><span>{promo} aktif</span><button onClick={removePromo}>Hapus</button></div>}
-          {promoMessage && <p className="promo-message">{promoMessage}</p>}
-          {discount > 0 && <div className="summary-row discount-row"><span>Diskon promo</span><strong>- Rp {discount.toLocaleString('id-ID')}</strong></div>}
-          <div className="summary-row total">
-            <span>Total</span>
-            <strong>Rp {total.toLocaleString('id-ID')}</strong>
-          </div>
-          <Link to="/checkout" className={`btn btn-primary full center-link ${items.length === 0 ? 'is-disabled' : ''}`} aria-disabled={items.length === 0} onClick={(event) => { if (items.length === 0) event.preventDefault(); }}>
-            {items.length === 0 ? 'Belanja dulu' : 'Lanjut ke checkout'}
-          </Link>
-        </aside>
->>>>>>> 1269403bf23387faac28fbe9b9d1c3a919191dce
         </div>
-        {items.length > 0 && (
-          <div className="mobile-summary-bar">
-            <div>
-              <span>Total</span>
-              <strong>Rp {total.toLocaleString('id-ID')}</strong>
-            </div>
-            <div className="mobile-summary-actions">
-              <Link to="/checkout" className="btn btn-primary small">Checkout</Link>
-            </div>
-          </div>
-        )}
       </div>
       <PublicFooter />
     </div>
