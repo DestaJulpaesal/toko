@@ -47,6 +47,7 @@ export function formatProduct(product, audience = AUDIENCE.PUBLIC) {
     variantId: variant?.id,
     name: product.name,
     category: product.category?.name || 'Glosir',
+    description: product.description || '',
     price,
     originalPrice,
     discountPercent,

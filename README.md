@@ -70,12 +70,15 @@ Set `VITE_STORE_WHATSAPP_NUMBER` to the store's customer-order number in interna
 
 For the backend, set `DATABASE_URL`, `DIRECT_URL`, and a strong `JWT_SECRET`. `DATABASE_URL` should use the Supabase transaction pooler; `DIRECT_URL` should use the direct PostgreSQL connection for Prisma migrations. Never commit real `.env` files or service-role keys.
 
+Homepage Glosir mengambil kategori, promo aktif, dan produk pilihan melalui satu endpoint `/api/homepage`; cache homepage ditampilkan segera lalu diperbarui dari API. Halaman katalog menampilkan katalog publik dari cache browser lebih dulu, lalu memperbaruinya dari API. Cache hanya menyimpan data publik yang sudah dibersihkan dari harga modal dan kolom internal.
+
 Halaman `/contact-us` menyimpan nama, nomor WhatsApp, dan pesan pengunjung ke tabel `ContactMessage`.
 Pada database baru atau database yang sudah memiliki baseline Prisma, jalankan
 `npx prisma migrate deploy` dari folder `backend` agar tabel tersedia. Database
 lama yang belum memiliki baseline harus dibaseline sesuai kondisi aktual sebelum
 migrasi Prisma dijalankan. Peta dan tautan rating memakai alamat toko yang
-disediakan pemilik; perbarui alamat di
+disediakan pemilik; halaman kontak menampilkan peta interaktif langsung di
+halaman. Perbarui alamat di
 `frontend/src/pages/ContactPage.jsx` jika lokasi toko berubah.
 
 Untuk menjalankan data demo, gunakan hanya database development dan set sesi

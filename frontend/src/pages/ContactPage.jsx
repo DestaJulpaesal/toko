@@ -163,7 +163,7 @@ export default function ContactPage() {
             <iframe
               title="Peta lokasi Toko Glosir"
               src={MAP_EMBED_URL}
-              loading="lazy"
+              loading="eager"
               referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen
             />

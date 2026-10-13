@@ -8,7 +8,7 @@ export default function ProductCard({ product, isFavorited = false, onToggleFavo
 
   return (
     <article
-      className="bg-white border border-gray-200 rounded-[18px] p-3 flex flex-col relative shadow-sm hover:shadow-md transition-shadow"
+      className="product-card catalog-product-card bg-white border border-gray-200 rounded-[18px] p-3 flex flex-col relative shadow-sm hover:shadow-md transition-shadow"
       style={{
         background: '#ffffff',
         border: '1px solid #e5e7eb',
@@ -22,7 +22,7 @@ export default function ProductCard({ product, isFavorited = false, onToggleFavo
     >
       {/* Kontainer Foto Produk & Tombol Wishlist */}
       <div
-        className="relative w-full aspect-square rounded-[14px] overflow-hidden bg-slate-50 mb-2.5 block"
+        className="catalog-product-image relative w-full aspect-square rounded-[14px] overflow-hidden bg-slate-50 mb-2.5 block"
         style={{
           position: 'relative',
           width: '100%',
@@ -42,31 +42,38 @@ export default function ProductCard({ product, isFavorited = false, onToggleFavo
             if (onToggleFavorite) onToggleFavorite(product);
           }}
           aria-label={isFavorited ? `Hapus ${product.name} dari favorit` : `Tambahkan ${product.name} ke favorit`}
+          aria-pressed={isFavorited}
           className="absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-sm flex items-center justify-center transition-all cursor-pointer border-none"
           style={{
             position: 'absolute',
-            top: '10px',
-            right: '10px',
+            top: '9px',
+            right: '9px',
             zIndex: 10,
-            background: 'rgba(255, 255, 255, 0.9)',
-            border: 'none',
+            background: isFavorited ? '#fff1f2' : 'rgba(255, 255, 255, 0.96)',
+            border: `1px solid ${isFavorited ? '#fecdd3' : 'rgba(229, 231, 235, 0.9)'}`,
             borderRadius: '50%',
-            width: '32px',
-            height: '32px',
+            width: '36px',
+            minWidth: '36px',
+            height: '36px',
+            minHeight: '36px',
+            padding: 0,
             display: 'flex',
+            flex: '0 0 36px',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-            transition: 'transform 0.15s ease, background 0.15s ease',
+            color: isFavorited ? '#e11d48' : '#64748b',
+            boxShadow: '0 2px 8px rgba(15, 23, 42, 0.16)',
+            transition: 'transform 0.15s ease, background 0.15s ease, color 0.15s ease',
           }}
         >
           <Heart
             size={18}
             className={isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-600 fill-none'}
             fill={isFavorited ? '#ef4444' : 'none'}
-            color={isFavorited ? '#ef4444' : '#4b5563'}
+            color={isFavorited ? '#e11d48' : '#475569'}
             strokeWidth={2}
+            style={{ display: 'block', width: 18, height: 18, flex: '0 0 18px' }}
           />
         </button>
 
@@ -142,7 +149,7 @@ export default function ProductCard({ product, isFavorited = false, onToggleFavo
       {/* Nama Produk */}
       <Link
         to={product.detailPath || `/products/${product.id}`}
-        className="text-gray-900 font-bold text-base leading-snug mb-2 line-clamp-2 min-h-[2.6em] no-underline hover:text-[#1f7a4a]"
+        className="catalog-product-title text-gray-900 font-bold text-base leading-snug mb-2 line-clamp-2 min-h-[2.6em] no-underline hover:text-[#1f7a4a]"
         style={{
           textDecoration: 'none',
           color: '#111827',
@@ -161,7 +168,7 @@ export default function ProductCard({ product, isFavorited = false, onToggleFavo
       </Link>
 
       {/* Harga Produk */}
-      <div style={{ marginTop: 'auto', marginBottom: '12px' }}>
+      <div className="catalog-product-price" style={{ marginTop: 'auto', marginBottom: '12px' }}>
         <div
           className="text-xl font-black text-[#1f7a4a]"
           style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1f7a4a' }}
@@ -182,7 +189,7 @@ export default function ProductCard({ product, isFavorited = false, onToggleFavo
       <button
         type="button"
         onClick={() => onAddToCart && onAddToCart(product)}
-        className="w-full min-h-[46px] rounded-xl bg-[#1f7a4a] hover:bg-[#166534] text-white font-extrabold text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer border-none"
+        className="catalog-product-add w-full min-h-[46px] rounded-xl bg-[#1f7a4a] hover:bg-[#166534] text-white font-extrabold text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer border-none"
         style={{
           width: '100%',
           minHeight: '46px',

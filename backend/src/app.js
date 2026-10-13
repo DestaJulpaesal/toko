@@ -48,6 +48,8 @@ import { startExpiryNotificationJob } from './jobs/expiryNotificationJob.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import operationalNotificationRoutes from './routes/operationalNotificationRoutes.js';
 import stockMovementRoutes from './routes/stockMovementRoutes.js';
+import prisma from './config/db.js';
+import { createHomepageHandler } from './services/homepageHandler.js';
 
 const app = express();
 
@@ -84,6 +86,7 @@ app.get('/api/health', (req, res) => {
 // sebagai lapisan tambahan selain loginLimiter & checkoutLimiter yang sudah ada.
 app.use('/api', apiLimiter);
 
+app.get('/api/homepage', createHomepageHandler(prisma));
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/products', productUnitRoutes);

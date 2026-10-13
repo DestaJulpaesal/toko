@@ -10,6 +10,7 @@ import jwt from 'jsonwebtoken';
 import { createAuth } from '../src/middleware/auth.js';
 import { createSessionService } from '../src/services/sessionService.js';
 import { createCatalogHandlers } from '../src/services/catalogHandlers.js';
+import { createHomepageHandler } from '../src/services/homepageHandler.js';
 import {
   AUDIENCE,
   PUBLIC_FORBIDDEN_KEYS,
@@ -29,6 +30,7 @@ const makeProduct = (overrides = {}, variantOverrides = {}) => ({
   name: 'Le Mineral 1,5 ML',
   sku: 'SKU-LEMINERAL',
   status: 'ACTIVE',
+  description: 'Air mineral untuk kebutuhan sehari-hari.',
   stockWarning: 5,
   isQuickAccess: true,
   isFeatured: false,
@@ -91,6 +93,33 @@ app.get('/products', softAuth, handlers.listProducts);
 app.get('/products/:id', softAuth, handlers.getProduct);
 app.get('/event-packages', handlers.listEventPackages);
 app.get('/event-packages/:id', handlers.getEventPackage);
+app.get('/homepage', createHomepageHandler({
+  category: {
+    async findMany() {
+      return [{ id: 'c-home', name: 'Sembako', _count: { products: 1 } }];
+    },
+  },
+  promoCampaign: {
+    async findMany() {
+      return [{ id: 'promo-home', name: 'Promo Hemat', discountType: 'PERCENT', discountValue: '10', isActive: true }];
+    },
+  },
+  product: {
+    async findMany() {
+      return [{
+        id: 'p-home',
+        name: 'Beras',
+        imageUrl: null,
+        originalPrice: '15000',
+        isFlashSale: true,
+        isBestseller: true,
+        isRecommended: false,
+        category: { name: 'Sembako' },
+        variants: [{ sellPrice: '12000', basePrice: '9000' }],
+      }];
+    },
+  },
+}));
 const server = await new Promise((resolve) => { const s = app.listen(0, () => resolve(s)); });
 const baseUrl = `http://127.0.0.1:${server.address().port}`;
 test.after(() => server.close());
@@ -142,6 +171,18 @@ test('pengunjung: paket acara tidak berisi harga modal / kolom mentah varian', a
   assert.equal(detail.body.package.items[0].variant.product.name, 'Le Mineral 1,5 ML');
 });
 
+test('homepage: satu respons berisi semua data publik tanpa membocorkan harga modal', async () => {
+  const { status, body } = await get('/homepage');
+  assert.equal(status, 200);
+  assert.equal(body.categories[0].name, 'Sembako');
+  assert.equal(body.promos[0].name, 'Promo Hemat');
+  assert.equal(body.flashSaleProducts[0].price, 12000);
+  assert.equal(body.flashSaleProducts[0].originalPrice, 15000);
+  assert.equal(body.bestsellerProducts[0].id, 'p-home');
+  assert.deepEqual(body.recommendedProducts, []);
+  assert.deepEqual(findForbiddenKeys(body), []);
+});
+
 test('token kedaluwarsa atau ngawur: tetap 200 sebagai pengunjung, bukan 403', async () => {
   for (const token of [tokenFor('OWNER', { expiresIn: -10 }), 'token.ngawur.sekali']) {
     const { status, body } = await get('/products?all=true', token);
@@ -164,6 +205,15 @@ test('kasir: tidak menerima harga modal, tetapi menerima barcode dan harga grosi
   assert.equal(first.barcode, '8996001600399');
   assert.equal(first.wholesalePrice, 5000);
   assert.equal(first.variants[0].wholesalePrice, 5000);
+});
+
+test('detail produk: mengirim deskripsi dan varian publik tanpa data modal', async () => {
+  const { status, body } = await get('/products/p-aktif');
+  assert.equal(status, 200);
+  assert.equal(body.product.description, 'Air mineral untuk kebutuhan sehari-hari.');
+  assert.equal(body.product.variants[0].id, 'v-aktif');
+  assert.equal(JSON.stringify(body).includes('basePrice'), false);
+  assert.equal(JSON.stringify(body).includes('purchasePrice'), false);
 });
 
 test('OWNER dan ADMIN: menerima harga modal dan bisa memakai ?all=true', async () => {

@@ -39,7 +39,10 @@ export function createCatalogHandlers(db) {
     try {
       const product = await db.product.findUnique({
         where: { id: req.params.id },
-        include: { category: true, variants: { where: { isDefault: true, isActive: true }, take: 1 } },
+        include: {
+          category: true,
+          variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } },
+        },
       });
 
       // Produk Draft/Hidden tidak boleh terlihat oleh pengunjung, walaupun ID-nya diketahui.

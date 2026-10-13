@@ -7,7 +7,7 @@ import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import CatalogImage from '../components/CatalogImage';
 import ProductCard from '../components/ProductCard';
-import { PUBLIC_CATALOG_CACHE_KEY, categoriesFromProducts, stripSensitive } from '../utils/catalogStorage';
+import { PUBLIC_CATALOG_CACHE_KEY, categoriesFromProducts, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
 import { showSuccess } from '../utils/noticeService';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
@@ -56,17 +56,27 @@ const CATEGORY_META = {
 export default function ProductPage() {
   const [searchParams] = useSearchParams();
   const { addItem, totalItems } = useCart();
+  const [initialCatalog] = useState(() => {
+    const cached = readJsonStorage(localStorage, PUBLIC_CATALOG_CACHE_KEY, []);
+    return Array.isArray(cached) ? stripSensitive(cached) : [];
+  });
   const [activeFilter, setActiveFilter] = useState(searchParams.get('category') || '');
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState(initialCatalog);
+  const [categories, setCategories] = useState(() => categoriesFromProducts(initialCatalog));
+  const [categoriesLoading, setCategoriesLoading] = useState(() => initialCatalog.length === 0);
+  const [loading, setLoading] = useState(() => initialCatalog.length === 0);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [sort, setSort] = useState('default');
   const [categoryScrollEdges, setCategoryScrollEdges] = useState({ left: false, right: false });
   const categoryScrollRef = useRef(null);
   const { toggleFavorite, isFavorite } = useFavorites();
-  const filters = categories.map((cat) => cat.name);
+  const filters = categories
+    .map((category) => category.name)
+    .sort((first, second) => {
+      if (first === 'Glosir') return -1;
+      if (second === 'Glosir') return 1;
+      return first.localeCompare(second, 'id');
+    });
 
   const updateCategoryScrollEdges = () => {
     const element = categoryScrollRef.current;
@@ -110,17 +120,7 @@ export default function ProductPage() {
   useEffect(() => {
     let cancelled = false;
     let categoriesLoaded = false;
-    let catalogForCategories = [];
-
-    try {
-      const cachedProducts = JSON.parse(localStorage.getItem(PUBLIC_CATALOG_CACHE_KEY) || '[]');
-      if (Array.isArray(cachedProducts) && cachedProducts.length > 0) {
-        catalogForCategories = stripSensitive(cachedProducts);
-        setProducts(catalogForCategories);
-      }
-    } catch {
-      // Ignore an invalid local cache and use the API response.
-    }
+    let catalogForCategories = initialCatalog;
 
     const fetchJson = async (path) => {
       const response = await apiFetch(path);
@@ -200,8 +200,12 @@ export default function ProductPage() {
         const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
         catalogForCategories = merged;
         setProducts(merged);
-        if (!categoriesLoaded) setCategories(categoriesFromProducts(merged));
-        localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));
+        if (!categoriesLoaded && merged.length > 0) setCategories(categoriesFromProducts(merged));
+        try {
+          localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));
+        } catch (error) {
+          console.warn('Catalog cache could not be saved:', error);
+        }
       })
       .catch((error) => console.error('Catalog content failed:', error))
       .finally(() => setLoading(false));
@@ -209,7 +213,7 @@ export default function ProductPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialCatalog]);
 
   const visibleProducts = products
     .filter((product) => {
@@ -228,14 +232,14 @@ export default function ProductPage() {
   return (
     <div className="glosir-public-page">
       <PublicHeader />
-      <main className="catalog-shell" style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 16px' }}>
-        <header style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
+      <main className="catalog-shell catalog-page-shell">
+        <header className="catalog-page-heading">
           <div>
-            <span style={{ fontSize: '0.85rem', color: '#1f7a4a', fontWeight: 800, textTransform: 'uppercase' }}>Katalog Produk</span>
-            <h1 style={{ fontSize: '1.8rem', fontWeight: 900, color: '#111827', margin: '4px 0 0' }}>Belanja Grosir & Eceran</h1>
+            <span className="catalog-page-eyebrow">Katalog Produk</span>
+            <h1>Belanja Grosir & Eceran</h1>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <Link to="/cart" className="btn btn-primary" style={{ minHeight: '44px', fontWeight: 700, borderRadius: '12px' }}>
+          <div className="catalog-page-heading-actions">
+            <Link to="/cart" className="btn btn-primary">
               Keranjang ({totalItems})
             </Link>
           </div>
@@ -327,36 +331,19 @@ export default function ProductPage() {
         )}
 
         {/* Pencarian & Urutan */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1', minWidth: '240px', position: 'relative' }}>
-            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+        <div className="catalog-page-tools">
+          <div className="catalog-page-search">
+            <Search size={18} aria-hidden="true" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Cari nama barang..."
-              style={{
-                width: '100%',
-                height: '46px',
-                paddingLeft: '40px',
-                paddingRight: '14px',
-                borderRadius: '12px',
-                border: '1px solid #d1d5db',
-                fontSize: '0.95rem',
-              }}
             />
           </div>
           <select
             value={sort}
             onChange={(event) => setSort(event.target.value)}
             aria-label="Urutkan produk"
-            style={{
-              height: '46px',
-              padding: '0 16px',
-              borderRadius: '12px',
-              border: '1px solid #d1d5db',
-              fontSize: '0.92rem',
-              background: '#ffffff',
-            }}
           >
             <option value="default">Urutkan: Rekomendasi</option>
             <option value="low">Harga Termurah</option>
@@ -365,7 +352,7 @@ export default function ProductPage() {
         </div>
 
         {/* Grid Produk Style FreshMart: Gambar Besar, Harga Jelas, Tombol Tambah Besar */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
+        <div className="catalog-page-product-grid">
           {visibleProducts.map((product) => (
             <ProductCard
               key={product.id}

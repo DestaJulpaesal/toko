@@ -55,6 +55,34 @@ const defaultCategories = [
   { name: 'Promo Mingguan', icon: '🏷️' },
 ];
 
+const PUBLIC_HOMEPAGE_CACHE_KEY = 'glosir_public_homepage_v1';
+let homepageRequestPromise;
+
+function readHomepageCache() {
+  const cached = readJsonStorage(localStorage, PUBLIC_HOMEPAGE_CACHE_KEY, null);
+  if (!cached
+    || !Array.isArray(cached.categories)
+    || !Array.isArray(cached.promos)
+    || !Array.isArray(cached.flashSaleProducts)
+    || !Array.isArray(cached.bestsellerProducts)
+    || !Array.isArray(cached.recommendedProducts)) return null;
+  return cached;
+}
+
+function fetchHomepageData() {
+  if (!homepageRequestPromise) {
+    homepageRequestPromise = apiFetch('/homepage')
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Homepage gagal dimuat (${response.status})`);
+        return response.json();
+      })
+      .finally(() => {
+        homepageRequestPromise = null;
+      });
+  }
+  return homepageRequestPromise;
+}
+
 function promoIsActive(promo, now = Date.now()) {
   const startsAt = promo.startsAt ? new Date(promo.startsAt).getTime() : null;
   const endsAt = promo.endsAt ? new Date(promo.endsAt).getTime() : null;
@@ -117,13 +145,14 @@ function HomePromoBanner({ promo, variant }) {
 }
 
 export default function HomePage() {
-  const [flashSaleProducts, setFlashSaleProducts] = useState([]);
-  const [bestsellerProducts, setBestsellerProducts] = useState([]);
-  const [recommendedProducts, setRecommendedProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [activePromos, setActivePromos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialHomepage] = useState(readHomepageCache);
+  const [flashSaleProducts, setFlashSaleProducts] = useState(() => initialHomepage?.flashSaleProducts || []);
+  const [bestsellerProducts, setBestsellerProducts] = useState(() => initialHomepage?.bestsellerProducts || []);
+  const [recommendedProducts, setRecommendedProducts] = useState(() => initialHomepage?.recommendedProducts || []);
+  const [categories, setCategories] = useState(() => initialHomepage?.categories || []);
+  const [categoriesLoading, setCategoriesLoading] = useState(() => !initialHomepage);
+  const [activePromos, setActivePromos] = useState(() => (initialHomepage?.promos || []).filter((promo) => promoIsActive(promo)));
+  const [loading, setLoading] = useState(() => !initialHomepage);
   const findHomePromo = (name) => activePromos.find((promo) => promo.name?.trim().toLowerCase() === name);
   
   const flashSaleScrollRef = useRef(null);
@@ -146,116 +175,45 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
-    let categoryRequestSettled = false;
     const cachedProducts = readJsonStorage(localStorage, PUBLIC_CATALOG_CACHE_KEY, []);
     const safeCachedProducts = Array.isArray(cachedProducts) ? stripSensitive(cachedProducts) : [];
-    let fallbackCategories = categoriesFromProducts(safeCachedProducts);
+    const fallbackCategories = categoriesFromProducts(safeCachedProducts);
 
-    apiFetch('/categories/public/list')
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Kategori gagal dimuat (${response.status})`);
-        return response.json();
-      })
+    fetchHomepageData()
       .then((data) => {
-        if (!cancelled) {
-          const remoteCategories = data?.success && Array.isArray(data.categories) ? data.categories : [];
-          categoryRequestSettled = true;
-          setCategories(remoteCategories.length > 0 ? remoteCategories : fallbackCategories);
+        if (cancelled) return;
+
+        const homepage = {
+          categories: Array.isArray(data?.categories) && data.categories.length > 0
+            ? data.categories
+            : fallbackCategories,
+          promos: Array.isArray(data?.promos) ? data.promos : [],
+          flashSaleProducts: Array.isArray(data?.flashSaleProducts) ? data.flashSaleProducts : [],
+          bestsellerProducts: Array.isArray(data?.bestsellerProducts) ? data.bestsellerProducts : [],
+          recommendedProducts: Array.isArray(data?.recommendedProducts) ? data.recommendedProducts : [],
+        };
+
+        setCategories(homepage.categories);
+        setActivePromos(homepage.promos.filter((promo) => promoIsActive(promo)));
+        setFlashSaleProducts(homepage.flashSaleProducts);
+        setBestsellerProducts(homepage.bestsellerProducts);
+        setRecommendedProducts(homepage.recommendedProducts);
+        setLoading(false);
+        setCategoriesLoading(false);
+
+        try {
+          localStorage.setItem(PUBLIC_HOMEPAGE_CACHE_KEY, JSON.stringify(homepage));
+        } catch (error) {
+          console.warn('Homepage cache could not be saved:', error);
         }
       })
       .catch((error) => {
-        console.error('Homepage category list failed:', error);
-        categoryRequestSettled = true;
-        if (!cancelled) setCategories(fallbackCategories);
-      })
-      .finally(() => {
-        if (!cancelled) setCategoriesLoading(false);
+        console.error('Homepage data failed:', error);
+        if (cancelled) return;
+        if (fallbackCategories.length > 0 && categories.length === 0) setCategories(fallbackCategories);
+        setLoading(false);
+        setCategoriesLoading(false);
       });
-
-    apiFetch('/promos?activeOnly=true')
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Promo gagal dimuat (${response.status})`);
-        return response.json();
-      })
-      .then((data) => {
-        if (!cancelled) {
-          const promos = data?.success && Array.isArray(data.promos) ? data.promos : [];
-          setActivePromos(promos.filter((promo) => promoIsActive(promo)));
-        }
-      })
-      .catch((error) => {
-        console.error('Homepage promo list failed:', error);
-        if (!cancelled) setActivePromos([]);
-      });
-
-    Promise.all([
-      apiFetch('/products').then((res) => res.json()).catch(() => null),
-      apiFetch('/products/public/flash-sale').then((res) => res.json()).catch(() => null),
-      apiFetch('/products/public/bestseller').then((res) => res.json()).catch(() => null),
-      apiFetch('/products/public/recommended').then((res) => res.json()).catch(() => null),
-    ]).then(([productsRes, flashSaleRes, bestsellerRes, recommendedRes]) => {
-          if (cancelled) return;
-          const rawProducts = productsRes?.success && Array.isArray(productsRes.products) ? productsRes.products : [];
-          const rawFlashSale = flashSaleRes?.success && Array.isArray(flashSaleRes.products) ? flashSaleRes.products : [];
-          const rawBestseller = bestsellerRes?.success && Array.isArray(bestsellerRes.products) ? bestsellerRes.products : [];
-          const rawRecommended = recommendedRes?.success && Array.isArray(recommendedRes.products) ? recommendedRes.products : [];
-
-          if (!categoryRequestSettled && rawProducts.length > 0) {
-            fallbackCategories = categoriesFromProducts(rawProducts);
-          }
-
-          if (rawFlashSale.length > 0) {
-            setFlashSaleProducts(
-              rawFlashSale.map((p) => ({
-                id: p.id,
-                name: p.name,
-                category: p.category || 'Sembako',
-                price: Number(p.price || 0),
-                originalPrice: Number(p.originalPrice || 0),
-                imageUrl: p.imageUrl || null,
-                badge: 'Flash Sale',
-              }))
-            );
-          }
-
-          if (rawBestseller.length > 0) {
-            setBestsellerProducts(
-              rawBestseller.map((p) => ({
-                id: p.id,
-                name: p.name,
-                category: p.category || 'Sembako',
-                price: Number(p.price || 0),
-                originalPrice: Number(p.originalPrice || 0),
-                imageUrl: p.imageUrl || null,
-                badge: 'Terlaris',
-              }))
-            );
-          }
-
-          if (rawRecommended.length > 0) {
-            setRecommendedProducts(
-              rawRecommended.map((p) => ({
-                id: p.id,
-                name: p.name,
-                category: p.category || 'Sembako',
-                price: Number(p.price || 0),
-                originalPrice: Number(p.originalPrice || 0),
-                imageUrl: p.imageUrl || null,
-                badge: 'Rekomendasi',
-              }))
-            );
-          }
-
-          setLoading(false);
-        }).catch((error) => {
-          console.error('Homepage catalog content failed:', error);
-          if (cancelled) return;
-          setFlashSaleProducts([]);
-          setBestsellerProducts([]);
-          setRecommendedProducts([]);
-          setActivePromos([]);
-          setLoading(false);
-        });
 
     return () => {
       cancelled = true;
