@@ -35,6 +35,21 @@ export function categoriesFromProducts(products) {
   }));
 }
 
+export function mergeCatalogCategories(categories, products) {
+  const merged = new Map();
+  const addCategory = (category) => {
+    const name = String(category?.name || '').trim();
+    if (!name) return;
+
+    const key = name.toLocaleLowerCase('id');
+    if (!merged.has(key)) merged.set(key, { ...category, name });
+  };
+
+  categories.forEach(addCategory);
+  categoriesFromProducts(products).forEach(addCategory);
+  return Array.from(merged.values());
+}
+
 export function readJsonStorage(storage, key, fallback) {
   try {
     const saved = storage.getItem(key);

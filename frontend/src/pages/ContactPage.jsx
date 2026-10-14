@@ -21,6 +21,7 @@ export default function ContactPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -159,13 +160,20 @@ export default function ContactPage() {
               <MapPin size={17} /> Petunjuk arah
             </a>
           </div>
-          <div className="contact-map-frame">
+          <div className={`contact-map-frame${mapLoaded ? ' is-loaded' : ''}`}>
+            <div className="contact-map-placeholder">
+              <span className="contact-map-placeholder-pin"><MapPin size={24} /></span>
+              <strong>{STORE_NAME}</strong>
+              <span>{STORE_ADDRESS}</span>
+              <a href={MAPS_URL} target="_blank" rel="noreferrer">Buka lokasi di Google Maps</a>
+            </div>
             <iframe
               title="Peta lokasi Toko Glosir"
               src={MAP_EMBED_URL}
-              loading="eager"
+              loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen
+              onLoad={() => setMapLoaded(true)}
             />
             <a className="contact-map-rating" href={MAPS_URL} target="_blank" rel="noreferrer">
               <span className="contact-map-rating-stars" aria-hidden="true">

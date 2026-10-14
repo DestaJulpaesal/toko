@@ -6,7 +6,7 @@ import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import { useCart } from '../context/CartContext';
 import { showSuccess } from '../utils/noticeService';
-import { PUBLIC_CATALOG_CACHE_KEY, categoriesFromProducts, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
+import { PUBLIC_CATALOG_CACHE_KEY, categoriesFromProducts, mergeCatalogCategories, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
 
 const CATEGORY_META = {
   'Glosir': {
@@ -146,11 +146,15 @@ function HomePromoBanner({ promo, variant }) {
 
 export default function HomePage() {
   const [initialHomepage] = useState(readHomepageCache);
+  const [initialCatalogCategories] = useState(() => {
+    const cachedProducts = readJsonStorage(localStorage, PUBLIC_CATALOG_CACHE_KEY, []);
+    return categoriesFromProducts(Array.isArray(cachedProducts) ? stripSensitive(cachedProducts) : []);
+  });
   const [flashSaleProducts, setFlashSaleProducts] = useState(() => initialHomepage?.flashSaleProducts || []);
   const [bestsellerProducts, setBestsellerProducts] = useState(() => initialHomepage?.bestsellerProducts || []);
   const [recommendedProducts, setRecommendedProducts] = useState(() => initialHomepage?.recommendedProducts || []);
-  const [categories, setCategories] = useState(() => initialHomepage?.categories || []);
-  const [categoriesLoading, setCategoriesLoading] = useState(() => !initialHomepage);
+  const [categories, setCategories] = useState(() => mergeCatalogCategories(initialHomepage?.categories || [], initialCatalogCategories));
+  const [categoriesLoading, setCategoriesLoading] = useState(() => !initialHomepage?.categories?.length && initialCatalogCategories.length === 0);
   const [activePromos, setActivePromos] = useState(() => (initialHomepage?.promos || []).filter((promo) => promoIsActive(promo)));
   const [loading, setLoading] = useState(() => !initialHomepage);
   const findHomePromo = (name) => activePromos.find((promo) => promo.name?.trim().toLowerCase() === name);
@@ -179,21 +183,39 @@ export default function HomePage() {
     const safeCachedProducts = Array.isArray(cachedProducts) ? stripSensitive(cachedProducts) : [];
     const fallbackCategories = categoriesFromProducts(safeCachedProducts);
 
+    apiFetch('/categories/public/list')
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Daftar kategori gagal dimuat (${response.status})`);
+        return response.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const remoteCategories = data?.success && Array.isArray(data.categories) ? data.categories : [];
+        setCategories((current) => mergeCatalogCategories(remoteCategories, current));
+      })
+      .catch((error) => {
+        console.error('Homepage category list failed:', error);
+      })
+      .finally(() => {
+        if (!cancelled) setCategoriesLoading(false);
+      });
+
     fetchHomepageData()
       .then((data) => {
         if (cancelled) return;
 
         const homepage = {
-          categories: Array.isArray(data?.categories) && data.categories.length > 0
-            ? data.categories
-            : fallbackCategories,
+          categories: mergeCatalogCategories(
+            Array.isArray(data?.categories) ? data.categories : [],
+            fallbackCategories,
+          ),
           promos: Array.isArray(data?.promos) ? data.promos : [],
           flashSaleProducts: Array.isArray(data?.flashSaleProducts) ? data.flashSaleProducts : [],
           bestsellerProducts: Array.isArray(data?.bestsellerProducts) ? data.bestsellerProducts : [],
           recommendedProducts: Array.isArray(data?.recommendedProducts) ? data.recommendedProducts : [],
         };
 
-        setCategories(homepage.categories);
+        setCategories((current) => mergeCatalogCategories(homepage.categories, current));
         setActivePromos(homepage.promos.filter((promo) => promoIsActive(promo)));
         setFlashSaleProducts(homepage.flashSaleProducts);
         setBestsellerProducts(homepage.bestsellerProducts);
@@ -210,7 +232,7 @@ export default function HomePage() {
       .catch((error) => {
         console.error('Homepage data failed:', error);
         if (cancelled) return;
-        if (fallbackCategories.length > 0 && categories.length === 0) setCategories(fallbackCategories);
+        setCategories((current) => mergeCatalogCategories(fallbackCategories, current));
         setLoading(false);
         setCategoriesLoading(false);
       });
@@ -286,7 +308,7 @@ export default function HomePage() {
             <Link to="/products" className="view-all-link">Lihat Semua <ChevronRight size={16} /></Link>
           </div>
           <div className="category-browse-grid">
-            {categoriesLoading && <p className="category-loading" role="status">Memuat kategori...</p>}
+            {categoriesLoading && categories.length === 0 && <p className="category-loading" role="status">Memuat kategori...</p>}
             {categories.map((cat) => {
               const meta = CATEGORY_META[cat.name] || { icon: '🛍️' };
               return (

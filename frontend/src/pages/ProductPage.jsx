@@ -7,7 +7,7 @@ import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import CatalogImage from '../components/CatalogImage';
 import ProductCard from '../components/ProductCard';
-import { PUBLIC_CATALOG_CACHE_KEY, categoriesFromProducts, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
+import { PUBLIC_CATALOG_CACHE_KEY, categoriesFromProducts, mergeCatalogCategories, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
 import { showSuccess } from '../utils/noticeService';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
@@ -119,7 +119,7 @@ export default function ProductPage() {
 
   useEffect(() => {
     let cancelled = false;
-    let categoriesLoaded = false;
+    let remoteCategories = [];
     let catalogForCategories = initialCatalog;
 
     const fetchJson = async (path) => {
@@ -128,21 +128,25 @@ export default function ProductPage() {
       return response.json();
     };
 
+    const publishCategories = () => {
+      if (cancelled) return;
+      setCategories(mergeCatalogCategories(remoteCategories, catalogForCategories));
+    };
+
     fetchJson('/categories/public/list')
       .then((data) => {
-        if (!cancelled) {
-          const remoteCategories = data?.success && Array.isArray(data.categories) ? data.categories : [];
-          categoriesLoaded = true;
-          setCategories(remoteCategories.length > 0 ? remoteCategories : categoriesFromProducts(catalogForCategories));
-        }
+        if (cancelled) return;
+        remoteCategories = data?.success && Array.isArray(data.categories) ? data.categories : [];
+        publishCategories();
       })
       .catch((error) => {
         console.error('Catalog category list failed:', error);
-        categoriesLoaded = true;
-        if (!cancelled) setCategories(categoriesFromProducts(catalogForCategories));
       })
       .finally(() => {
-        if (!cancelled) setCategoriesLoading(false);
+        if (!cancelled) {
+          publishCategories();
+          setCategoriesLoading(false);
+        }
       });
 
     Promise.allSettled([
@@ -200,7 +204,7 @@ export default function ProductPage() {
         const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
         catalogForCategories = merged;
         setProducts(merged);
-        if (!categoriesLoaded && merged.length > 0) setCategories(categoriesFromProducts(merged));
+        publishCategories();
         try {
           localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));
         } catch (error) {
@@ -208,7 +212,11 @@ export default function ProductPage() {
         }
       })
       .catch((error) => console.error('Catalog content failed:', error))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -267,7 +275,7 @@ export default function ProductPage() {
               onScroll={updateCategoryScrollEdges}
             >
               {categoriesLoading && <p className="category-loading" role="status">Memuat kategori...</p>}
-              {!categoriesLoading && filters.map((filter) => {
+              {filters.map((filter) => {
                 const meta = CATEGORY_META[filter] || { icon: '🛍️' };
                 const isActive = filter === activeFilter;
 
