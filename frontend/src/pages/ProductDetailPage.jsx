@@ -1,24 +1,49 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, MessageCircle, Minus, Plus, ShoppingBag } from 'lucide-react';
+import { Check, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useFavorites } from '../context/FavoritesContext';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
+import ProductCard from '../components/ProductCard';
 import { apiFetch } from '../services/api';
 import { PUBLIC_CATALOG_CACHE_KEY, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
 import { showSuccess } from '../utils/noticeService';
 
-function readCachedProduct(id) {
+function readCachedProducts() {
   const products = readJsonStorage(localStorage, PUBLIC_CATALOG_CACHE_KEY, []);
-  return Array.isArray(products)
-    ? stripSensitive(products).find((product) => product.id === id) || null
-    : null;
+  return Array.isArray(products) ? stripSensitive(products) : [];
+}
+
+function readCachedProduct(id) {
+  return readCachedProducts().find((product) => product.id === id) || null;
+}
+
+function findRelatedProducts(product, products) {
+  const category = String(product?.category || '').trim().toLocaleLowerCase('id');
+  if (!category) return [];
+
+  return products
+    .filter((candidate) => (
+      candidate.id !== product.id
+      && String(candidate.category || '').trim().toLocaleLowerCase('id') === category
+      && Number(candidate.stock || 0) > 0
+    ))
+    .slice(0, 4);
+}
+
+function readCachedRelatedProducts(id) {
+  const products = readCachedProducts();
+  const product = products.find((entry) => entry.id === id);
+  return findRelatedProducts(product, products);
 }
 
 export default function ProductDetailPage() {
   const { id } = useParams();
   const { addItem } = useCart();
+  const { toggleFavorite, isFavorite } = useFavorites();
   const [product, setProduct] = useState(() => readCachedProduct(id));
+  const [relatedProducts, setRelatedProducts] = useState(() => readCachedRelatedProducts(id));
   const [loading, setLoading] = useState(() => !readCachedProduct(id));
   const [error, setError] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -28,6 +53,7 @@ export default function ProductDetailPage() {
     const cachedProduct = readCachedProduct(id);
 
     setProduct(cachedProduct);
+    setRelatedProducts(readCachedRelatedProducts(id));
     setLoading(!cachedProduct);
     setError('');
     setQuantity(1);
@@ -59,6 +85,29 @@ export default function ProductDetailPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!product) return undefined;
+
+    let cancelled = false;
+    apiFetch('/products')
+    .then(async (response) => {
+      const data = await response.json();
+      if (!response.ok || !data?.success || !Array.isArray(data.products)) {
+        throw new Error(data?.message || `Produk terkait gagal dimuat (${response.status})`);
+      }
+      if (!cancelled) {
+        setRelatedProducts(findRelatedProducts(product, stripSensitive(data.products)));
+      }
+    })
+    .catch((requestError) => {
+      console.error('Related products failed to load:', requestError);
+    });
+
+    return () => {
+    cancelled = true;
+    };
+  }, [product?.id, product?.category]);
+
   const availableStock = Math.max(0, Number(product?.stock || 0));
   const canAddToCart = Boolean(product) && availableStock > 0;
   const discountPercent = product?.discountPercent
@@ -70,6 +119,11 @@ export default function ProductDetailPage() {
     const quantityToAdd = Math.min(quantity, availableStock);
     for (let index = 0; index < quantityToAdd; index += 1) addItem(product);
     showSuccess(`${quantityToAdd} ${product.name} dimasukkan ke keranjang`);
+  };
+
+  const addRelatedToCart = (relatedProduct) => {
+    addItem(relatedProduct);
+    showSuccess(`"${relatedProduct.name}" ditambahkan ke keranjang`);
   };
 
   if (!product && loading) {
@@ -184,13 +238,32 @@ export default function ProductDetailPage() {
               </button>
             </div>
             {loading && <p className="detail-refresh-note" role="status">Memperbarui informasi produk...</p>}
-            <a href={`https://wa.me/${import.meta.env.VITE_STORE_WHATSAPP_NUMBER || ''}?text=${encodeURIComponent(`Halo Glosir, saya ingin bertanya tentang ${product.name}.`)}`} target="_blank" rel="noreferrer" className="detail-whatsapp">
-              <span className="detail-whatsapp-mark"><MessageCircle size={16} /></span>
-              <span><strong>Butuh info lebih lanjut?</strong><small>Tanyakan produk ini lewat WhatsApp</small></span>
-              <ArrowLeft size={16} className="detail-whatsapp-arrow" />
-            </a>
           </div>
         </section>
+        {relatedProducts.length > 0 && (
+          <section className="detail-related-section" aria-labelledby="detail-related-heading">
+            <div className="detail-related-heading">
+              <div>
+                <span className="detail-related-eyebrow">Pilihan untukmu</span>
+                <h2 id="detail-related-heading">Produk dalam kategori yang sama</h2>
+              </div>
+              <Link to={`/products?category=${encodeURIComponent(product.category || '')}`}>
+                Lihat kategori
+              </Link>
+            </div>
+            <div className="detail-related-grid">
+              {relatedProducts.map((relatedProduct) => (
+                <ProductCard
+                  key={relatedProduct.id}
+                  product={relatedProduct}
+                  isFavorited={isFavorite(relatedProduct.id)}
+                  onToggleFavorite={toggleFavorite}
+                  onAddToCart={addRelatedToCart}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
       <PublicFooter />
     </div>

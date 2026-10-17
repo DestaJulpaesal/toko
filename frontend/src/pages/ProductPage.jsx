@@ -13,11 +13,11 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 const CATEGORY_META = {
   'Glosir': {
-    image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=64&q=80',
+    image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=240&q=85',
     icon: '🛒',
   },
   'Kebutuhan Dapur': {
-    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=64&q=80',
+    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=240&q=85',
     icon: '🍳',
   },
   'Buah & Sayuran': { icon: '🍎' },
@@ -27,11 +27,11 @@ const CATEGORY_META = {
   'Roti & Kue': { icon: '🥐' },
   'Daging & Ikan': { icon: '🐟' },
   'Minuman': {
-    image: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=64&q=80',
+    image: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=240&q=85',
     icon: '☕',
   },
   'Bahan Pokok': {
-    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=64&q=80',
+    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=240&q=85',
     icon: '🌾',
   },
   'Camilan': { icon: '🍪' },
@@ -40,15 +40,15 @@ const CATEGORY_META = {
   'Rumah Tangga': { icon: '🧹' },
   'Sabun & Kebersihan': { icon: '🧼' },
   'Acara': {
-    image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=64&q=80',
+    image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=240&q=85',
     icon: '🎉',
   },
   'Parsel': {
-    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=64&q=80',
+    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=240&q=85',
     icon: '🎁',
   },
   'Paket Acara': {
-    image: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=64&q=80',
+    image: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=240&q=85',
     icon: '📦',
   },
 };
