@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, PackagePlus, Pencil, Plus, ShoppingBag, Trash2 } from 'lucide-react';
-import AdminSidebar from '../components/AdminSidebar';
+import { Eye, PackagePlus, Pencil, Search, ShoppingBag, Trash2 } from 'lucide-react';
+import AdminShell from '../layouts/AdminShell';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import BulkProductModal from '../components/BulkProductModal';
 import BarcodePrintModal from '../components/BarcodePrintModal';
 import StockReceiptImportModal from '../components/StockReceiptImportModal';
-import ModalForm from '../components/ModalForm';
 import { generateAutoBarcode, playBeep } from '../utils/barcodeUtils';
 import CurrencyInput from '../components/CurrencyInput';
 import CatalogImageField from '../components/CatalogImageField';
@@ -27,6 +26,7 @@ const emptyForm = {
   purchasePrice: '',
   originalPrice: '',
   stock: '',
+  stockWarning: 5,
   status: 'Aktif',
   imageUrl: '',
   isQuickAccess: false,
@@ -39,6 +39,7 @@ export default function AdminProductsPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState('Semua');
   const [categoryFilter, setCategoryFilter] = useState('Semua');
   const [sortBy, setSortBy] = useState('nameAsc');
@@ -49,7 +50,6 @@ export default function AdminProductsPage() {
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [printModalProduct, setPrintModalProduct] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -123,7 +123,7 @@ export default function AdminProductsPage() {
   useEffect(() => () => window.clearTimeout(scannerTimerRef.current), []);
 
   const visibleProducts = products.filter((product) => {
-    const matchesSearch = `${product.name} ${product.sku} ${product.category}`.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = `${product.name} ${product.sku} ${product.barcode || ''} ${product.category}`.toLowerCase().includes(deferredSearch.toLowerCase());
     const matchesStatus = statusFilter === 'Semua' || product.status === statusFilter;
     const matchesCategory = categoryFilter === 'Semua' || product.category === categoryFilter;
     return matchesSearch && matchesStatus && matchesCategory;
@@ -179,7 +179,6 @@ export default function AdminProductsPage() {
       status: product.status || 'Aktif',
       imageUrl: product.imageUrl || '',
     });
-    setIsModalOpen(true);
     setNotice(`✓ ${product.name} terdeteksi. Nama produk otomatis dimasukkan.`);
   };
 
@@ -204,8 +203,6 @@ export default function AdminProductsPage() {
     if (matchedProduct) {
       fillFormFromProduct(matchedProduct, rawCode);
     } else {
-      setForm((prev) => ({ ...prev, barcode: rawCode, sku: prev.sku || rawCode }));
-      setIsModalOpen(true);
       setNotice(`Barcode "${rawCode}" terbaca, tetapi belum terdaftar. Isi nama produk lalu simpan.`);
     }
     window.setTimeout(() => barcodeInputRef.current?.focus(), 0);
@@ -245,17 +242,6 @@ export default function AdminProductsPage() {
     setForm(emptyForm);
     setEditingId(null);
     setAuditLogs([]);
-  };
-
-  const openCreateModal = () => {
-    resetForm();
-    setIsModalOpen(true);
-    setTimeout(() => barcodeInputRef.current?.focus(), 150);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    resetForm();
   };
 
   // 1-Click Auto Barcode
@@ -391,6 +377,7 @@ export default function AdminProductsPage() {
         purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : Number(form.price),
         originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
         stock: Number(form.stock),
+        stockWarning: Number(form.stockWarning ?? 0),
         isQuickAccess: Boolean(form.isQuickAccess),
       };
       const discountPercent = payload.originalPrice && payload.originalPrice > payload.price
@@ -435,7 +422,7 @@ export default function AdminProductsPage() {
         await loadProducts();
       }
       setNotice(editingId ? 'Produk berhasil diperbarui di database.' : 'Produk berhasil ditambahkan ke database.');
-      closeModal();
+      resetForm();
     } catch (error) {
       setNotice(error.name === 'AbortError' ? 'Penyimpanan terlalu lama. Periksa koneksi database lalu coba lagi.' : error.message || 'Produk gagal disimpan ke database.');
     } finally {
@@ -458,6 +445,7 @@ export default function AdminProductsPage() {
       purchasePrice: product.purchasePrice ?? '',
       originalPrice: product.originalPrice ?? '',
       stock: product.stock ?? '',
+      stockWarning: product.stockWarning ?? 5,
       packages: (product.variants || []).filter((variant) => !variant.isDefault).map((variant) => ({
         id: variant.id,
         name: variant.name || '',
@@ -473,7 +461,7 @@ export default function AdminProductsPage() {
       .then((response) => response.json())
       .then((data) => setAuditLogs(data.logs || []))
       .catch(() => setAuditLogs([]));
-    setIsModalOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const deleteProduct = async (id) => {
@@ -507,8 +495,7 @@ export default function AdminProductsPage() {
   };
 
   return (
-    <div className="admin-shell admin-crud-shell">
-      <AdminSidebar active="Produk" />
+    <AdminShell active="Produk" className="admin-crud-shell">
 
       {/* Camera Barcode Scanner Modal */}
       <BarcodeScannerModal
@@ -524,7 +511,6 @@ export default function AdminProductsPage() {
             fillFormFromProduct(matchedProduct, scannedSku);
           } else {
             setForm((prev) => ({ ...prev, barcode: scannedSku, sku: prev.sku || scannedSku }));
-            setIsModalOpen(true);
             setNotice(`Barcode "${scannedSku}" berhasil dibaca, tetapi belum terdaftar. Lengkapi nama produk lalu simpan.`);
           }
         }}
@@ -552,8 +538,6 @@ export default function AdminProductsPage() {
         onClose={() => setPrintModalProduct(null)}
         product={printModalProduct}
       />
-
-      <main className="admin-main">
         <header className="admin-header">
           <div>
             <p className="eyebrow light">Product management</p>
@@ -691,6 +675,11 @@ export default function AdminProductsPage() {
               Stok
               <input name="stock" value={form.stock ?? ''} onChange={updateField} type="number" min="0" placeholder="25" />
             </label>
+            <label>
+              Stok minimum (batas restock)
+              <input name="stockWarning" value={form.stockWarning ?? 0} onChange={updateField} type="number" min="0" step="1" placeholder="5" />
+              <small className="field-help">Peringatan muncul saat stok sama atau di bawah angka ini.</small>
+            </label>
 
             <section className="product-packages-panel">
               <div className="panel-heading">
@@ -724,7 +713,7 @@ export default function AdminProductsPage() {
           <section className="crud-table-panel">
             <div className="crud-toolbar">
               <label className="crud-search">
-                <span>cari</span>
+                <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
                 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama atau barcode SKU..." />
               </label>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -818,7 +807,6 @@ export default function AdminProductsPage() {
         </section>
 
         <footer className="admin-footer">Glosir Owner Workspace <span>Sistem Barcode & Inventory Terintegrasi</span></footer>
-      </main>
-    </div>
+    </AdminShell>
   );
 }
