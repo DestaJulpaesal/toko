@@ -8,7 +8,7 @@ import { useCart } from '../context/CartContext';
 const promoFaqs = [
   {
     q: 'Bagaimana cara menggunakan kode promo ini saat belanja di kasir toko fisik?',
-    a: 'Sangat mudah! Saat berada di kasir toko Glosir, cukup tunjukkan kartu promo ini dari ponsel Anda atau sebutkan kode promonya (contoh: LEBARAN15) kepada kasir sebelum pembayaran.'
+    a: 'Sebutkan kode promo yang masih aktif kepada kasir sebelum pembayaran. Promo akan divalidasi berdasarkan masa berlaku dan syarat minimum belanja.'
   },
   {
     q: 'Apakah bisa memesan lewat WhatsApp dan tetap mendapatkan promo?',
@@ -30,6 +30,7 @@ export default function PromoPage() {
   const [toastMessage, setToastMessage] = useState('');
   const [copiedCode, setCopiedCode] = useState('');
   const [vouchers, setVouchers] = useState([]);
+  const [hasPromoCodes, setHasPromoCodes] = useState(false);
   const [flashSaleProducts, setFlashSaleProducts] = useState([]);
 
   useEffect(() => {
@@ -42,16 +43,17 @@ export default function PromoPage() {
 
         const promos = promoRes?.success && Array.isArray(promoRes.promos) ? promoRes.promos : [];
         const products = productRes?.success && Array.isArray(productRes.products) ? productRes.products : [];
+        setHasPromoCodes(promos.some((promo) => Boolean(promo.code)));
 
         setVouchers(
           promos.map((promo) => ({
             id: promo.id,
             name: promo.name,
-            code: promo.slug.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 18) || 'PROMO',
+            code: promo.code,
             badge: promo.discountType === 'PERCENT' ? `${promo.discountValue}% OFF` : `POTONGAN Rp ${Number(promo.discountValue || 0).toLocaleString('id-ID')}`,
             type: promo.discountType === 'PERCENT' ? 'Persentase' : 'Potongan Tunai',
             highlight: promo.description || 'Promo aktif dari Glosir untuk kebutuhan belanja Anda.',
-            minSpend: 0,
+            minSpend: Number(promo.minPurchase || 0),
             scope: 'Semua Produk',
             channel: 'Kasir Toko, Web & WhatsApp',
             validUntil: promo.endsAt ? new Date(promo.endsAt).toLocaleDateString('id-ID') : 'Promo Berjalan',
@@ -103,8 +105,8 @@ export default function PromoPage() {
     }
   };
 
-  const handleApplyPromo = (code) => {
-    const success = applyPromo(code);
+  const handleApplyPromo = async (code) => {
+    const success = await applyPromo(code);
     if (success) {
       showToast(`✓ Promo "${code}" berhasil diaktifkan untuk keranjang belanja Anda!`);
     } else {
@@ -160,8 +162,10 @@ export default function PromoPage() {
             <div className="step-card">
               <div className="step-badge">01</div>
               <div className="step-icon">📋</div>
-              <h3>Pilih & Salin Voucher</h3>
-              <p>Pilih voucher yang sesuai di bawah, klik tombol <strong>"Salin Kode"</strong> atau klik <strong>"Gunakan Promo"</strong>.</p>
+              <h3>{hasPromoCodes ? 'Pilih & Salin Voucher' : 'Pilih Promo yang Tersedia'}</h3>
+              <p>{hasPromoCodes
+                ? <>Pilih voucher yang sesuai di bawah, klik <strong>"Salin Kode"</strong> atau klik <strong>"Gunakan Promo"</strong>.</>
+                : 'Pilih promo yang tersedia dan tanyakan cara menggunakannya kepada tim Glosir.'}</p>
             </div>
             <div className="step-card">
               <div className="step-badge">02</div>
@@ -173,7 +177,9 @@ export default function PromoPage() {
               <div className="step-badge">03</div>
               <div className="step-icon">🎉</div>
               <h3>Nikmati Potongan Harga</h3>
-              <p>Masukkan kode di keranjang, atau tunjukkan ke kasir toko, atau kirim ke WhatsApp saat order!</p>
+              <p>{hasPromoCodes
+                ? 'Masukkan kode di keranjang, atau tunjukkan ke kasir toko, atau kirim ke WhatsApp saat order!'
+                : 'Tim Glosir akan membantu mengonfirmasi syarat dan cara menggunakan promo.'}</p>
             </div>
           </div>
         </section>
@@ -240,11 +246,11 @@ export default function PromoPage() {
 
                   {/* Right Action Stub */}
                   <div className="voucher-action-stub">
+                  {voucher.code ? <>
                     <div className="voucher-code-box">
                       <span className="code-label">KODE PROMO</span>
                       <strong className="code-display">{voucher.code}</strong>
                     </div>
-
                     <div className="voucher-action-buttons">
                       <button
                         className={`btn-copy-code ${copiedCode === voucher.code ? 'copied' : ''}`}
@@ -270,11 +276,17 @@ export default function PromoPage() {
                       >
                         Klaim via WA
                       </a>
-                    </div>
+                      </div>
+                    </> : <div className="voucher-action-buttons">
+                      <Link className="btn-wa-claim" to="/contact-us">Tanya promo ini</Link>
+                    </div>}
                   </div>
                 </article>
               );
             })}
+            {!visibleVouchers.length && (
+              <div className="table-empty">Belum ada voucher aktif. Hubungi tim Glosir untuk menanyakan promo yang tersedia.</div>
+            )}
           </div>
         </section>
 

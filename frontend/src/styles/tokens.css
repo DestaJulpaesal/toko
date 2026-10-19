@@ -2,25 +2,35 @@
    GLOSIR DESIGN TOKENS — satu-satunya sumber warna/ukuran.
    Jangan tulis hex/px acak di CSS lain; pakai variabel ini.
    ========================================================== */
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations');
+}
+
 :root {
   /* Warna */
-  --g-bg: #f5faf7;
-  --g-surface: #ffffff;
-  --g-surface-2: #f5faf7;
-  --g-border: #d6e8dc;
-  --g-border-strong: #b6d1c0;
-  --g-text: #19251d;
-  --g-muted: #647168;
+  --g-bg: #f5f2ec;
+  --g-surface: #fffdf9;
+  --g-surface-2: #f8f5ef;
+  --g-border: #e4ded4;
+  --g-border-strong: #cfc6b8;
+  --g-text: #24231f;
+  --g-muted: #625f58;
   --g-primary: #006040;
-  --g-primary-hover: #005035;
-  --g-primary-soft: #cfe7d9;
+  --g-primary-hover: #004b33;
+  --g-primary-soft: #e4f0e7;
   --g-accent: #d8a93a;
-  --g-danger: #b53a34;
-  --g-danger-soft: #f9ebea;
-  --g-warning: #936812;
-  --g-warning-soft: #fff5d9;
-  --g-info: #3d6f8c;
-  --g-info-soft: #e7f1f6;
+  --g-success: #236b42;
+  --g-success-soft: #e7f3e9;
+  --g-danger: #a8322b;
+  --g-danger-soft: #faeae8;
+  --g-warning: #805800;
+  --g-warning-soft: #fff4d6;
+  --g-info: #285d78;
+  --g-info-soft: #e5f1f6;
 
   /* Spasi (kelipatan 4) */
   --g-space-1: 4px;  --g-space-2: 8px;  --g-space-3: 12px; --g-space-4: 16px;
@@ -29,9 +39,11 @@
   /* Bentuk */
   --g-radius-sm: 8px;
   --g-radius: 12px;
-  --g-radius-lg: 16px;
+  --g-radius-lg: 18px;
+  --g-radius-xl: 24px;
   --g-shadow-sm: 0 1px 2px rgba(32, 66, 44, 0.06);
-  --g-shadow: 0 6px 20px rgba(32, 66, 44, 0.08);
+  --g-shadow: 0 8px 24px rgba(45, 38, 25, 0.08);
+  --g-shadow-lg: 0 18px 48px rgba(45, 38, 25, 0.14);
 
   /* Tipografi */
   --g-font: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -45,25 +57,10 @@
   /* Layout */
   --g-content-max: 1400px;
   --g-control-h: 40px;
-}
-
-.dark {
-  --g-bg: #f5faf7;
-  --g-surface: #ffffff;
-  --g-surface-2: #f5faf7;
-  --g-border: #d6e8dc;
-  --g-border-strong: #b6d1c0;
-  --g-text: #19251d;
-  --g-muted: #647168;
-  --g-primary: #006040;
-  --g-primary-hover: #005035;
-  --g-primary-soft: #cfe7d9;
-  --g-danger: #b53a34;
-  --g-danger-soft: #f9ebea;
-  --g-warning: #936812;
-  --g-warning-soft: #fff5d9;
-  --g-info: #3d6f8c;
-  --g-info-soft: #e7f1f6;
-  --g-shadow-sm: 0 1px 2px rgba(32, 66, 44, 0.06);
-  --g-shadow: 0 6px 20px rgba(32, 66, 44, 0.08);
+  --g-control-h-touch: 44px;
+  --g-z-dropdown: 100;
+  --g-z-sticky: 200;
+  --g-z-modal: 1000;
+  --g-motion-fast: 150ms;
+  --g-motion-normal: 200ms;
 }

@@ -2,6 +2,7 @@ import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, categorySchema } from '../middleware/security.js';
+import { invalidateHomepageCache } from '../services/homepageHandler.js';
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ function formatCategory(category) {
     name: category.name,
     slug: category.slug,
     description: category.description || '',
+    imageUrl: category.imageUrl || null,
     productCount: category._count?.products || 0,
     createdAt: category.createdAt,
     updatedAt: category.updatedAt,
@@ -24,6 +26,7 @@ function formatCategory(category) {
 // Endpoint publik untuk kategori (tanpa auth)
 router.get('/public/list', async (req, res) => {
   try {
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
     const categories = await prisma.category.findMany({
       include: { _count: { select: { products: true } } },
       orderBy: { name: 'asc' },
@@ -50,7 +53,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
 router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(categorySchema), async (req, res) => {
   try {
-    const { name, description = '' } = req.body || {};
+    const { name, description = '', imageUrl = '' } = req.body || {};
     const trimmedName = String(name || '').trim();
     const slug = makeSlug(trimmedName);
 
@@ -59,9 +62,10 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
     }
 
     const category = await prisma.category.create({
-      data: { name: trimmedName, slug, description: String(description).trim() || null },
+      data: { name: trimmedName, slug, description: String(description).trim() || null, imageUrl: String(imageUrl || '').trim() || null },
       include: { _count: { select: { products: true } } },
     });
+    invalidateHomepageCache(prisma);
     return res.status(201).json({ success: true, category: formatCategory(category) });
   } catch (error) {
     return res.status(400).json({
@@ -73,7 +77,7 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
 
 router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(categorySchema), async (req, res) => {
   try {
-    const { name, description = '' } = req.body || {};
+    const { name, description = '', imageUrl = '' } = req.body || {};
     const trimmedName = String(name || '').trim();
     const slug = makeSlug(trimmedName);
 
@@ -83,9 +87,10 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
 
     const category = await prisma.category.update({
       where: { id: req.params.id },
-      data: { name: trimmedName, slug, description: String(description).trim() || null },
+      data: { name: trimmedName, slug, description: String(description).trim() || null, imageUrl: String(imageUrl || '').trim() || null },
       include: { _count: { select: { products: true } } },
     });
+    invalidateHomepageCache(prisma);
     return res.json({ success: true, category: formatCategory(category) });
   } catch (error) {
     return res.status(error.code === 'P2025' ? 404 : 400).json({
@@ -108,6 +113,7 @@ router.delete('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (r
     }
 
     await prisma.category.delete({ where: { id: req.params.id } });
+    invalidateHomepageCache(prisma);
     return res.json({ success: true, message: 'Kategori berhasil dihapus' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Kategori gagal dihapus' });

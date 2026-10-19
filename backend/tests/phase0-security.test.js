@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { strongPasswordSchema } from '../src/middleware/security.js';
+import { checkoutSchema, holdCartSchema, strongPasswordSchema } from '../src/middleware/security.js';
 
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rootDir = path.resolve(backendDir, '..');
@@ -24,5 +24,12 @@ assert.equal(productionSeed.status, 1);
 assert.match(`${productionSeed.stdout}${productionSeed.stderr}`, /tidak boleh dijalankan di production/i);
 assert.equal(strongPasswordSchema.safeParse('12345678').success, false);
 assert.equal(strongPasswordSchema.safeParse('Toko-Aman-2026!').success, true);
+assert.equal(checkoutSchema.safeParse({
+  items: [{ variantId: 'variant-1', unitId: null, quantity: 1 }],
+  paidAmount: 0,
+}).success, true);
+assert.equal(holdCartSchema.safeParse({
+  items: [{ variantId: 'variant-1', unitId: null, quantity: 1 }],
+}).success, true);
 
 console.log('Phase 0 security checks passed.');

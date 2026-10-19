@@ -8,11 +8,11 @@ import prisma from '../config/db.js';
 /**
  * Ambil aturan poin yang aktif (hanya 1 row)
  */
-export async function getActiveLoyaltyRule() {
-  let rule = await prisma.loyaltyRule.findFirst({ where: { isActive: true } });
+export async function getActiveLoyaltyRule(client = prisma) {
+  let rule = await client.loyaltyRule.findFirst({ where: { isActive: true } });
   if (!rule) {
     // Buat default jika belum ada
-    rule = await prisma.loyaltyRule.create({
+    rule = await client.loyaltyRule.create({
       data: {
         pointsPerRp100k: 100,
         minTransactionAmount: 100000,
@@ -139,11 +139,11 @@ export function checkSellBelowCost(items) {
  * @param {number} withinDays - Dalam berapa hari ke depan
  * @returns {Array} List produk yang akan kadaluarsa
  */
-export async function getExpiringProducts(withinDays = 30) {
+export async function getExpiringProducts(withinDays = 30, client = prisma) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() + withinDays);
 
-  const units = await prisma.productUnit.findMany({
+  const units = await client.productUnit.findMany({
     where: {
       expiryDate: { not: null, lte: cutoffDate },
       isActive: true,
@@ -179,8 +179,12 @@ export async function getExpiringProducts(withinDays = 30) {
  */
 export async function getProductPerformance(startDate, endDate, limit = 20) {
   const dateFilter = {};
-  if (startDate) dateFilter.gte = new Date(startDate);
-  if (endDate) dateFilter.lte = new Date(endDate);
+  if (startDate) dateFilter.gte = new Date(`${String(startDate)}T00:00:00`);
+  if (endDate) {
+    const endExclusive = new Date(`${String(endDate)}T00:00:00`);
+    endExclusive.setDate(endExclusive.getDate() + 1);
+    dateFilter.lt = endExclusive;
+  }
 
   // Query order items yang COMPLETED (bukan VOID)
   const orderItems = await prisma.orderItem.findMany({

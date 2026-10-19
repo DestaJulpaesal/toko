@@ -15,6 +15,7 @@ import PublicInfoPage from './pages/PublicInfoPage';
 import ContactPage from './pages/ContactPage';
 import EventPackagePage from './pages/EventPackagePage';
 import AuthActionPage from './pages/AuthActionPage';
+import OrderLookupPage from './pages/OrderLookupPage';
 import PublicScrollReveal from './components/PublicScrollReveal';
 
 // Halaman kasir & admin: lazy-loaded (code-splitting) supaya bundle publik tidak ikut membawa kode admin.
@@ -45,10 +46,12 @@ const AdminStockOpnamePage = lazy(() => import('./pages/AdminStockOpnamePage'));
 const AdminRestockPage = lazy(() => import('./pages/AdminRestockPage'));
 const AdminEventPackagesPage = lazy(() => import('./pages/AdminEventPackagesPage'));
 const AdminProductPerformancePage = lazy(() => import('./pages/AdminProductPerformancePage'));
+const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'));
 const AdminStockLedgerPage = lazy(() => import('./pages/AdminStockLedgerPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
+import { PublicSettingsProvider } from './context/PublicSettingsContext';
 import ConfirmDialog from './components/ConfirmDialog';
 import NoticeToast from './components/NoticeToast';
 import FirstTimeGuide from './components/FirstTimeGuide';
@@ -71,6 +74,16 @@ function AuthRoute({ children, roles }) {
   if (roles && !roles.includes(user.role)) {
     return <Navigate to={user.role === 'CASHIER' ? '/kasir' : user.role === 'PARCEL_MANAGER' ? '/parcel-manager' : '/admin'} replace />;
   }
+  const simpleOwnerPaths = ['/admin', '/admin/products', '/admin/parcel-collections', '/admin/finance'];
+  const displayMode = localStorage.getItem(`glosir_display_mode_${user.id}`) || 'simple';
+  if (
+    user.role === 'OWNER'
+    && displayMode === 'simple'
+    && window.location.pathname.startsWith('/admin')
+    && !simpleOwnerPaths.includes(window.location.pathname)
+  ) {
+    return <Navigate to="/admin" replace />;
+  }
   return children;
 }
 
@@ -78,6 +91,7 @@ export default function App() {
   return (
     <FavoritesProvider>
       <CartProvider>
+        <PublicSettingsProvider>
         <Router>
           <ConfirmDialog />
           <NoticeToast />
@@ -100,6 +114,7 @@ export default function App() {
             <Route path="/syarat-ketentuan" element={<PublicInfoPage pageKey="terms" />} />
             <Route path="/kebijakan-privasi" element={<PublicInfoPage pageKey="privacy" />} />
             <Route path="/contact-us" element={<ContactPage />} />
+            <Route path="/pesanan" element={<OrderLookupPage />} />
             <Route path="/faq" element={<PublicInfoPage pageKey="faq" />} />
             <Route path="/pusat-bantuan" element={<PublicInfoPage pageKey="help" />} />
             <Route path="/testimoni" element={<PublicInfoPage pageKey="testimonials" />} />
@@ -124,6 +139,7 @@ export default function App() {
             <Route path="/admin/parcels" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelsPage /></AuthRoute>} />
             <Route path="/admin/promos" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminPromosPage /></AuthRoute>} />
             <Route path="/admin/profile" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminProfilePage /></AuthRoute>} />
+            <Route path="/admin/settings" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminSettingsPage /></AuthRoute>} />
             <Route path="/admin/content" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminContentPage /></AuthRoute>} />
             <Route path="/admin/finance" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinancePage /></AuthRoute>} />
             <Route path="/admin/personal-finance" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminPersonalFinancePage /></AuthRoute>} />
@@ -150,6 +166,7 @@ export default function App() {
           </Routes>
           </Suspense>
         </Router>
+        </PublicSettingsProvider>
       </CartProvider>
     </FavoritesProvider>
   );

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Search, MessageCircle, Menu, X, Clock, Store } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { usePublicSettings } from '../context/PublicSettingsContext';
+import { normalizeIndonesianPhone } from '../utils/phoneUtils';
 
 // Flag opsional menu musiman Parsel Lebaran (bisa diatur dari config)
 const SHOW_PARSEL_LEBARAN = false;
@@ -22,6 +24,7 @@ export default function PublicHeader() {
   const [currentUser, setCurrentUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { totalItems, totalPrice } = useCart();
+  const { storeProfile } = usePublicSettings();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,7 +40,8 @@ export default function PublicHeader() {
 
   const portalLink = currentUser?.role === 'OWNER' ? '/admin' : '/kasir';
   const portalLabel = currentUser?.role === 'OWNER' ? 'Admin' : 'Kasir';
-  const storeWaNumber = import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '';
+  const storeWaNumber = normalizeIndonesianPhone(storeProfile.phone || import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '');
+  const storeName = storeProfile.name || 'Glosir';
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -56,7 +60,7 @@ export default function PublicHeader() {
             <Store size={14} className="icon-inline" /> Pesan online, ambil di toko
           </span>
           <span className="info-hours">
-            <Clock size={14} className="icon-inline" /> Buka: 08:00 - 21:00 WIB
+            <Clock size={14} className="icon-inline" /> {storeProfile.openingHours || 'Jam buka belum tersedia'}
           </span>
         </div>
       </div>
@@ -67,7 +71,7 @@ export default function PublicHeader() {
           <div className="header-brand-wrap">
             <span className="brand-mark" aria-hidden="true"><Store size={21} strokeWidth={2.5} /></span>
             <Link to="/" className="brand-title">
-              Glosir
+              {storeName}
             </Link>
             <span className="brand-sub">Sembako & Grosir</span>
           </div>

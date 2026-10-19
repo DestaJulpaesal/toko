@@ -21,13 +21,27 @@ export const SESSION_CACHE_TTL_MS = 10_000;
 
 export function createSessionService({ loadUser, ttlMs = SESSION_CACHE_TTL_MS, now = Date.now } = {}) {
   const cache = new Map(); // userId -> { at, user }
+  const pendingLoads = new Map();
 
   async function findUser(id) {
     const hit = cache.get(id);
     if (hit && now() - hit.at < ttlMs) return hit.user;
-    const user = (await loadUser(id)) ?? null;
-    cache.set(id, { at: now(), user });
-    return user;
+    const pending = pendingLoads.get(id);
+    if (pending) return pending;
+
+    let load;
+    load = Promise.resolve()
+      .then(() => loadUser(id))
+      .then((user) => {
+        const result = user ?? null;
+        if (pendingLoads.get(id) === load) cache.set(id, { at: now(), user: result });
+        return result;
+      })
+      .finally(() => {
+        if (pendingLoads.get(id) === load) pendingLoads.delete(id);
+      });
+    pendingLoads.set(id, load);
+    return load;
   }
 
   // Mengembalikan { ok: true, user } atau { ok: false, reason: 'expired' | 'invalid' | 'inactive' | 'revoked' }.
@@ -62,8 +76,14 @@ export function createSessionService({ loadUser, ttlMs = SESSION_CACHE_TTL_MS, n
 
   return {
     authenticate,
-    invalidate: (userId) => cache.delete(userId),
-    clear: () => cache.clear(),
+    invalidate: (userId) => {
+      cache.delete(userId);
+      pendingLoads.delete(userId);
+    },
+    clear: () => {
+      cache.clear();
+      pendingLoads.clear();
+    },
   };
 }
 

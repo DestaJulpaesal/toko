@@ -5,18 +5,15 @@ import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import { useCart } from '../context/CartContext';
+import { usePublicSettings } from '../context/PublicSettingsContext';
+import { normalizeIndonesianPhone } from '../utils/phoneUtils';
 import { showSuccess } from '../utils/noticeService';
-import { PUBLIC_CATALOG_CACHE_KEY, categoriesFromProducts, mergeCatalogCategories, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
+import { readJsonStorage } from '../utils/catalogStorage';
+import { publicCategoriesOrDefault, sortPublicCategories } from '../utils/publicContentDefaults';
 
 const CATEGORY_META = {
-  'Glosir': {
-    image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=240&q=85',
-    icon: '🛒',
-  },
-  'Kebutuhan Dapur': {
-    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=240&q=85',
-    icon: '🍳',
-  },
+  'Glosir': { icon: '🛒' },
+  'Kebutuhan Dapur': { icon: '🍳' },
   'Buah & Sayuran': { icon: '🍎' },
   'Buah dan Sayuran': { icon: '🍎' },
   'Sayur & Buah': { icon: '🥬' },
@@ -28,38 +25,12 @@ const CATEGORY_META = {
   'Perawatan Rumah': { icon: '🧹' },
   'Rumah Tangga': { icon: '🧹' },
   'Sabun & Kebersihan': { icon: '🧼' },
-  'Minuman': {
-    image: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=240&q=85',
-    icon: '☕',
-  },
-  'Bahan Pokok': {
-    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=240&q=85',
-    icon: '🌾',
-  },
-  'Acara': {
-    image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=240&q=85',
-    icon: '🎉',
-  },
-  'Parsel': {
-    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=240&q=85',
-    icon: '🎁',
-  },
-  'Paket Acara': {
-    image: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=240&q=85',
-    icon: '📦',
-  },
+  'Minuman': { icon: '☕' },
+  'Bahan Pokok': { icon: '🌾' },
+  'Acara': { icon: '🎉' },
+  'Parsel': { icon: '🎁' },
+  'Paket Acara': { icon: '📦' },
 };
-
-const CATEGORY_ORDER = ['Glosir', 'Kebutuhan Dapur', 'Minuman', 'Bahan Pokok', 'Acara', 'Parsel', 'Paket Acara'];
-
-const defaultCategories = [
-  { name: 'Sembako & Beras', icon: '🌾' },
-  { name: 'Minyak & Bumbu Dapur', icon: '🍳' },
-  { name: 'Minuman & Kopi', icon: '☕' },
-  { name: 'Makanan Ringan', icon: '🍪' },
-  { name: 'Sabun & Kebersihan', icon: '🧼' },
-  { name: 'Promo Mingguan', icon: '🏷️' },
-];
 
 const PUBLIC_HOMEPAGE_CACHE_KEY = 'glosir_public_homepage_v1';
 let homepageRequestPromise;
@@ -152,15 +123,10 @@ function HomePromoBanner({ promo, variant }) {
 
 export default function HomePage() {
   const [initialHomepage] = useState(readHomepageCache);
-  const [initialCatalogCategories] = useState(() => {
-    const cachedProducts = readJsonStorage(localStorage, PUBLIC_CATALOG_CACHE_KEY, []);
-    return categoriesFromProducts(Array.isArray(cachedProducts) ? stripSensitive(cachedProducts) : []);
-  });
   const [flashSaleProducts, setFlashSaleProducts] = useState(() => initialHomepage?.flashSaleProducts || []);
   const [bestsellerProducts, setBestsellerProducts] = useState(() => initialHomepage?.bestsellerProducts || []);
   const [recommendedProducts, setRecommendedProducts] = useState(() => initialHomepage?.recommendedProducts || []);
-  const [categories, setCategories] = useState(() => mergeCatalogCategories(initialHomepage?.categories || [], initialCatalogCategories));
-  const [categoriesLoading, setCategoriesLoading] = useState(() => !initialHomepage?.categories?.length && initialCatalogCategories.length === 0);
+  const [categories, setCategories] = useState(() => publicCategoriesOrDefault(initialHomepage?.categories || []));
   const [activePromos, setActivePromos] = useState(() => (initialHomepage?.promos || []).filter((promo) => promoIsActive(promo)));
   const [loading, setLoading] = useState(() => !initialHomepage);
   const findHomePromo = (name) => activePromos.find((promo) => promo.name?.trim().toLowerCase() === name);
@@ -178,82 +144,34 @@ export default function HomePage() {
   });
   
   const { addItem } = useCart();
-  const storeWaNumber = import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '';
+  const { storeProfile } = usePublicSettings();
+  const storeWaNumber = normalizeIndonesianPhone(storeProfile.phone || import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '');
   const promoDemo8 = findHomePromo('promo demo 8');
   const promoDemo9 = findHomePromo('promo demo 9');
   const promoDemo10 = findHomePromo('promo demo 10');
-  const visibleCategories = categories
-    .filter((category) => category.productCount == null || Number(category.productCount) > 0)
-    .sort((first, second) => {
-      const firstOrder = CATEGORY_ORDER.indexOf(first.name);
-      const secondOrder = CATEGORY_ORDER.indexOf(second.name);
-      if (firstOrder >= 0 || secondOrder >= 0) {
-        if (firstOrder < 0) return 1;
-        if (secondOrder < 0) return -1;
-        return firstOrder - secondOrder;
-      }
-      return first.name.localeCompare(second.name, 'id');
-    });
+  const visibleCategories = sortPublicCategories(publicCategoriesOrDefault(categories));
 
   useEffect(() => {
     let cancelled = false;
-    const cachedProducts = readJsonStorage(localStorage, PUBLIC_CATALOG_CACHE_KEY, []);
-    const safeCachedProducts = Array.isArray(cachedProducts) ? stripSensitive(cachedProducts) : [];
-    const fallbackCategories = categoriesFromProducts(safeCachedProducts);
-
-    apiFetch('/categories/public/list')
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Daftar kategori gagal dimuat (${response.status})`);
-        return response.json();
-      })
-      .then((data) => {
-        if (cancelled) return;
-        const remoteCategories = data?.success && Array.isArray(data.categories) ? data.categories : [];
-        setCategories((current) => mergeCatalogCategories([...remoteCategories, ...current], safeCachedProducts));
-      })
-      .catch((error) => {
-        console.error('Homepage category list failed:', error);
-      })
-      .finally(() => {
-        if (!cancelled) setCategoriesLoading(false);
-      });
-
-    apiFetch('/event-packages')
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Paket acara gagal dimuat (${response.status})`);
-        return response.json();
-      })
-      .then((data) => {
-        if (cancelled || !Array.isArray(data?.packages)) return;
-        const eventCategories = data.packages.map(() => ({ category: 'Paket Acara' }));
-        setCategories((current) => mergeCatalogCategories(current, eventCategories));
-      })
-      .catch((error) => {
-        console.error('Homepage event package categories failed:', error);
-      });
 
     fetchHomepageData()
       .then((data) => {
         if (cancelled) return;
 
         const homepage = {
-          categories: mergeCatalogCategories(
-            Array.isArray(data?.categories) ? data.categories : [],
-            fallbackCategories,
-          ),
+          categories: publicCategoriesOrDefault(Array.isArray(data?.categories) ? data.categories : []),
           promos: Array.isArray(data?.promos) ? data.promos : [],
           flashSaleProducts: Array.isArray(data?.flashSaleProducts) ? data.flashSaleProducts : [],
           bestsellerProducts: Array.isArray(data?.bestsellerProducts) ? data.bestsellerProducts : [],
           recommendedProducts: Array.isArray(data?.recommendedProducts) ? data.recommendedProducts : [],
         };
 
-        setCategories((current) => mergeCatalogCategories([...homepage.categories, ...current], safeCachedProducts));
+        setCategories(homepage.categories);
         setActivePromos(homepage.promos.filter((promo) => promoIsActive(promo)));
         setFlashSaleProducts(homepage.flashSaleProducts);
         setBestsellerProducts(homepage.bestsellerProducts);
         setRecommendedProducts(homepage.recommendedProducts);
         setLoading(false);
-        setCategoriesLoading(false);
 
         try {
           localStorage.setItem(PUBLIC_HOMEPAGE_CACHE_KEY, JSON.stringify(homepage));
@@ -264,9 +182,7 @@ export default function HomePage() {
       .catch((error) => {
         console.error('Homepage data failed:', error);
         if (cancelled) return;
-        setCategories((current) => mergeCatalogCategories([...fallbackCategories, ...current], safeCachedProducts));
         setLoading(false);
-        setCategoriesLoading(false);
       });
 
     return () => {
@@ -340,9 +256,9 @@ export default function HomePage() {
             <Link to="/products" className="view-all-link">Lihat Semua <ChevronRight size={16} /></Link>
           </div>
           <div className="category-browse-grid homepage-category-grid">
-            {categoriesLoading && visibleCategories.length === 0 && <p className="category-loading" role="status">Memuat kategori...</p>}
             {visibleCategories.map((cat) => {
               const meta = CATEGORY_META[cat.name] || { icon: '🛍️' };
+              const categoryImage = cat.imageUrl;
               return (
                 <Link
                   key={cat.id}
@@ -351,9 +267,9 @@ export default function HomePage() {
                   aria-label={`Lihat kategori ${cat.name}`}
                 >
                   <span className="category-icon-big">
-                    {meta.image ? (
+                    {categoryImage ? (
                       <img
-                        src={meta.image}
+                        src={categoryImage}
                         alt=""
                         loading="lazy"
                         onError={(e) => {
@@ -364,7 +280,7 @@ export default function HomePage() {
                         }}
                       />
                     ) : null}
-                    <span className={meta.image ? 'category-icon-fallback is-hidden' : 'category-icon-fallback'}>
+                    <span className={categoryImage ? 'category-icon-fallback is-hidden' : 'category-icon-fallback'}>
                       {meta.icon}
                     </span>
                   </span>
@@ -664,17 +580,17 @@ export default function HomePage() {
             <div className="store-info-text">
               <span className="store-info-eyebrow"><Store size={14} /> Toko fisik Glosir</span>
               <div className="store-info-heading">
-                <h2>Toko Glosir Kampung</h2>
-                <span className="store-open-badge"><span /> Buka setiap hari</span>
+                <h2>{storeProfile.name || 'Toko Glosir'}</h2>
+                {storeProfile.openingHours && <span className="store-open-badge"><span /> {storeProfile.openingHours}</span>}
               </div>
               <div className="store-info-details">
                 <div className="store-info-detail">
                   <span className="store-info-detail-icon"><MapPin size={19} /></span>
-                  <span><small>Alamat toko</small><strong>Jl. Raya Kampung Glosir No. 1, RT 02 / RW 03</strong><span className="store-detail-hint">Dekat Masjid Jami</span></span>
+                  <span><small>Alamat toko</small><strong>{storeProfile.address || 'Informasi alamat toko belum tersedia.'}</strong></span>
                 </div>
                 <div className="store-info-detail">
                   <span className="store-info-detail-icon"><Clock size={19} /></span>
-                  <span><small>Jam operasional</small><strong>08:00–21:00 WIB</strong><span className="store-detail-hint">Setiap hari</span></span>
+                  <span><small>Jam operasional</small><strong>{storeProfile.openingHours || 'Informasi jam buka belum tersedia.'}</strong></span>
                 </div>
               </div>
               <p className="store-pickup-note">

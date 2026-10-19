@@ -1,13 +1,15 @@
-# Glosir E-Commerce Platform
+# Glosir
 
-A large-scale commerce system for Glosir + Parcel commerce with WhatsApp ordering flow.
+Platform toko Glosir: POS kasir, katalog publik, pesanan WhatsApp, program parsel,
+serta pengelolaan stok dan keuangan. Repo ini berisi backend Express/Prisma dan
+frontend React/Vite.
 
 ## Tech Stack
 - Backend: Node.js + Express + Prisma + PostgreSQL
-- Frontend: React + Vite + Tailwind CSS
+- Frontend: React + Vite
 - Auth: JWT + role-based access
-- Payment: midtrans/other provider optional
-- Messaging: WhatsApp API integration
+- Order online: konfirmasi melalui WhatsApp (bukan payment gateway)
+- Database: PostgreSQL/Supabase
 - Monorepo-style structure in a single workspace
 
 ## Project Structure
@@ -49,15 +51,30 @@ Glosir/
 - Cashier sales, online order confirmations, and expenditures sync into one finance ledger.
 - Owner can review profit, debt, and savings targets.
 
-## Recommended Development Phases
+## Menjalankan secara lokal
 
-1. Setup backend + database
-2. Build product catalog and stock management
-3. Build cashier and POS flow
-4. Build storefront and cart
-5. Build WhatsApp order automation
-6. Integrate finance and admin dashboard
-7. Add promotions, reports, and optimization
+1. Gunakan Node.js 20 atau lebih baru.
+2. Salin `backend/.env.example` menjadi `backend/.env`, lalu isi database
+   development, `JWT_SECRET` acak yang kuat, dan nilai integrasi yang diperlukan.
+   `DATABASE_URL` memakai URL pooler transaksi; `DIRECT_URL` dipakai Prisma untuk
+   migrasi. Jangan gunakan database produksi untuk tes atau seed.
+3. Di terminal pertama jalankan `cd backend`, `npm ci`, lalu `npm run dev`.
+4. Salin `frontend/.env.example` menjadi `frontend/.env`, atur `VITE_API_URL`
+   (lokal: `http://127.0.0.1:5000/api`), kemudian jalankan `cd frontend`,
+   `npm ci`, dan `npm run dev`.
+5. Jalankan migrasi hanya setelah memeriksa target database:
+   `cd backend && npx prisma migrate deploy`. Migrasi belum dijalankan oleh
+   perubahan optimasi ini.
+
+## Pemeriksaan
+
+- Backend: `cd backend && npm test`, `npx eslint src`, `npx prisma validate`
+- Frontend: `cd frontend && npm test`, `npm run build`
+- `npm run test:phase1` dan `npm run preflight` melakukan operasi tulis pada
+  database; jalankan hanya terhadap staging khusus, bukan database produksi.
+
+Backend health: `GET /api/health` (liveness ringan) dan
+`GET /api/health/deep` (pemeriksaan database).
 
 ## Notes
 
@@ -109,10 +126,6 @@ sudah terdaftar di Glosir; akun baru tidak otomatis dibuat.
 
 Create a public Supabase Storage bucket named `catalog-images`. The backend requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_ANON_KEY` when its Storage policy permits uploads); `SUPABASE_CATALOG_BUCKET` is optional and defaults to `catalog-images`. Owners and admins can upload JPG, PNG, or WebP files up to 5 MB from the product, parsel, and event-package forms. Files are placed under `products/`, `parcels/`, or `event-packages/`, and only the returned public URL is saved in the existing database record.
 
-### Catalog Images
-
-Create a public Supabase Storage bucket named `catalog-images`. The backend requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_ANON_KEY` when its Storage policy permits uploads); `SUPABASE_CATALOG_BUCKET` is optional and defaults to `catalog-images`. Owners and admins can upload JPG, PNG, or WebP files up to 5 MB from the product, parsel, and event-package forms. Files are placed under `products/`, `parcels/`, or `event-packages/`, and only the returned public URL is saved in the existing database record.
-
 ## Implemented Controls
 
 - JWT sessions expire after 8 hours and automatically redirect to login when expired or rejected.
@@ -126,7 +139,9 @@ Create a public Supabase Storage bucket named `catalog-images`. The backend requ
 - Customer WhatsApp commands: `cek pesanan`, `status`, and `lacak [nomor order]`. Status notifications are sent after admin updates an order through `PATCH /api/orders/:id/status`.
 - Parsel now uses `ProductVariant` contents, supports automatic/manual pricing, shows contents publicly, and deducts component stock during POS checkout.
 
-WhatsApp provider integration, error monitoring, and scheduled database backups still require deployment-specific credentials and infrastructure.
+Integrasi WhatsApp, email, Google OAuth, dan penyimpanan gambar memerlukan
+kredensial deployment. Periksa `.env.example` untuk nama variabel; jangan
+menyimpan nilai rahasia di repo.
 ## Backup dan keamanan akun
 
 Backup terjadwal aktif melalui `startBackupJob` (default 02:00 Asia/Jakarta) dan

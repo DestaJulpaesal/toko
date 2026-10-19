@@ -2,11 +2,13 @@ import express from 'express';
 import prisma from '../config/db.js';
 import { updateFinanceLoggingStreak } from '../services/financeStreakService.js';
 import { createIdempotencyGuard, verifyWebhookSecret } from '../services/webhookSecurity.js';
+import { normalizeIndonesianPhone } from '../utils/phoneUtils.js';
 
 const router = express.Router();
 // Satu instance dipakai untuk semua request selama server hidup (lihat catatan di webhookSecurity.js
 // soal keterbatasannya kalau nanti backend dijalankan lebih dari satu proses sekaligus).
-const idempotency = createIdempotencyGuard();const normalizePhone = (value) => String(value || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
+const idempotency = createIdempotencyGuard();
+const normalizePhone = normalizeIndonesianPhone;
 const allowedNumbers = () => String(process.env.OWNER_WHATSAPP_NUMBER || '').split(',').map(normalizePhone).filter(Boolean);
 const money = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 

@@ -1,4 +1,15 @@
 import prisma from '../src/config/db.js';
+import { randomBytes } from 'node:crypto';
+
+if (process.env.NODE_ENV === 'production') {
+  console.error('seedUsers tidak boleh dijalankan pada NODE_ENV=production.');
+  process.exit(1);
+}
+
+const seedPassword = process.env.SEED_DEFAULT_PASSWORD || randomBytes(24).toString('base64url');
+if (!process.env.SEED_DEFAULT_PASSWORD) {
+  console.log(`Password seed sementara (catat sekarang, tidak disimpan kembali): ${seedPassword}`);
+}
 
 async function seedUsers() {
   console.log('Seeding user accounts...');
@@ -7,21 +18,21 @@ async function seedUsers() {
     {
       name: 'Owner Glosir',
       email: 'owner@glosir.com',
-      password: 'Glosir2026!',
+      password: seedPassword,
       role: 'OWNER',
       phone: '081234567890',
     },
     {
       name: 'Admin Glosir',
       email: 'admin@glosir.com',
-      password: 'Glosir2026!',
+      password: seedPassword,
       role: 'ADMIN',
       phone: '081234567891',
     },
     {
       name: 'Kasir Glosir',
       email: 'kasir@glosir.com',
-      password: 'Glosir2026!',
+      password: seedPassword,
       role: 'CASHIER',
       phone: '081234567892',
     },

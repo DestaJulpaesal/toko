@@ -3,35 +3,97 @@ import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, customerCreateSchema, customerUpdateSchema } from '../middleware/security.js';
 import { writeAuditLog } from '../services/auditLogService.js';
+import { parsePagination } from '../utils/pagination.js';
 
 const router = express.Router();
-router.use(authenticateToken);
+router.use(authenticateToken, requireRole('OWNER', 'ADMIN', 'CASHIER'));
 
 // Helper to add or deduct points from customer
-export async function updateCustomerPoints(customerId, pointsDelta) {
+export async function updateCustomerPoints(customerId, pointsDelta, client = prisma) {
   if (!customerId) return null;
 
-  try {
-    const customer = await prisma.customer.findUnique({ where: { id: customerId } });
-    if (customer) {
-      const current = Number(customer.points || 0);
-      const newPoints = Math.max(current + pointsDelta, 0);
-      await prisma.customer.update({
-        where: { id: customerId },
-        data: { points: newPoints },
-      });
-      return { previousPoints: current, newPoints };
-    }
-  } catch (err) {
-    console.warn('Prisma customer update failed:', err.message);
-  }
-
-  return null;
+  const delta = Number(pointsDelta);
+  if (!Number.isInteger(delta)) throw new Error('Perubahan poin tidak valid');
+  const customer = await client.customer.findUnique({ where: { id: customerId }, select: { points: true } });
+  if (!customer) throw new Error('Pelanggan tidak ditemukan');
+  const current = Number(customer.points || 0);
+  if (delta < 0 && current < Math.abs(delta)) throw new Error('Saldo poin pelanggan tidak mencukupi');
+  const update = await client.customer.updateMany({
+    where: { id: customerId, points: current },
+    data: { points: { increment: delta } },
+  });
+  if (update.count !== 1) throw new Error('Saldo poin berubah. Silakan ulangi transaksi.');
+  return { previousPoints: current, newPoints: current + delta };
 }
 
 // GET /api/customers - List all customers with points
+// GET /api/customers/:id/detail - customer purchase profile (without member points)
+router.get('/:id/detail', async (req, res) => {
+  try {
+    const customer = await prisma.customer.findUnique({
+      where: { id: req.params.id },
+      include: {
+        orders: {
+          where: { status: { notIn: ['CANCELLED', 'VOIDED'] } },
+          orderBy: { createdAt: 'desc' },
+          include: { items: { select: { name: true, quantity: true, unitPrice: true, total: true } } },
+        },
+        debts: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!customer) return res.status(404).json({ success: false, message: 'Pelanggan tidak ditemukan' });
+
+    const orders = customer.orders.map((order) => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      total: Number(order.total || 0),
+      paymentStatus: order.paymentStatus,
+      createdAt: order.createdAt,
+      items: order.items.map((item) => ({
+        name: item.name,
+        quantity: Number(item.quantity || 0),
+        unitPrice: Number(item.unitPrice || 0),
+        total: Number(item.total || 0),
+      })),
+    }));
+    const frequentProducts = {};
+    orders.forEach((order) => order.items.forEach((item) => {
+      const key = item.name;
+      if (!frequentProducts[key]) frequentProducts[key] = { name: key, quantity: 0, total: 0 };
+      frequentProducts[key].quantity += item.quantity;
+      frequentProducts[key].total += item.total;
+    }));
+    const debts = customer.debts.map((debt) => ({
+      id: debt.id, amount: Number(debt.amount || 0), paidAmount: Number(debt.paidAmount || 0),
+      remainingAmount: Math.max(Number(debt.amount || 0) - Number(debt.paidAmount || 0), 0),
+      status: debt.status, dueDate: debt.dueDate, description: debt.description || '', createdAt: debt.createdAt,
+    }));
+    return res.json({
+      success: true,
+      customer: {
+        id: customer.id, name: customer.name, phone: customer.phone, email: customer.email,
+        address: customer.address, notes: customer.notes || '',
+        createdAt: customer.createdAt,
+      },
+      summary: {
+        totalOrders: orders.length,
+        totalSpent: orders.reduce((sum, order) => sum + order.total, 0),
+        outstandingDebt: debts.reduce((sum, debt) => sum + debt.remainingAmount, 0),
+      },
+      orders,
+      debts,
+      frequentProducts: Object.values(frequentProducts).sort((a, b) => b.quantity - a.quantity).slice(0, 10),
+    });
+  } catch (error) {
+    console.error('Customer detail failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Detail pelanggan tidak tersedia.' });
+  }
+});
+
 router.get('/', async (req, res) => {
   const { search } = req.query;
+  const pagination = parsePagination(req.query);
 
   try {
     const where = search
@@ -44,83 +106,29 @@ router.get('/', async (req, res) => {
         }
       : undefined;
 
-    const customers = await prisma.customer.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: {
-          select: { orders: true },
+    const [customers, total] = await Promise.all([
+      prisma.customer.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: pagination.skip,
+        take: pagination.take,
+        select: {
+          id: true, name: true, phone: true, email: true, address: true, notes: true,
+          points: true, createdAt: true, _count: { select: { orders: true } },
         },
-      },
-    });
-
-    // GET /api/customers/:id/detail - customer purchase profile (without member points)
-    router.get('/:id/detail', async (req, res) => {
-      try {
-        const customer = await prisma.customer.findUnique({
-          where: { id: req.params.id },
-          include: {
-            orders: {
-              where: { status: { notIn: ['CANCELLED', 'VOIDED'] } },
-              orderBy: { createdAt: 'desc' },
-              include: { items: { select: { name: true, quantity: true, unitPrice: true, total: true } } },
-            },
-            debts: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
-          },
-        });
-        if (!customer) return res.status(404).json({ success: false, message: 'Pelanggan tidak ditemukan' });
-
-        const orders = customer.orders.map((order) => ({
-          id: order.id,
-          orderNumber: order.orderNumber,
-          status: order.status,
-          total: Number(order.total || 0),
-          paymentStatus: order.paymentStatus,
-          createdAt: order.createdAt,
-          items: order.items.map((item) => ({
-            name: item.name,
-            quantity: Number(item.quantity || 0),
-            unitPrice: Number(item.unitPrice || 0),
-            total: Number(item.total || 0),
-          })),
-        }));
-        const frequentProducts = {};
-        orders.forEach((order) => order.items.forEach((item) => {
-          const key = item.name;
-          if (!frequentProducts[key]) frequentProducts[key] = { name: key, quantity: 0, total: 0 };
-          frequentProducts[key].quantity += item.quantity;
-          frequentProducts[key].total += item.total;
-        }));
-        const debts = customer.debts.map((debt) => ({
-          id: debt.id, amount: Number(debt.amount || 0), paidAmount: Number(debt.paidAmount || 0),
-          remainingAmount: Math.max(Number(debt.amount || 0) - Number(debt.paidAmount || 0), 0),
-          status: debt.status, dueDate: debt.dueDate, description: debt.description || '', createdAt: debt.createdAt,
-        }));
-        return res.json({
-          success: true,
-          customer: {
-            id: customer.id, name: customer.name, phone: customer.phone, email: customer.email,
-            address: customer.address, notes: customer.notes || '',
-            createdAt: customer.createdAt,
-          },
-          summary: {
-            totalOrders: orders.length,
-            totalSpent: orders.reduce((sum, order) => sum + order.total, 0),
-            outstandingDebt: debts.reduce((sum, debt) => sum + debt.remainingAmount, 0),
-          },
-          orders,
-          debts,
-          frequentProducts: Object.values(frequentProducts).sort((a, b) => b.quantity - a.quantity).slice(0, 10),
-        });
-      } catch (error) {
-        console.error('Customer detail failed:', error.message);
-        return res.status(503).json({ success: false, message: 'Detail pelanggan tidak tersedia.' });
-      }
-    });
+      }),
+      prisma.customer.count({ where }),
+    ]);
 
     return res.json({
       success: true,
       source: 'database',
+      pagination: {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        total,
+        totalPages: Math.ceil(total / pagination.pageSize),
+      },
       customers: customers.map((c) => ({
         id: c.id,
         name: c.name,

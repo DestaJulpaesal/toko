@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, Quote } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
+import { publicInfoOrDefault } from '../utils/publicContentDefaults';
 
 const pageMap = {
-  terms: { type: 'TERMS', title: 'Syarat & Ketentuan', description: 'Ketentuan penggunaan layanan Glosir.' },
-  privacy: { type: 'PRIVACY', title: 'Kebijakan Privasi', description: 'Cara kami menjaga perlindungan data pelanggan.' },
-  contact: { type: 'CONTACT', title: 'Contact Us', description: 'Kirim pertanyaan, permintaan, atau kebutuhan Anda.' },
-  faq: { type: 'FAQ', title: 'Pusat Bantuan / FAQ', description: 'Jawaban untuk pertanyaan paling umum pelanggan.' },
-  help: { type: 'HELP', title: 'Pusat Bantuan', description: 'Dukungan pelanggan dan bantuan untuk kebutuhan Anda.' },
-  testimonials: { type: 'TESTIMONIAL', title: 'Testimoni / Ulasan', description: 'Pengalaman pelanggan yang sudah menggunakan layanan Glosir.' },
+  terms: { type: 'TERMS', title: 'Syarat & Ketentuan', description: 'Panduan pemesanan dan penggunaan layanan Glosir.' },
+  privacy: { type: 'PRIVACY', title: 'Kebijakan Privasi', description: 'Penjelasan tentang penggunaan dan perlindungan data pelanggan.' },
+  faq: { type: 'FAQ', title: 'Pusat Bantuan', description: 'Jawaban untuk pertanyaan yang sering ditanyakan pelanggan.' },
+  help: { type: 'HELP', title: 'Pusat Bantuan', description: 'Cara menghubungi tim dan mendapatkan bantuan dari Glosir.' },
+  testimonials: { type: 'TESTIMONIAL', title: 'Cerita Pelanggan', description: 'Pengalaman pelanggan bersama Glosir.' },
 };
 
 function parseContentBlocks(content = '') {
@@ -19,8 +21,82 @@ function parseContentBlocks(content = '') {
     .filter(Boolean);
 }
 
+function parseFaqBlock(block) {
+  const match = block.match(/(?:^|\n)Q:\s*([\s\S]*?)(?:\nA:\s*([\s\S]*))?$/i);
+  if (!match) return null;
+  return { question: match[1].trim(), answer: (match[2] || '').trim() };
+}
+
+function ContentBody({ item, type }) {
+  const blocks = parseContentBlocks(item.content);
+
+  if (type === 'FAQ') {
+    const questions = blocks.map(parseFaqBlock).filter(Boolean);
+    if (questions.length) {
+      return (
+        <div className="public-faq-list">
+          {questions.map(({ question, answer }, index) => (
+            <details className="public-faq-item" key={`${item.id}-${index}`}>
+              <summary>{question}</summary>
+              {answer && <p>{answer}</p>}
+            </details>
+          ))}
+        </div>
+      );
+    }
+  }
+
+  if (type === 'TESTIMONIAL') {
+    const quotes = blocks.map((block) => {
+      const match = block.match(/^["“]?([\s\S]*?)["”]?\s*[-–—]\s*(.+)$/);
+      return match ? { quote: match[1].replace(/^["“]|["”]$/g, '').trim(), author: match[2].trim() } : null;
+    }).filter(Boolean);
+
+    if (quotes.length) {
+      return (
+        <div className="public-testimonial-grid">
+          {quotes.map(({ quote, author }, index) => (
+            <blockquote className="public-testimonial-card" key={`${item.id}-${index}`}>
+              <Quote size={19} aria-hidden="true" />
+              <p>{quote}</p>
+              <cite>{author}</cite>
+            </blockquote>
+          ))}
+        </div>
+      );
+    }
+  }
+
+  const isNumberedList = blocks.length > 1 && blocks.every((block) => /^\d+[.)]\s+/.test(block));
+  const isBulletList = blocks.every((block) => block.split('\n').every((line) => /^[-*]\s+/.test(line.trim())));
+
+  if (isNumberedList) {
+    return (
+      <ol className="public-content-list public-content-list-numbered">
+        {blocks.map((block, index) => <li key={`${item.id}-${index}`}>{block.replace(/^\d+[.)]\s+/, '')}</li>)}
+      </ol>
+    );
+  }
+
+  if (isBulletList) {
+    return (
+      <ul className="public-content-list">
+        {blocks.flatMap((block) => block.split('\n').map((line) => line.trim().replace(/^[-*]\s+/, ''))).map((line, index) => (
+          <li key={`${item.id}-${index}`}>{line}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="public-content-copy">
+      {blocks.map((block, index) => <p key={`${item.id}-${index}`}>{block}</p>)}
+    </div>
+  );
+}
+
 export default function PublicInfoPage({ pageKey = 'terms' }) {
-  const [page, setPage] = useState(null);
+  const [items, setItems] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -28,102 +104,96 @@ export default function PublicInfoPage({ pageKey = 'terms' }) {
 
   useEffect(() => {
     let active = true;
+    const cacheKey = `glosir_public_content_v2_${meta.type.toLowerCase()}`;
 
     const loadPage = async () => {
-      const cacheKey = `glosir_public_content_${meta.type.toLowerCase()}`;
-      let hasCachedPage = false;
       try {
-        const cachedPage = JSON.parse(localStorage.getItem(cacheKey) || 'null');
-        if (cachedPage) {
-          setPage(cachedPage);
+        const cachedItems = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+        if (Array.isArray(cachedItems)) {
+          setItems(cachedItems);
           setLoading(false);
-          hasCachedPage = true;
         }
       } catch {
-        // Ignore an invalid local cache and use the API response.
+        try {
+          localStorage.removeItem(cacheKey);
+        } catch {
+          // Browser storage may be disabled; fetch the published content anyway.
+        }
       }
 
-      if (!hasCachedPage) setLoading(true);
       setError('');
       try {
         const response = await apiFetch(`/site-content/public?type=${meta.type.toLowerCase()}`);
         const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Konten gagal dimuat.');
         if (!active) return;
-        if (!response.ok || !data.success) {
-          throw new Error(data.message || 'Konten gagal dimuat.');
-        }
 
-        const item = data.data?.item || data.data?.items?.[0] || null;
-        setPage(item);
-        if (item) localStorage.setItem(cacheKey, JSON.stringify(item));
+        const publishedItems = Array.isArray(data.data?.items)
+          ? data.data.items
+          : data.data?.item
+            ? [data.data.item]
+            : [];
+        const visibleItems = publicInfoOrDefault(meta.type, publishedItems);
+        setItems(visibleItems);
+        try {
+          if (publishedItems.length) localStorage.setItem(cacheKey, JSON.stringify(publishedItems));
+        } catch {
+          // The page remains usable when browser storage is full or disabled.
+        }
       } catch (loadError) {
         if (!active) return;
-        setError(loadError.message || 'Konten gagal dimuat.');
+        console.warn('Public information unavailable; using frontend defaults:', loadError.message);
+        setItems((current) => publicInfoOrDefault(meta.type, current));
       } finally {
         if (active) setLoading(false);
       }
     };
 
+    setLoading(true);
     loadPage();
     return () => {
       active = false;
     };
   }, [meta.type]);
 
-  const contentBlocks = page ? parseContentBlocks(page.content) : [];
-
   return (
-    <div className="public-page">
+    <div className="public-page public-info-page">
       <PublicHeader />
       <main className="public-content-shell">
         <section className="inner-hero info-hero">
           <div>
-            <span className="eyebrow dark">Informasi Publik</span>
+            <span className="eyebrow dark">INFORMASI GLOSIR</span>
             <h1>{meta.title}</h1>
           </div>
           <p>{meta.description}</p>
         </section>
 
-        <section className="info-card-wrap">
-          {loading && <div className="info-card loading-state">Memuat data...</div>}
-          {error && <div className="info-card error-state">{error}</div>}
+        <section className="info-card-wrap" aria-live="polite">
+          {loading && <div className="info-card loading-state">Memuat informasi...</div>}
+          {error && <div className="info-card error-state" role="alert">{error}</div>}
 
-          {!loading && !error && page && (
-            <article className="info-card">
-              <div className="info-card-head">
-                <span className="pill">{page.type}</span>
-                <h2>{page.title}</h2>
-              </div>
-
-              {contentBlocks.length > 0 ? (
-                <div className="info-content-blocks">
-                  {contentBlocks.map((block, index) => {
-                    const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
-                    const isListBlock = lines.some((line) => line.startsWith('-') || line.startsWith('Q:') || line.startsWith('A:'));
-
-                    return isListBlock ? (
-                      <ul key={index} className="info-list">
-                        {lines.map((line, lineIndex) => (
-                          <li key={`${index}-${lineIndex}`}>
-                            {line.replace(/^[-*]\s*/, '').replace(/^Q:\s*/, 'Q: ').replace(/^A:\s*/, 'A: ')}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p key={index}>{block}</p>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p>Konten belum tersedia untuk kategori ini.</p>
-              )}
-            </article>
+          {!loading && !error && items.length > 0 && (
+            <div className="public-info-list">
+              {items.map((item, index) => (
+                <article className={`info-card public-info-card public-info-card-${meta.type.toLowerCase()}`} key={item.id}>
+                  <div className="info-card-head">
+                    <span className="public-info-index">{String(index + 1).padStart(2, '0')}</span>
+                    <div>
+                      <span className="public-info-type">{meta.title}</span>
+                      <h2>{item.title}</h2>
+                    </div>
+                  </div>
+                  <ContentBody item={item} type={meta.type} />
+                </article>
+              ))}
+            </div>
           )}
 
-          {!loading && !error && !page && (
+          {!loading && !error && items.length === 0 && (
             <div className="info-card empty-state">
-              <h2>Konten belum dibuat</h2>
-              <p>Silakan buat data ini dari panel admin agar informasi publik dapat ditampilkan di website.</p>
+              <h2>Informasi belum tersedia</h2>
+              <p>Tim Glosir sedang menyiapkan informasi untuk halaman ini.</p>
+              <Link className="public-info-contact-link" to="/contact-us">Hubungi Glosir <ArrowRight size={16} /></Link>
             </div>
           )}
         </section>

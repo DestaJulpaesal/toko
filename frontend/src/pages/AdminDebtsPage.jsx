@@ -12,13 +12,31 @@ export default function AdminDebtsPage() {
   const [payment, setPayment] = useState(null);
   const [notice, setNotice] = useState('');
   const [payingId, setPayingId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 25, total: 0, totalPages: 0 });
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const load = async () => {
-    const [debtResponse, accountResponse] = await Promise.all([apiFetch(`/debts?status=${status}`), apiFetch('/finance/accounts')]);
-    const debtData = await debtResponse.json(); const accountData = await accountResponse.json();
-    if (debtData.success) setDebts(debtData.data || debtData.debts || []);
-    if (accountData.success) setAccounts(accountData.data || accountData.accounts || []);
+    setLoading(true);
+    setLoadError('');
+    try {
+      const query = new URLSearchParams({ status, page: String(page), pageSize: '25' });
+      const [debtResponse, accountResponse] = await Promise.all([apiFetch(`/debts?${query}`), apiFetch('/finance/accounts')]);
+      const debtData = await debtResponse.json(); const accountData = await accountResponse.json();
+      if (!debtResponse.ok || !debtData.success) throw new Error(debtData.message || 'Data piutang gagal dimuat.');
+      if (!accountResponse.ok || !accountData.success) throw new Error(accountData.message || 'Akun penerimaan gagal dimuat.');
+      const nextDebts = debtData.data || debtData.debts || [];
+      setDebts(nextDebts);
+      setPagination(debtData.pagination || { page, pageSize: 25, total: nextDebts.length, totalPages: nextDebts.length ? 1 : 0 });
+      setAccounts(accountData.data || accountData.accounts || []);
+      if (!nextDebts.length && page > 1) setPage((current) => current - 1);
+    } catch (error) {
+      setLoadError(error.message || 'Data piutang gagal dimuat.');
+    } finally {
+      setLoading(false);
+    }
   };
-  useEffect(() => { load(); }, [status]);
+  useEffect(() => { load(); }, [status, page]);
   const pay = async (event) => {
     event.preventDefault();
     if (payingId) return;
@@ -34,8 +52,11 @@ export default function AdminDebtsPage() {
   };
   return <AdminShell active="Piutang" className="admin-crud-shell"><header className="admin-header"><div><p className="eyebrow light">Receivables</p><h1>Piutang Customer</h1><p className="admin-subtitle">Kelola cicilan dan penerimaan piutang dari database.</p></div></header>
     {notice && <div className="crud-notice" role="status">{notice}<button onClick={() => setNotice('')}>×</button></div>}
-    <div className="crud-toolbar"><label>Status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="OPEN">Terbuka</option><option value="OVERDUE">Jatuh tempo</option><option value="PAID">Lunas</option><option value="ALL">Semua</option></select></label></div>
-    <section className="crud-table-panel"><div className="product-table-wrap"><table className="product-table"><thead><tr><th>Customer</th><th>Jatuh tempo</th><th>Sisa</th><th>Status</th><th>Aksi</th></tr></thead><tbody>{debts.map((debt) => <tr key={debt.id}><td><strong>{debt.customerName || debt.customer?.name || '-'}</strong><small>{debt.description}</small></td><td>{debt.dueDate ? new Date(debt.dueDate).toLocaleDateString('id-ID') : '-'}</td><td>{money(debt.remainingAmount ?? debt.amount)}</td><td><span className={`status-chip ${debt.status === 'PAID' ? 'good' : debt.dueDate && new Date(debt.dueDate) < new Date() ? 'bad' : 'warning'}`}>{debt.status}</span></td><td>{debt.status !== 'PAID' && <button onClick={() => setPayment({ id: debt.id, amount: debt.remainingAmount ?? debt.amount, accountId: accounts[0]?.id || '' })}>Bayar</button>}</td></tr>)}</tbody></table>{!debts.length && <div className="table-empty">Belum ada piutang.</div>}</div></section>
+    {loadError && <div className="crud-notice" role="alert">{loadError}</div>}
+    <div className="crud-toolbar"><label>Status<select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="OPEN">Terbuka</option><option value="OVERDUE">Jatuh tempo</option><option value="PAID">Lunas</option><option value="ALL">Semua</option></select></label></div>
+    <section className="crud-table-panel"><div className="product-table-wrap"><table className="product-table"><thead><tr><th>Customer</th><th>Jatuh tempo</th><th>Sisa</th><th>Status</th><th>Aksi</th></tr></thead><tbody>{debts.map((debt) => <tr key={debt.id}><td><strong>{debt.customerName || debt.customer?.name || '-'}</strong><small>{debt.description}</small></td><td>{debt.dueDate ? new Date(debt.dueDate).toLocaleDateString('id-ID') : '-'}</td><td>{money(debt.remainingAmount ?? debt.amount)}</td><td><span className={`status-chip ${debt.status === 'PAID' ? 'good' : debt.dueDate && new Date(debt.dueDate) < new Date() ? 'bad' : 'warning'}`}>{debt.status}</span></td><td>{debt.status !== 'PAID' && <button onClick={() => setPayment({ id: debt.id, amount: debt.remainingAmount ?? debt.amount, accountId: accounts[0]?.id || '' })}>Bayar</button>}</td></tr>)}</tbody></table>{loading ? <div className="table-empty">Memuat piutang...</div> : !debts.length && <div className="table-empty">Belum ada piutang.</div>}</div>
+      {pagination.totalPages > 1 && <div className="g-pagination" aria-label="Halaman daftar piutang"><span>Menampilkan {((pagination.page - 1) * pagination.pageSize) + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} dari {pagination.total.toLocaleString('id-ID')}</span><button type="button" className="g-btn" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={loading || page <= 1}>Sebelumnya</button><button type="button" className="g-btn" onClick={() => setPage((value) => Math.min(pagination.totalPages, value + 1))} disabled={loading || page >= pagination.totalPages}>Berikutnya</button></div>}
+    </section>
     {payment && <div className="crud-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !payingId) setPayment(null); }}><form className="crud-form-panel" onSubmit={pay}><h2>Bayar piutang</h2><label>Nominal<CurrencyInput name="amount" value={payment.amount} onValueChange={(value) => setPayment((current) => ({ ...current, amount: value }))} /></label><label>Akun penerimaan<select value={payment.accountId} onChange={(event) => setPayment((current) => ({ ...current, accountId: event.target.value }))}>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label><button className="btn btn-primary" disabled={Boolean(payingId)}>{payingId ? 'Menyimpan...' : 'Simpan pembayaran'}</button><button type="button" className="btn btn-secondary" disabled={Boolean(payingId)} onClick={() => setPayment(null)}>Batal</button></form></div>}
   </AdminShell>;
 }

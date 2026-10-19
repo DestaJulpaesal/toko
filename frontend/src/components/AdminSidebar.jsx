@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../services/api';
 import { clearStaffCaches } from '../utils/catalogStorage';
 import ReminderBell from './ReminderBell';
-import { Archive, CalendarRange, Check, ChevronDown, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
+import { Archive, CalendarRange, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
 
 const ownerPrimaryGroups = [
   { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Penagihan Wilayah', '/admin/parcel-collections'], ['06', 'Keuangan', '/admin/finance']] },
@@ -15,7 +15,7 @@ const ownerSecondaryGroups = [
   { label: 'Katalog', links: [['09', 'Kategori', '/admin/categories'], ['10', 'Promo', '/admin/promos'], ['10b', 'Performa Produk', '/admin/product-performance']] },
   { label: 'Parsel', links: [['11', 'Parsel', '/admin/parcels'], ['12', 'Peserta Parsel', '/admin/parcel-participants'], ['13', 'Program Parsel', '/admin/parcel-programs'], ['14', 'Wilayah Parsel', '/admin/parcel-regions']] },
   { label: 'Keuangan Lanjutan', links: [['15', 'Catatan Pribadi', '/admin/personal-finance'], ['16', 'Laporan Keuangan', '/admin/finance/reports'], ['17', 'Kalender Keuangan', '/admin/finance/calendar'], ['18', 'Total Kekayaan', '/admin/finance/networth'], ['19', 'Persetujuan Keuangan', '/admin/finance/approvals'], ['20', 'Audit Keuangan', '/admin/finance/audit']] },
-  { label: 'Website & Kontrol', links: [['21', 'Konten Publik', '/admin/content'], ['22', 'Profil', '/admin/profile'], ['24', 'Paket Acara', '/admin/event-packages']] },
+  { label: 'Website & Kontrol', links: [['21', 'Konten Publik', '/admin/content'], ['22', 'Profil', '/admin/profile'], ['25', 'Pengaturan Toko', '/admin/settings'], ['24', 'Paket Acara', '/admin/event-packages']] },
 ];
 
 const cashierGroups = [
@@ -32,7 +32,6 @@ export default function AdminSidebar({ active = '' }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState('');
-  const [secondaryOpen, setSecondaryOpen] = useState(false);
   const [pendingOrderCount, setPendingOrderCount] = useState(0);
   const [displayMode, setDisplayMode] = useState(() => localStorage.getItem('glosir_display_mode') || 'simple');
   const [largeText, setLargeText] = useState(() => localStorage.getItem('glosir_large_text') === 'true');
@@ -52,7 +51,6 @@ export default function AdminSidebar({ active = '' }) {
         setCurrentUser(user);
         const mode = localStorage.getItem(`glosir_display_mode_${user.id}`) || (user.role === 'OWNER' ? 'simple' : 'complete');
         setDisplayMode(mode);
-        setSecondaryOpen(mode === 'complete');
         setLargeText(localStorage.getItem(`glosir_large_text_${user.id}`) === 'true');
       } else {
         // Default fallback if no stored user
@@ -114,11 +112,9 @@ export default function AdminSidebar({ active = '' }) {
   const isOwner = !isCashier && !isParcelManager;
   const visibleGroups = filterGroups(isParcelManager ? parcelManagerGroups : isCashier ? cashierGroups : ownerPrimaryGroups);
   const visibleSecondaryGroups = isOwner && displayMode === 'complete' ? filterGroups(ownerSecondaryGroups) : [];
-  const hasSecondarySearch = sidebarSearch.trim() && visibleSecondaryGroups.length > 0;
   const toggleDisplayMode = () => {
     const nextMode = displayMode === 'simple' ? 'complete' : 'simple';
     setDisplayMode(nextMode);
-    setSecondaryOpen(nextMode === 'complete');
     if (currentUser?.id) localStorage.setItem(`glosir_display_mode_${currentUser.id}`, nextMode);
     localStorage.setItem('glosir_display_mode', nextMode);
     navigate(nextMode === 'simple' ? '/admin' : '/admin/detail');
@@ -163,13 +159,21 @@ export default function AdminSidebar({ active = '' }) {
             ))}
           </div>
         ))}
+        {isOwner && (
+          <button
+            type="button"
+            className="sidebar-mode-toggle"
+            onClick={toggleDisplayMode}
+            title={`Beralih ke mode ${displayMode === 'simple' ? 'lengkap' : 'simpel'}`}
+          >
+            <span className="sidebar-icon" aria-hidden="true"><LayoutDashboard size={16} strokeWidth={1.9} /></span>
+            <span className="sidebar-link-label">Mode {displayMode === 'simple' ? 'Lengkap' : 'Simpel'}</span>
+          </button>
+        )}
         {isOwner && visibleSecondaryGroups.length > 0 && (
-          <div className={`sidebar-secondary-section${secondaryOpen || hasSecondarySearch ? ' is-open' : ''}`}>
-            <button type="button" className="sidebar-layer-toggle" onClick={(event) => { event.stopPropagation(); setSecondaryOpen((open) => !open); }} aria-expanded={secondaryOpen || Boolean(hasSecondarySearch)}>
-              <span><span className="sidebar-layer-mark"><Check size={13} /></span> Menu Lainnya</span>
-              <ChevronDown size={15} aria-hidden="true" />
-            </button>
-            {(secondaryOpen || hasSecondarySearch) && visibleSecondaryGroups.map((group) => (
+          <div className="sidebar-secondary-section">
+            <span className="nav-label">Menu Lainnya</span>
+            {visibleSecondaryGroups.map((group) => (
               <div className="sidebar-nav-group sidebar-secondary-group" key={group.label}>
                 <span className="nav-label">{group.label}</span>
                 {group.links.map(([number, label, to]) => (
@@ -184,22 +188,11 @@ export default function AdminSidebar({ active = '' }) {
         )}
       </nav>
 
-      <div className="sidebar-upgrade">
+      {!isOwner && <div className="sidebar-upgrade">
         <strong>{isParcelManager ? 'Wilayah Parsel' : isCashier ? 'Workspace Kasir' : 'Menu Lainnya'} <span aria-hidden="true">✦</span></strong>
         <small>{isParcelManager ? 'Pantau peserta wilayah' : isCashier ? 'Operasional siap digunakan' : 'Akses fitur lanjutan toko'}</small>
-        {isOwner ? (
-          <>
-            <button type="button" onClick={() => setSecondaryOpen(true)} aria-expanded={secondaryOpen}>
-              {secondaryOpen ? 'Menu terbuka' : 'Buka menu'} <span aria-hidden="true">→</span>
-            </button>
-            <button type="button" onClick={toggleDisplayMode}>
-              Mode {displayMode === 'simple' ? 'Lengkap' : 'Simpel'} <span aria-hidden="true">↔</span>
-            </button>
-          </>
-        ) : (
-          <Link to={isParcelManager ? '/parcel-manager' : '/kasir'}>{isParcelManager ? 'Buka wilayah' : 'Buka kasir'} <span aria-hidden="true">→</span></Link>
-        )}
-      </div>
+        <Link to={isParcelManager ? '/parcel-manager' : '/kasir'}>{isParcelManager ? 'Buka wilayah' : 'Buka kasir'} <span aria-hidden="true">→</span></Link>
+      </div>}
 
       <div className="sidebar-profile">
         <span className="avatar">{isParcelManager ? 'PM' : isCashier ? 'KS' : 'OG'}</span>

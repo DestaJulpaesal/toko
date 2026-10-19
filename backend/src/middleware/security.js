@@ -116,8 +116,10 @@ export const notificationPreferencesSchema = z.object({
 }).strict();
 
 export const checkoutSchema = z.object({
+  clientRequestId: z.string().uuid().optional(),
   items: z.array(z.object({
     variantId: z.string().min(1).optional(),
+    unitId: z.string().min(1).nullable().optional(),
     eventPackageId: z.string().min(1).optional(),
     parcelId: z.string().min(1).optional(),
     quantity: z.coerce.number().int().positive(),
@@ -131,12 +133,15 @@ export const checkoutSchema = z.object({
   cashierName: z.string().optional(),
   redeemedPoints: z.coerce.number().int().nonnegative().default(0),
   discount: z.coerce.number().nonnegative().default(0),
+  discountReason: z.string().trim().max(500).optional(),
+  promoCode: z.string().trim().max(64).optional(),
   holdOrderId: z.string().min(1).nullable().optional(),
 }).passthrough();
 
 export const holdCartSchema = z.object({
   items: z.array(z.object({
     variantId: z.string().min(1).optional(),
+    unitId: z.string().min(1).nullable().optional(),
     eventPackageId: z.string().min(1).optional(),
     parcelId: z.string().min(1).optional(),
     quantity: z.coerce.number().int().positive(),
@@ -146,6 +151,7 @@ export const holdCartSchema = z.object({
   customerType: z.enum(['RETAIL', 'WHOLESALE']).default('RETAIL'),
   discount: z.coerce.number().nonnegative().default(0),
   promoId: z.string().optional().default('none'),
+  promoCode: z.string().trim().max(64).optional(),
   note: z.string().trim().max(500).optional().default(''),
 }).passthrough();
 
@@ -165,10 +171,16 @@ export const onlineOrderSchema = z.object({
   }).refine((item) => item.variantId || item.parcelId || item.eventPackageId, 'Item pesanan tidak valid')).min(1, 'Keranjang belanja masih kosong'),
 });
 
+export const publicOrderLookupSchema = z.object({
+  orderNumber: z.string().trim().min(8).max(80),
+  phoneLastFour: z.string().regex(/^\d{4}$/, 'Masukkan 4 digit terakhir nomor WhatsApp.'),
+}).strict();
+
 // ---- Kategori ----
 export const categorySchema = z.object({
   name: z.string().trim().min(1, 'Nama kategori wajib diisi'),
   description: z.string().trim().optional().nullable().default(''),
+  imageUrl: z.string().trim().url('URL gambar kategori tidak valid').or(z.literal('')).optional().nullable().default(''),
 });
 
 // ---- Pelanggan ----
@@ -409,14 +421,22 @@ export const productBulkSchema = z.object({
 // ---- Promo ----
 export const promoCreateSchema = z.object({
   name: z.string().trim().min(1, 'Nama promo wajib diisi'),
+  code: z.string().trim().min(1).max(64).optional().nullable(),
   description: z.string().trim().optional().nullable().default(''),
   discountType: z.enum(['PERCENT', 'FIXED']).optional().default('PERCENT'),
   discountValue: z.coerce.number().optional().default(0),
+  minPurchase: z.coerce.number().nonnegative().optional().nullable(),
+  maxDiscount: z.coerce.number().positive().optional().nullable(),
+  usageLimit: z.coerce.number().int().positive().optional().nullable(),
   startsAt: z.union([z.string(), z.date()]).optional().nullable(),
   endsAt: z.union([z.string(), z.date()]).optional().nullable(),
   isActive: z.coerce.boolean().optional().default(true),
 });
 export const promoUpdateSchema = promoCreateSchema.partial();
+export const promoValidationSchema = z.object({
+  code: z.string().trim().min(1).max(64),
+  subtotal: z.coerce.number().nonnegative(),
+});
 
 // ---- Konten situs ----
 export const siteContentCreateSchema = z.object({

@@ -7,50 +7,45 @@ import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import CatalogImage from '../components/CatalogImage';
 import ProductCard from '../components/ProductCard';
-import { PUBLIC_CATALOG_CACHE_KEY, categoriesFromProducts, mergeCatalogCategories, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
+import { PUBLIC_CATALOG_CACHE_KEY, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
+import { publicCategoriesOrDefault, sortPublicCategories } from '../utils/publicContentDefaults';
 import { showSuccess } from '../utils/noticeService';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
+const publicCatalogRequests = new Map();
+
+function fetchCatalogJson(path) {
+  if (!publicCatalogRequests.has(path)) {
+    const request = apiFetch(path)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`${path} gagal dimuat (${response.status})`);
+        return response.json();
+      })
+      .finally(() => publicCatalogRequests.delete(path));
+    publicCatalogRequests.set(path, request);
+  }
+  return publicCatalogRequests.get(path);
+}
+
 const CATEGORY_META = {
-  'Glosir': {
-    image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=240&q=85',
-    icon: '🛒',
-  },
-  'Kebutuhan Dapur': {
-    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=240&q=85',
-    icon: '🍳',
-  },
+  'Glosir': { icon: '🛒' },
+  'Kebutuhan Dapur': { icon: '🍳' },
   'Buah & Sayuran': { icon: '🍎' },
   'Buah dan Sayuran': { icon: '🍎' },
   'Sayur & Buah': { icon: '🥬' },
   'Susu & Telur': { icon: '🥛' },
   'Roti & Kue': { icon: '🥐' },
   'Daging & Ikan': { icon: '🐟' },
-  'Minuman': {
-    image: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=240&q=85',
-    icon: '☕',
-  },
-  'Bahan Pokok': {
-    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=240&q=85',
-    icon: '🌾',
-  },
+  'Minuman': { icon: '☕' },
+  'Bahan Pokok': { icon: '🌾' },
   'Camilan': { icon: '🍪' },
   'Makanan Ringan': { icon: '🍿' },
   'Perawatan Rumah': { icon: '🧹' },
   'Rumah Tangga': { icon: '🧹' },
   'Sabun & Kebersihan': { icon: '🧼' },
-  'Acara': {
-    image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=240&q=85',
-    icon: '🎉',
-  },
-  'Parsel': {
-    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=240&q=85',
-    icon: '🎁',
-  },
-  'Paket Acara': {
-    image: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=240&q=85',
-    icon: '📦',
-  },
+  'Acara': { icon: '🎉' },
+  'Parsel': { icon: '🎁' },
+  'Paket Acara': { icon: '📦' },
 };
 
 export default function ProductPage() {
@@ -62,21 +57,15 @@ export default function ProductPage() {
   });
   const [activeFilter, setActiveFilter] = useState(searchParams.get('category') || '');
   const [products, setProducts] = useState(initialCatalog);
-  const [categories, setCategories] = useState(() => categoriesFromProducts(initialCatalog));
-  const [categoriesLoading, setCategoriesLoading] = useState(() => initialCatalog.length === 0);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(() => initialCatalog.length === 0);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [sort, setSort] = useState('default');
   const [categoryScrollEdges, setCategoryScrollEdges] = useState({ left: false, right: false });
   const categoryScrollRef = useRef(null);
   const { toggleFavorite, isFavorite } = useFavorites();
-  const filters = categories
+  const filters = sortPublicCategories(publicCategoriesOrDefault(categories))
     .map((category) => category.name)
-    .sort((first, second) => {
-      if (first === 'Glosir') return -1;
-      if (second === 'Glosir') return 1;
-      return first.localeCompare(second, 'id');
-    });
 
   const updateCategoryScrollEdges = () => {
     const element = categoryScrollRef.current;
@@ -109,7 +98,7 @@ export default function ProductPage() {
       resizeObserver.disconnect();
       window.removeEventListener('resize', updateCategoryScrollEdges);
     };
-  }, [filters.length, categoriesLoading]);
+  }, [filters.length]);
 
   useEffect(() => {
     const query = searchParams.get('search');
@@ -119,56 +108,49 @@ export default function ProductPage() {
 
   useEffect(() => {
     let cancelled = false;
-    let remoteCategories = [];
-    let catalogForCategories = initialCatalog;
 
-    const fetchJson = async (path) => {
-      const response = await apiFetch(path);
-      if (!response.ok) throw new Error(`${path} gagal dimuat (${response.status})`);
-      return response.json();
-    };
-
-    const publishCategories = () => {
-      if (cancelled) return;
-      setCategories(mergeCatalogCategories(remoteCategories, catalogForCategories));
-    };
-
-    fetchJson('/categories/public/list')
+    fetchCatalogJson('/categories/public/list')
       .then((data) => {
         if (cancelled) return;
-        remoteCategories = data?.success && Array.isArray(data.categories) ? data.categories : [];
-        publishCategories();
+        if (!data?.success || !Array.isArray(data.categories)) throw new Error('Daftar kategori tidak valid.');
+        setCategories(data.categories);
       })
       .catch((error) => {
         console.error('Catalog category list failed:', error);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          publishCategories();
-          setCategoriesLoading(false);
-        }
       });
 
-    Promise.allSettled([
-      fetchJson('/products'),
-      fetchJson('/parcels'),
-      fetchJson('/event-packages'),
-    ])
-      .then((results) => {
+    let catalogProducts = initialCatalog;
+    let catalogParcels = [];
+    let catalogEvents = [];
+
+    const publishCatalog = () => {
+      if (cancelled) return;
+      const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
+      setProducts(merged);
+      try {
+        localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));
+      } catch (error) {
+        console.warn('Catalog cache could not be saved:', error);
+      }
+    };
+
+    fetchCatalogJson('/products')
+      .then((data) => {
+        if (!data?.success || !Array.isArray(data.products)) throw new Error('Daftar produk tidak valid.');
         if (cancelled) return;
+        catalogProducts = data.products;
+        publishCatalog();
+      })
+      .catch((error) => console.error('Catalog products failed to load:', error))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-        const [productResult, parcelResult, eventResult] = results;
-        const productData = productResult.status === 'fulfilled' ? productResult.value : null;
-        const parcelData = parcelResult.status === 'fulfilled' ? parcelResult.value : null;
-        const eventData = eventResult.status === 'fulfilled' ? eventResult.value : null;
-
-        if (!productData && !parcelData && !eventData) {
-          console.error('Catalog products, parcels, and event packages failed to load.', results);
-          return;
-        }
-
-        const catalogProducts = productData?.success && Array.isArray(productData.products) ? productData.products : [];
-        const catalogParcels = parcelData?.success && Array.isArray(parcelData.parcels) ? parcelData.parcels.map((parcel) => ({
+    fetchCatalogJson('/parcels')
+      .then((data) => {
+        if (!data?.success || !Array.isArray(data.parcels)) throw new Error('Daftar parsel tidak valid.');
+        if (cancelled) return;
+        catalogParcels = data.parcels.map((parcel) => ({
           id: `parcel-${parcel.id}`,
           parcelId: parcel.id,
           name: parcel.name,
@@ -183,12 +165,20 @@ export default function ProductPage() {
           items: parcel.items || [],
           detailPath: '/parsel',
           imageUrl: parcel.imageUrl || null,
-        })) : [];
-        const catalogEvents = eventData?.success && Array.isArray(eventData.packages) ? eventData.packages.map((item) => ({
+        }));
+        publishCatalog();
+      })
+      .catch((error) => console.error('Catalog parcels failed to load:', error));
+
+    fetchCatalogJson('/event-packages')
+      .then((data) => {
+        if (!data?.success || !Array.isArray(data.packages)) throw new Error('Daftar paket acara tidak valid.');
+        if (cancelled) return;
+        catalogEvents = data.packages.map((item) => ({
           id: `event-${item.id}`,
           eventPackageId: item.id,
           name: item.name,
-          category: 'Paket Acara',
+          category: 'Acara',
           price: Number(item.price || 0),
           originalPrice: null,
           discountPercent: 0,
@@ -199,24 +189,10 @@ export default function ProductPage() {
           items: (item.items || []).map((entry) => ({ id: entry.id, quantity: entry.quantity, productName: entry.variant?.product?.name, variantName: entry.variant?.name })),
           detailPath: '/paket-acara',
           imageUrl: item.imageUrl || null,
-        })) : [];
-
-        const merged = [...catalogProducts, ...catalogParcels, ...catalogEvents];
-        catalogForCategories = merged;
-        setProducts(merged);
-        publishCategories();
-        try {
-          localStorage.setItem(PUBLIC_CATALOG_CACHE_KEY, JSON.stringify(stripSensitive(merged)));
-        } catch (error) {
-          console.warn('Catalog cache could not be saved:', error);
-        }
+        }));
+        publishCatalog();
       })
-      .catch((error) => console.error('Catalog content failed:', error))
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+      .catch((error) => console.error('Catalog event packages failed to load:', error));
 
     return () => {
       cancelled = true;
@@ -274,9 +250,9 @@ export default function ProductPage() {
               ref={categoryScrollRef}
               onScroll={updateCategoryScrollEdges}
             >
-              {categoriesLoading && <p className="category-loading" role="status">Memuat kategori...</p>}
               {filters.map((filter) => {
                 const meta = CATEGORY_META[filter] || { icon: '🛍️' };
+                const categoryImage = categories.find((category) => category.name === filter)?.imageUrl;
                 const isActive = filter === activeFilter;
 
                 return (
@@ -289,9 +265,9 @@ export default function ProductPage() {
                     aria-label={`Tampilkan produk kategori ${filter}`}
                   >
                     <span className="category-icon-big">
-                      {meta.image ? (
+                      {categoryImage ? (
                         <img
-                          src={meta.image}
+                          src={categoryImage}
                           alt=""
                           loading="lazy"
                           onError={(event) => {
@@ -300,7 +276,7 @@ export default function ProductPage() {
                           }}
                         />
                       ) : null}
-                      <span className={meta.image ? 'category-icon-fallback is-hidden' : 'category-icon-fallback'}>
+                      <span className={categoryImage ? 'category-icon-fallback is-hidden' : 'category-icon-fallback'}>
                         {meta.icon}
                       </span>
                     </span>

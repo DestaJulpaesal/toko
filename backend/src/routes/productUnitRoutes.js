@@ -4,6 +4,8 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody } from '../middleware/security.js';
 import { z } from 'zod';
 import { calculateStockDecrease, validateStock } from '../utils/stockCalculation.js';
+import { writeAuditLog } from '../services/auditLogService.js';
+import { invalidateHomepageCache } from '../services/homepageHandler.js';
 
 const router = express.Router();
 
@@ -17,6 +19,7 @@ const productUnitSchema = z.object({
   name: z.string().min(1, 'Nama satuan wajib diisi'),
   sku: z.string().min(1, 'SKU wajib diisi'),
   barcode: z.string().optional(),
+  basePrice: z.coerce.number().nonnegative('Harga modal tidak boleh negatif'),
   sellPrice: z.coerce.number().positive('Harga jual harus positif'),
   wholesalePrice: z.coerce.number().positive().optional(),
   conversionToBase: z.coerce.number().positive('Konversi harus positif'),
@@ -32,7 +35,7 @@ router.get('/:productId/units', authenticateToken, async (req, res) => {
 
     const product = await prisma.product.findUnique({
       where: { id: productId },
-      include: { units: { where: { isActive: true }, orderBy: { conversionToBase: 'desc' } } },
+      include: { units: { where: { isActive: true, isSellable: true }, orderBy: { conversionToBase: 'desc' } } },
     });
 
     if (!product) return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
@@ -82,6 +85,7 @@ router.post('/:productId/units', authenticateToken, requireRole('OWNER', 'ADMIN'
         ...req.body,
       },
     });
+    invalidateHomepageCache(prisma);
 
     return res.status(201).json({
       success: true,
@@ -121,6 +125,7 @@ router.patch('/:productId/units/:unitId', authenticateToken, requireRole('OWNER'
       where: { id: unitId },
       data: req.body,
     });
+    invalidateHomepageCache(prisma);
 
     return res.json({
       success: true,
@@ -155,6 +160,7 @@ router.delete('/:productId/units/:unitId', authenticateToken, requireRole('OWNER
       where: { id: unitId },
       data: { isActive: false },
     });
+    invalidateHomepageCache(prisma);
 
     return res.json({ success: true, message: 'Satuan berhasil dihapus' });
   } catch (error) {
@@ -180,6 +186,14 @@ router.put('/:productId/base-stock', authenticateToken, requireRole('OWNER', 'AD
     const updated = await prisma.product.update({
       where: { id: productId },
       data: { baseStockQty },
+    });
+    await writeAuditLog({
+      entityType: 'Product',
+      entityId: productId,
+      field: 'BASE_STOCK',
+      oldValue: { baseStockQty: Number(product.baseStockQty) },
+      newValue: { baseStockQty, note: note || null },
+      changedById: req.user.id,
     });
 
     return res.json({

@@ -90,8 +90,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', validateBody(parcelParticipantCreateSchema), async (req, res) => {
   try {
-    const { customerId, participantPhone, participantName, parcelId, programId, name, targetAmount, contributionAmount, frequency = 'DAILY', startDate, endDate, notes } = req.body || {};
-    const isManager = req.user?.role === 'PARCEL_MANAGER';
+    const { customerId, participantPhone, participantName, parcelId, programId, name, contributionAmount, frequency = 'DAILY', startDate, endDate, notes } = req.body || {};
     const participantDisplayName = String(participantName || name || '').trim();
     if (!participantDisplayName || !programId || Number(contributionAmount) <= 0) return res.status(400).json({ success: false, message: 'Nama peserta, program, dan nominal setoran wajib diisi.' });
     const program = await prisma.parcelProgram.findUnique({ where: { id: String(programId) }, select: { name: true, targetAmount: true } });

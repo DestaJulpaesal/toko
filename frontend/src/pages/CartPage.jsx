@@ -8,7 +8,7 @@ import PublicFooter from '../components/PublicFooter';
 import { showSuccess } from '../utils/noticeService';
 
 export default function CartPage() {
-  const { items, updateQty, removeItem, totalPrice, promo, discount, applyPromo, removePromo, addItem } = useCart();
+  const { items, updateQty, removeItem, totalPrice, promo, discount, promoError, applyPromo, removePromo, addItem } = useCart();
   const [promoInput, setPromoInput] = useState('');
   const [promoMessage, setPromoMessage] = useState('');
   const [lastOrder, setLastOrder] = useState(null);
@@ -33,9 +33,9 @@ export default function CartPage() {
     }
   };
 
-  const handlePromo = (event) => {
+  const handlePromo = async (event) => {
     event.preventDefault();
-    if (applyPromo(promoInput)) {
+    if (await applyPromo(promoInput)) {
       setPromoMessage('Kode promo berhasil dipakai.');
       setPromoInput('');
     } else {
@@ -159,6 +159,7 @@ export default function CartPage() {
             )}
 
             {promoMessage && <p style={{ fontSize: '0.85rem', color: '#4b5563', margin: '0 0 12px' }}>{promoMessage}</p>}
+            {promoError && <p role="alert" style={{ fontSize: '0.85rem', color: '#b42318', margin: '0 0 12px' }}>{promoError}</p>}
 
             {discount > 0 && (
               <div className="summary-row discount-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#16a34a' }}>
@@ -205,4 +206,3 @@ export default function CartPage() {
     </div>
   );
 }
-

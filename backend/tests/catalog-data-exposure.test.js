@@ -88,6 +88,7 @@ const fakeSessions = createSessionService({
 });
 const { softAuth } = createAuth(fakeSessions);
 const handlers = createCatalogHandlers(fakeDb);
+let homepageQueryCount = 0;
 const app = express();
 app.get('/products', softAuth, handlers.listProducts);
 app.get('/products/:id', softAuth, handlers.getProduct);
@@ -96,26 +97,30 @@ app.get('/event-packages/:id', handlers.getEventPackage);
 app.get('/homepage', createHomepageHandler({
   category: {
     async findMany() {
-      return [{ id: 'c-home', name: 'Sembako', _count: { products: 1 } }];
+      homepageQueryCount += 1;
+      return [{ id: 'c-home', name: 'Sembako', imageUrl: 'https://example.test/sembako.webp', _count: { products: 1 } }];
     },
   },
   promoCampaign: {
     async findMany() {
+      homepageQueryCount += 1;
       return [{ id: 'promo-home', name: 'Promo Hemat', discountType: 'PERCENT', discountValue: '10', isActive: true }];
     },
   },
   product: {
-    async findMany() {
+    async findMany(options) {
+      homepageQueryCount += 1;
+      assert.equal(options.select.originalPrice, undefined);
+      assert.equal(options.select.variants.select.basePrice, undefined);
       return [{
         id: 'p-home',
         name: 'Beras',
         imageUrl: null,
-        originalPrice: '15000',
         isFlashSale: true,
         isBestseller: true,
         isRecommended: false,
         category: { name: 'Sembako' },
-        variants: [{ sellPrice: '12000', basePrice: '9000' }],
+        variants: [{ sellPrice: '12000' }],
       }];
     },
   },
@@ -172,15 +177,22 @@ test('pengunjung: paket acara tidak berisi harga modal / kolom mentah varian', a
 });
 
 test('homepage: satu respons berisi semua data publik tanpa membocorkan harga modal', async () => {
+  const queryCountBefore = homepageQueryCount;
   const { status, body } = await get('/homepage');
   assert.equal(status, 200);
   assert.equal(body.categories[0].name, 'Sembako');
+  assert.equal(body.categories[0].imageUrl, 'https://example.test/sembako.webp');
   assert.equal(body.promos[0].name, 'Promo Hemat');
   assert.equal(body.flashSaleProducts[0].price, 12000);
-  assert.equal(body.flashSaleProducts[0].originalPrice, 15000);
+  assert.equal(body.flashSaleProducts[0].originalPrice, null);
   assert.equal(body.bestsellerProducts[0].id, 'p-home');
   assert.deepEqual(body.recommendedProducts, []);
   assert.deepEqual(findForbiddenKeys(body), []);
+
+  const cached = await get('/homepage');
+  assert.equal(cached.status, 200);
+  assert.deepEqual(cached.body, body);
+  assert.equal(homepageQueryCount - queryCountBefore, 3);
 });
 
 test('token kedaluwarsa atau ngawur: tetap 200 sebagai pengunjung, bukan 403', async () => {

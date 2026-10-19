@@ -12,6 +12,7 @@ import {
 import { logFinanceAudit } from '../services/financeAuditService.js';
 import { updateFinanceLoggingStreak } from '../services/financeStreakService.js';
 import { writeAuditLog } from '../services/auditLogService.js';
+import { getFinanceSummary } from '../services/financeSummaryService.js';
 
 const router = express.Router();
 router.use(authenticateToken, (req, res, next) => {
@@ -106,26 +107,15 @@ async function calculateOrderProfit(start, end) {
 
 router.get('/summary', async (req, res) => {
   try {
-    const [income, expense, transfer, debt] = await Promise.all(['INCOME', 'EXPENSE', 'TRANSFER', 'DEBT'].map((type) => prisma.financeTransaction.aggregate({ where: { type, deletedAt: null }, _sum: { amount: true }, _count: { _all: true } })));
-    const today = new Date(); const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 6);
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    const sum = async (type, start) => money((await prisma.financeTransaction.aggregate({ where: { type, deletedAt: null, createdAt: { gte: start } }, _sum: { amount: true } }))._sum.amount);
-    const [todaysIncome, weekIncome, monthIncome, todaysExpense, weekExpense, monthExpense] = await Promise.all(['INCOME', 'EXPENSE'].flatMap((type) => [todayStart, weekStart, monthStart].map((start) => sum(type, start))));
-    const [grossProfit, todaysGrossProfit, weekGrossProfit, monthGrossProfit] = await Promise.all([calculateOrderProfit(), calculateOrderProfit(todayStart), calculateOrderProfit(weekStart), calculateOrderProfit(monthStart)]);
-    return res.json({ success: true, summary: {
-      totalIncome: money(income._sum.amount), totalExpense: money(expense._sum.amount), totalTransfer: money(transfer._sum.amount), totalDebt: money(debt._sum.amount),
-      incomeCount: income._count._all, expenseCount: expense._count._all, transferCount: transfer._count._all, debtCount: debt._count._all,
-      net: money(income._sum.amount) - money(expense._sum.amount) - money(debt._sum.amount),
-      todaysIncome, todaysExpense, todaysNet: todaysIncome - todaysExpense, weekIncome, weekExpense, monthIncome, monthExpense,
-      grossProfit, todaysGrossProfit, weekGrossProfit, monthGrossProfit,
-    } });
+    return res.json(await getFinanceSummary(prisma));
   } catch (error) { console.error('Finance summary failed:', error.message); return res.status(503).json({ success: false, message: 'Data keuangan tidak dapat diambil dari database.' }); }
 });
 
 router.get('/transactions', async (req, res) => {
   try {
     const where = { deletedAt: null };
+    const requestedLimit = Number.parseInt(String(req.query.limit || ''), 10);
+    const take = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 500) : 500;
     if (req.query.type && String(req.query.type).toUpperCase() !== 'ALL') where.type = String(req.query.type).toUpperCase();
     if (req.query.tagId) where.tags = { some: { tagId: String(req.query.tagId) } };
     if (req.query.accountId) where.accountId = String(req.query.accountId);
@@ -139,8 +129,9 @@ router.get('/transactions', async (req, res) => {
       const text = String(req.query.search).trim();
       where.OR = [{ description: { contains: text, mode: 'insensitive' } }, { category: { contains: text, mode: 'insensitive' } }, { paymentMethod: { contains: text, mode: 'insensitive' } }];
     }
-    const rows = await prisma.financeTransaction.findMany({ where, include: transactionInclude(), orderBy: { createdAt: 'desc' }, take: 500 });
-    return res.json({ success: true, data: rows.map(formatTransaction), transactions: rows.map(formatTransaction) });
+    const rows = await prisma.financeTransaction.findMany({ where, include: transactionInclude(), orderBy: { createdAt: 'desc' }, take });
+    const transactions = rows.map(formatTransaction);
+    return res.json({ success: true, data: transactions, transactions });
   } catch (error) { return res.status(503).json({ success: false, message: 'Transaksi tidak dapat diambil dari database.' }); }
 });
 

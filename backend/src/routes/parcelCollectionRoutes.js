@@ -4,7 +4,6 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, parcelCollectionCreateSchema, parcelCollectionVerifySchema } from '../middleware/security.js';
 
 const router = express.Router();
-const ownerRoles = ['OWNER', 'ADMIN'];
 const allowedRoles = [authenticateToken, requireRole('OWNER', 'ADMIN', 'PARCEL_MANAGER')];
 
 const includeData = {

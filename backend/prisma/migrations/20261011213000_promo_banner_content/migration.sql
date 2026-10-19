@@ -1,0 +1,1 @@
+-- Live schema already includes the promo banner content fields.

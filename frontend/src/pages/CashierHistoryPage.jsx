@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import AdminSidebar from '../components/AdminSidebar';
-import { calculateEarnedPoints } from './CashierPage';
 import { apiFetch } from '../services/api';
+import { normalizeIndonesianPhone } from '../utils/phoneUtils';
 import { printReceipt } from '../utils/printReceipt';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { usePublicSettings } from '../context/PublicSettingsContext';
 import * as XLSX from 'xlsx';
 
 const formatMoney = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 
 export default function CashierHistoryPage() {
+  const { storeProfile } = usePublicSettings();
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
   const [methodFilter, setMethodFilter] = useState('ALL');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,6 +26,8 @@ export default function CashierHistoryPage() {
   const [reconciliation, setReconciliation] = useState(null);
   const [reconciliationSaving, setReconciliationSaving] = useState(false);
   const [reconciliationError, setReconciliationError] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 25, total: 0, totalPages: 0 });
 
   const downloadExcel = () => {
     const rows = filteredOrders.map((order) => ({ Faktur: order.orderNumber, Waktu: new Date(order.createdAt).toLocaleString('id-ID'), Pelanggan: order.customer?.name || 'Pelanggan Umum', Metode: order.paymentMethod, Total: order.total, Status: order.status }));
@@ -32,13 +38,16 @@ export default function CashierHistoryPage() {
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch('/orders');
+      const query = new URLSearchParams({ page: String(page), pageSize: '25' });
+      if (debouncedSearch.trim()) query.set('search', debouncedSearch.trim());
+      if (methodFilter !== 'ALL') query.set('method', methodFilter);
+      const res = await apiFetch(`/orders?${query}`);
       const data = await res.json();
-      if (data.success && Array.isArray(data.orders) && data.orders.length > 0) {
-        setOrders(data.orders);
-      }
+      if (!res.ok || !data.success || !Array.isArray(data.orders)) throw new Error(data.message || 'Riwayat transaksi gagal dimuat.');
+      setOrders(data.orders);
+      setPagination(data.pagination || { page, pageSize: 25, total: data.orders.length, totalPages: 1 });
     } catch (err) {
-      console.warn('Backend orders unavailable, using local orders:', err.message);
+      setReconciliationError(err.message || 'Riwayat transaksi gagal dimuat.');
     } finally {
       setLoading(false);
     }
@@ -60,7 +69,7 @@ export default function CashierHistoryPage() {
   useEffect(() => {
     loadOrders();
     loadCashAccounts();
-  }, []);
+  }, [page, debouncedSearch, methodFilter]);
 
   const filteredOrders = orders.filter((ord) => {
     const matchesSearch =
@@ -74,10 +83,7 @@ export default function CashierHistoryPage() {
   });
 
   const totalOmset = filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-  const totalPointsAwarded = filteredOrders.reduce(
-    (sum, o) => sum + (o.earnedPoints || calculateEarnedPoints(o.total)),
-    0
-  );
+  const totalPointsAwarded = filteredOrders.reduce((sum, order) => sum + Number(order.earnedPoints || 0), 0);
   const cashCount = filteredOrders.filter((o) => o.paymentMethod === 'CASH').length;
   const qrisCount = filteredOrders.filter((o) => o.paymentMethod === 'QRIS').length;
   const transferCount = filteredOrders.filter((o) => o.paymentMethod === 'TRANSFER').length;
@@ -157,7 +163,7 @@ export default function CashierHistoryPage() {
   };
 
   const handleShareWhatsApp = (order) => {
-    const pts = order.earnedPoints !== undefined ? order.earnedPoints : calculateEarnedPoints(order.total);
+    const pts = Number(order.earnedPoints || 0);
     const itemsList = (order.items || [])
       .map((it) => `• ${it.name} (${it.quantity || it.qty}x) = ${formatMoney(it.total || (it.unitPrice * (it.quantity || it.qty)))}`)
       .join('\n');
@@ -180,9 +186,7 @@ export default function CashierHistoryPage() {
       `--------------------------------\n` +
       `Terima kasih telah berbelanja di Glosir!`;
 
-    const phone = order.customer?.phone
-      ? order.customer.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')
-      : '';
+    const phone = normalizeIndonesianPhone(order.customer?.phone || '');
 
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
@@ -288,7 +292,7 @@ export default function CashierHistoryPage() {
               <span>Cari</span>
               <input
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Cari no. faktur, nama pembeli, atau ref..."
               />
             </label>
@@ -297,7 +301,7 @@ export default function CashierHistoryPage() {
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#777' }}>Metode:</span>
               <select
                 value={methodFilter}
-                onChange={(e) => setMethodFilter(e.target.value)}
+                onChange={(e) => { setMethodFilter(e.target.value); setPage(1); }}
                 style={{
                   minHeight: '38px',
                   borderRadius: '8px',
@@ -331,7 +335,7 @@ export default function CashierHistoryPage() {
               </thead>
               <tbody>
                 {filteredOrders.map((ord) => {
-                  const pts = ord.earnedPoints !== undefined ? ord.earnedPoints : calculateEarnedPoints(ord.total);
+                  const pts = Number(ord.earnedPoints || 0);
                   return (
                     <tr key={ord.id}>
                       <td>
@@ -409,6 +413,15 @@ export default function CashierHistoryPage() {
               </tbody>
             </table>
           </div>
+          {pagination.totalPages > 1 && (
+            <div className="g-pagination" aria-label="Halaman riwayat transaksi">
+              <span>Menampilkan {((pagination.page - 1) * pagination.pageSize) + 1}–{Math.min(pagination.page * pagination.pageSize, pagination.total)} dari {pagination.total.toLocaleString('id-ID')}</span>
+              <div>
+                <button type="button" className="g-btn" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={loading || page <= 1}>Sebelumnya</button>
+                <button type="button" className="g-btn" onClick={() => setPage((value) => Math.min(pagination.totalPages, value + 1))} disabled={loading || page >= pagination.totalPages}>Berikutnya</button>
+              </div>
+            </div>
+          )}
         </section>
 
         {voidTarget && <div className="receipt-modal-backdrop" onClick={() => !voidSaving && setVoidTarget(null)}><div className="void-dialog" onClick={(event) => event.stopPropagation()}><span className="panel-kicker">Kontrol transaksi</span><h2>Batalkan transaksi?</h2><p>{voidTarget.orderNumber} · {formatMoney(voidTarget.total)}</p><label>Alasan pembatalan<textarea value={voidReason} onChange={(event) => setVoidReason(event.target.value)} placeholder="Contoh: salah input jumlah barang" autoFocus /></label><div className="void-dialog-actions"><button className="btn btn-secondary" onClick={() => setVoidTarget(null)} disabled={voidSaving}>Kembali</button><button className="btn btn-danger" onClick={voidOrder} disabled={voidSaving || !voidReason.trim()}>{voidSaving ? 'Memproses...' : 'Ya, batalkan'}</button></div></div></div>}
@@ -427,10 +440,10 @@ export default function CashierHistoryPage() {
               {/* Thermal paper receipt box */}
               <div className="receipt-paper" id="printable-receipt">
                 <div className="receipt-shop-head">
-                  <h2>GLOSIR</h2>
-                  <p>Grosir & Sembako Terpercaya</p>
-                  <small>Jl. Raya Glosir No. 88, Jawa Barat</small>
-                  <small>WhatsApp: 0812-3456-7890</small>
+                  <h2>{storeProfile.name || 'Glosir'}</h2>
+                  <p>Toko Grosir & Eceran</p>
+                  {storeProfile.address && <small>{storeProfile.address}</small>}
+                  {storeProfile.phone && <small>WhatsApp: {storeProfile.phone}</small>}
                 </div>
 
                 <div className="receipt-divider-dash" />
@@ -529,9 +542,7 @@ export default function CashierHistoryPage() {
                   <div className="receipt-sum-row" style={{ color: '#177d47', fontWeight: 'bold' }}>
                     <span>Poin Transaksi Ini:</span>
                     <span>
-                      +{selectedOrder.earnedPoints !== undefined
-                        ? selectedOrder.earnedPoints
-                        : calculateEarnedPoints(selectedOrder.total)}{' '}
+                      +{Number(selectedOrder.earnedPoints || 0)}{' '}
                       Poin
                     </span>
                   </div>

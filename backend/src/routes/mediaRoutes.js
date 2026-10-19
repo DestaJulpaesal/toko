@@ -23,7 +23,7 @@ router.post('/catalog-image', authenticateToken, requireRole('OWNER', 'ADMIN'), 
   if (!req.file) return res.status(400).json({ success: false, message: 'Pilih file gambar terlebih dahulu.' });
 
   const group = String(req.body?.group || '').trim();
-  if (!['products', 'parcels', 'event-packages'].includes(group)) {
+  if (!['products', 'parcels', 'event-packages', 'categories'].includes(group)) {
     return res.status(400).json({ success: false, message: 'Jenis katalog gambar tidak valid.' });
   }
 

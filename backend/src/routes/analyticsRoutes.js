@@ -48,8 +48,12 @@ router.get('/loss-sales', ...ownerOnly, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     const dateFilter = {};
-    if (startDate) dateFilter.gte = new Date(startDate);
-    if (endDate) dateFilter.lte = new Date(endDate);
+    if (startDate) dateFilter.gte = new Date(`${String(startDate)}T00:00:00`);
+    if (endDate) {
+      const endExclusive = new Date(`${String(endDate)}T00:00:00`);
+      endExclusive.setDate(endExclusive.getDate() + 1);
+      dateFilter.lt = endExclusive;
+    }
 
     // Ambil audit log untuk jual rugi
     const auditLogs = await prisma.auditLog.findMany({
@@ -61,75 +65,6 @@ router.get('/loss-sales', ...ownerOnly, async (req, res) => {
       include: { changedBy: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
-    });
-
-    // Ringkasan penjualan lintas dimensi untuk dashboard laporan owner.
-    router.get('/sales-report', ...ownerOnly, async (req, res) => {
-      try {
-        const start = req.query.startDate ? new Date(`${String(req.query.startDate)}T00:00:00`) : null;
-        const end = req.query.endDate ? new Date(`${String(req.query.endDate)}T00:00:00`) : null;
-        if (end) end.setDate(end.getDate() + 1);
-        const createdAt = (start || end) ? { ...(start ? { gte: start } : {}), ...(end ? { lt: end } : {}) } : undefined;
-        const orders = await prisma.order.findMany({
-          where: { status: 'COMPLETED', ...(createdAt ? { createdAt } : {}) },
-          select: {
-            user: { select: { id: true, name: true } },
-            items: {
-              where: { productId: { not: null } },
-              select: {
-                productId: true, name: true, quantity: true, total: true,
-                product: { select: { name: true, sku: true, category: { select: { id: true, name: true } } } },
-                variant: { select: { basePrice: true } },
-              },
-            },
-          },
-        });
-        const productMap = new Map();
-        const categoryMap = new Map();
-        const cashierMap = new Map();
-        let revenue = 0;
-        let cogs = 0;
-        for (const order of orders) {
-          const cashier = order.user || { id: 'unassigned', name: 'Tanpa kasir' };
-          const cashierRow = cashierMap.get(cashier.id) || { cashierId: cashier.id, cashierName: cashier.name, totalQty: 0, revenue: 0, cogs: 0 };
-          for (const item of order.items) {
-            const qty = Number(item.quantity);
-            const itemRevenue = Number(item.total);
-            const itemCogs = Number(item.variant?.basePrice || 0) * qty;
-            revenue += itemRevenue; cogs += itemCogs;
-            const product = item.product || { name: item.name, sku: '-' };
-            const productRow = productMap.get(item.productId) || { productId: item.productId, productName: product.name, productSku: product.sku, totalQty: 0, revenue: 0, cogs: 0, profit: 0 };
-            productRow.totalQty += qty; productRow.revenue += itemRevenue; productRow.cogs += itemCogs; productRow.profit += itemRevenue - itemCogs;
-            productMap.set(item.productId, productRow);
-            const category = product.category || { id: 'uncategorized', name: 'Tanpa kategori' };
-            const categoryRow = categoryMap.get(category.id) || { categoryId: category.id, categoryName: category.name, totalQty: 0, revenue: 0, cogs: 0, profit: 0 };
-            categoryRow.totalQty += qty; categoryRow.revenue += itemRevenue; categoryRow.cogs += itemCogs; categoryRow.profit += itemRevenue - itemCogs;
-            categoryMap.set(category.id, categoryRow);
-            cashierRow.totalQty += qty; cashierRow.revenue += itemRevenue; cashierRow.cogs += itemCogs;
-          }
-          cashierRow.profit = cashierRow.revenue - cashierRow.cogs;
-          cashierMap.set(cashier.id, cashierRow);
-        }
-        const products = [...productMap.values()].map((row) => ({ ...row, margin: row.revenue ? (row.profit / row.revenue) * 100 : 0 }));
-        const catalog = await prisma.product.findMany({ select: { id: true, name: true, sku: true, category: { select: { name: true } } } });
-        const soldIds = new Set(products.map((row) => row.productId));
-        const unsold = catalog.filter((product) => !soldIds.has(product.id)).map((product) => ({ productId: product.id, productName: product.name, productSku: product.sku, categoryName: product.category.name }));
-        const expenses = await prisma.financeTransaction.aggregate({ where: { type: 'EXPENSE', deletedAt: null, ...(createdAt ? { createdAt } : {}) }, _sum: { amount: true } });
-        const operatingExpense = Number(expenses._sum.amount || 0);
-        return res.json({
-          success: true,
-          period: { startDate: req.query.startDate || null, endDate: req.query.endDate || null },
-          summary: { revenue, cogs, grossProfit: revenue - cogs, operatingExpense, netProfit: revenue - cogs - operatingExpense, orderCount: orders.length },
-          products: products.sort((a, b) => b.totalQty - a.totalQty),
-          bestSelling: [...products].sort((a, b) => b.totalQty - a.totalQty).slice(0, 20),
-          unsold,
-          categories: [...categoryMap.values()].sort((a, b) => b.revenue - a.revenue),
-          cashiers: [...cashierMap.values()].sort((a, b) => b.revenue - a.revenue),
-        });
-      } catch (error) {
-        console.error('Sales report error:', error.message);
-        return res.status(500).json({ success: false, message: 'Gagal memuat laporan penjualan.' });
-      }
     });
 
     return res.json({
@@ -151,6 +86,85 @@ router.get('/loss-sales', ...ownerOnly, async (req, res) => {
 // ────────────────────────────────────────────
 // LOYALTY RULES
 // ────────────────────────────────────────────
+// GET /api/analytics/sales-report
+// Ringkasan penjualan lintas dimensi untuk dashboard laporan owner.
+// ────────────────────────────────────────────
+router.get('/sales-report', ...ownerOnly, async (req, res) => {
+  try {
+    const start = req.query.startDate ? new Date(`${String(req.query.startDate)}T00:00:00`) : null;
+    const end = req.query.endDate ? new Date(`${String(req.query.endDate)}T00:00:00`) : null;
+    if (end) end.setDate(end.getDate() + 1);
+    const createdAt = (start || end) ? { ...(start ? { gte: start } : {}), ...(end ? { lt: end } : {}) } : undefined;
+    const orders = await prisma.order.findMany({
+      where: { status: 'COMPLETED', ...(createdAt ? { createdAt } : {}) },
+      select: {
+        user: { select: { id: true, name: true } },
+        items: {
+          where: { productId: { not: null } },
+          select: {
+            productId: true, name: true, quantity: true, total: true,
+            product: { select: { name: true, sku: true, category: { select: { id: true, name: true } } } },
+            variant: { select: { basePrice: true } },
+          },
+        },
+      },
+    });
+    const productMap = new Map();
+    const categoryMap = new Map();
+    const cashierMap = new Map();
+    let revenue = 0;
+    let cogs = 0;
+    for (const order of orders) {
+      const cashier = order.user || { id: 'unassigned', name: 'Tanpa kasir' };
+      const cashierRow = cashierMap.get(cashier.id) || { cashierId: cashier.id, cashierName: cashier.name, totalQty: 0, revenue: 0, cogs: 0 };
+      for (const item of order.items) {
+        const qty = Number(item.quantity);
+        const itemRevenue = Number(item.total);
+        const itemCogs = Number(item.variant?.basePrice || 0) * qty;
+        revenue += itemRevenue;
+        cogs += itemCogs;
+        const product = item.product || { name: item.name, sku: '-' };
+        const productRow = productMap.get(item.productId) || { productId: item.productId, productName: product.name, productSku: product.sku, totalQty: 0, revenue: 0, cogs: 0, profit: 0 };
+        productRow.totalQty += qty;
+        productRow.revenue += itemRevenue;
+        productRow.cogs += itemCogs;
+        productRow.profit += itemRevenue - itemCogs;
+        productMap.set(item.productId, productRow);
+        const category = product.category || { id: 'uncategorized', name: 'Tanpa kategori' };
+        const categoryRow = categoryMap.get(category.id) || { categoryId: category.id, categoryName: category.name, totalQty: 0, revenue: 0, cogs: 0, profit: 0 };
+        categoryRow.totalQty += qty;
+        categoryRow.revenue += itemRevenue;
+        categoryRow.cogs += itemCogs;
+        categoryRow.profit += itemRevenue - itemCogs;
+        categoryMap.set(category.id, categoryRow);
+        cashierRow.totalQty += qty;
+        cashierRow.revenue += itemRevenue;
+        cashierRow.cogs += itemCogs;
+      }
+      cashierRow.profit = cashierRow.revenue - cashierRow.cogs;
+      cashierMap.set(cashier.id, cashierRow);
+    }
+    const products = [...productMap.values()].map((row) => ({ ...row, margin: row.revenue ? (row.profit / row.revenue) * 100 : 0 }));
+    const catalog = await prisma.product.findMany({ select: { id: true, name: true, sku: true, category: { select: { name: true } } } });
+    const soldIds = new Set(products.map((row) => row.productId));
+    const unsold = catalog.filter((product) => !soldIds.has(product.id)).map((product) => ({ productId: product.id, productName: product.name, productSku: product.sku, categoryName: product.category?.name || 'Tanpa kategori' }));
+    const expenses = await prisma.financeTransaction.aggregate({ where: { type: 'EXPENSE', deletedAt: null, ...(createdAt ? { createdAt } : {}) }, _sum: { amount: true } });
+    const operatingExpense = Number(expenses._sum.amount || 0);
+    return res.json({
+      success: true,
+      period: { startDate: req.query.startDate || null, endDate: req.query.endDate || null },
+      summary: { revenue, cogs, grossProfit: revenue - cogs, operatingExpense, netProfit: revenue - cogs - operatingExpense, orderCount: orders.length },
+      products: products.sort((a, b) => b.totalQty - a.totalQty),
+      bestSelling: [...products].sort((a, b) => b.totalQty - a.totalQty).slice(0, 20),
+      unsold,
+      categories: [...categoryMap.values()].sort((a, b) => b.revenue - a.revenue),
+      cashiers: [...cashierMap.values()].sort((a, b) => b.revenue - a.revenue),
+    });
+  } catch (error) {
+    console.error('Sales report error:', error.message);
+    return res.status(500).json({ success: false, message: 'Gagal memuat laporan penjualan.' });
+  }
+});
 
 // GET /api/analytics/loyalty-rule
 router.get('/loyalty-rule', ...ownerOnly, async (req, res) => {
@@ -201,7 +215,7 @@ router.patch('/loyalty-rule', ...ownerOnly, async (req, res) => {
 // ────────────────────────────────────────────
 
 // GET /api/analytics/customer-points/:customerId
-router.get('/customer-points/:customerId', authenticateToken, async (req, res) => {
+router.get('/customer-points/:customerId', authenticateToken, requireRole('OWNER', 'ADMIN', 'CASHIER'), async (req, res) => {
   try {
     const customer = await prisma.customer.findUnique({
       where: { id: req.params.customerId },
@@ -236,7 +250,7 @@ router.get('/customer-points/:customerId', authenticateToken, async (req, res) =
 });
 
 // POST /api/analytics/redeem-points
-router.post('/redeem-points', authenticateToken, async (req, res) => {
+router.post('/redeem-points', authenticateToken, requireRole('OWNER', 'ADMIN', 'CASHIER'), async (req, res) => {
   try {
     const { customerId, pointsToRedeem } = req.body;
     if (!customerId || !pointsToRedeem || pointsToRedeem <= 0) {

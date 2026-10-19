@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
+import CatalogImageField from '../components/CatalogImageField';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 
-const emptyForm = { name: '', description: '' };
+const emptyForm = { name: '', description: '', imageUrl: '' };
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -72,7 +73,7 @@ export default function AdminCategoriesPage() {
 
   const editCategory = (category) => {
     setEditingId(category.id);
-    setForm({ name: category.name, description: category.description });
+    setForm({ name: category.name, description: category.description, imageUrl: category.imageUrl || '' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -116,12 +117,13 @@ export default function AdminCategoriesPage() {
             <div className="panel-heading"><div><span className="panel-kicker">{editingId ? 'Edit kategori' : 'Kategori baru'}</span><h2>{editingId ? 'Perbarui informasi' : 'Tambah kategori'}</h2></div>{editingId && <button type="button" className="text-button" onClick={resetForm}>Batal</button>}</div>
             <label>Nama kategori<input name="name" value={form.name} onChange={updateField} placeholder="Contoh: Makanan Ringan" /></label>
             <label>Deskripsi<textarea name="description" value={form.description} onChange={updateField} placeholder="Jelaskan isi kategori secara singkat" rows="5" /></label>
+            <CatalogImageField value={form.imageUrl} onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))} group="categories" label="Gambar kategori" />
             <button className="btn btn-primary full" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah kategori'}</button>
           </form>
           <section className="crud-table-panel">
             <div className="crud-toolbar"><label className="crud-search"><Search className="w-4 h-4 text-emerald-600 inline mr-1" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari kategori..." /></label></div>
             <BulkTableActions selectedCount={selectedIds.length} totalCount={visibleCategories.length} allSelected={allSelected} onToggleAll={(checked) => setSelectedIds(checked ? visibleCategories.map((item) => item.id) : [])} onDelete={deleteSelected} deleting={bulkDeleting} />
-            <div className="product-table-wrap"><table className="product-table"><thead><tr><th className="bulk-check-column">Pilih</th><th>Kategori</th><th>Slug</th><th>Produk</th><th>Aksi</th></tr></thead><tbody>{visibleCategories.map((category) => <tr key={category.id}><td className="bulk-check-column"><BulkRowCheckbox checked={selectedIds.includes(category.id)} onChange={(checked) => setSelectedIds((current) => checked ? [...new Set([...current, category.id])] : current.filter((id) => id !== category.id))} label={`Pilih ${category.name}`} /></td><td><strong>{category.name}</strong><small>{category.description || 'Tanpa deskripsi'}</small></td><td>{category.slug}</td><td>{category.productCount}</td><td><div className="row-actions"><button onClick={() => editCategory(category)}>Edit</button><button onClick={() => deleteCategory(category.id)}>Hapus</button></div></td></tr>)}</tbody></table>{loading && <div className="table-empty">Memuat kategori...</div>}{!loading && visibleCategories.length === 0 && <div className="table-empty">Kategori tidak ditemukan.</div>}</div>
+            <div className="product-table-wrap"><table className="product-table"><thead><tr><th className="bulk-check-column">Pilih</th><th>Gambar</th><th>Kategori</th><th>Slug</th><th>Produk</th><th>Aksi</th></tr></thead><tbody>{visibleCategories.map((category) => <tr key={category.id}><td className="bulk-check-column"><BulkRowCheckbox checked={selectedIds.includes(category.id)} onChange={(checked) => setSelectedIds((current) => checked ? [...new Set([...current, category.id])] : current.filter((id) => id !== category.id))} label={`Pilih ${category.name}`} /></td><td>{category.imageUrl ? <img className="category-table-image" src={category.imageUrl} alt="" loading="lazy" /> : <span className="category-table-image-empty" aria-label="Belum ada gambar">—</span>}</td><td><strong>{category.name}</strong><small>{category.description || 'Tanpa deskripsi'}</small></td><td>{category.slug}</td><td>{category.productCount}</td><td><div className="row-actions"><button type="button" onClick={() => editCategory(category)}>Edit</button><button type="button" onClick={() => deleteCategory(category.id)}>Hapus</button></div></td></tr>)}</tbody></table>{loading && <div className="table-empty">Memuat kategori...</div>}{!loading && visibleCategories.length === 0 && <div className="table-empty">Kategori tidak ditemukan.</div>}</div>
           </section>
         </section>
         <footer className="admin-footer">Glosir Owner Workspace <span>Data kategori tersimpan di Supabase</span></footer>

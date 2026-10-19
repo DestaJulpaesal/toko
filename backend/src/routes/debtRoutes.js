@@ -2,9 +2,10 @@ import express from 'express';
 import prisma from '../config/db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { validateBody, debtCreateSchema, debtUpdateSchema } from '../middleware/security.js';
+import { parsePagination } from '../utils/pagination.js';
 
 const router = express.Router();
-router.use(authenticateToken);
+router.use(authenticateToken, requireRole('OWNER', 'ADMIN', 'CASHIER'));
 
 function formatDebt(record) {
   const amount = Number(record.amount || 0);
@@ -31,14 +32,37 @@ const include = { customer: { select: { id: true, name: true, phone: true } } };
 router.get('/', async (req, res) => {
   try {
     const { customerId, status } = req.query || {};
+    const usePagination = req.query.page !== undefined || req.query.pageSize !== undefined;
+    const pagination = parsePagination(req.query, { defaultPageSize: 25, maxPageSize: 100 });
     const where = { deletedAt: null, ...(customerId ? { customerId: String(customerId) } : {}) };
     if (status) {
       const normalized = String(status).toUpperCase();
       if (normalized === 'OVERDUE') where.status = 'OPEN', where.dueDate = { lt: new Date() };
       else if (normalized !== 'ALL') where.status = normalized;
     }
-    const records = await prisma.debtRecord.findMany({ where, include, orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }] });
-    return res.json({ success: true, data: records.map(formatDebt), debts: records.map(formatDebt) });
+    const [records, total] = await Promise.all([
+      prisma.debtRecord.findMany({
+        where,
+        include,
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+        ...(usePagination ? { skip: pagination.skip, take: pagination.take } : {}),
+      }),
+      usePagination ? prisma.debtRecord.count({ where }) : Promise.resolve(null),
+    ]);
+    const debts = records.map(formatDebt);
+    return res.json({
+      success: true,
+      data: debts,
+      debts,
+      ...(usePagination ? {
+        pagination: {
+          page: pagination.page,
+          pageSize: pagination.pageSize,
+          total,
+          totalPages: Math.ceil(total / pagination.pageSize),
+        },
+      } : {}),
+    });
   } catch (error) {
     console.error('Debt list failed:', error.message);
     return res.status(503).json({ success: false, message: 'Data piutang tidak dapat diambil dari database.' });

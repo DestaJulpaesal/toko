@@ -8,7 +8,7 @@ import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 
-const emptyForm = { name: '', code: '', type: 'Persentase', value: '', status: 'Aktif' };
+const emptyForm = { name: '', code: '', type: 'Persentase', value: '', minPurchase: '', maxDiscount: '', usageLimit: '', status: 'Aktif' };
 
 export default function AdminPromosPage() {
   const [promos, setPromos] = useState([]);
@@ -29,9 +29,12 @@ export default function AdminPromosPage() {
         setPromos(data.promos.map((promo) => ({
           id: promo.id,
           name: promo.name,
-          code: promo.slug || promo.name,
+          code: promo.code || '',
           type: promo.discountType === 'PERCENT' ? 'Persentase' : 'Potongan tetap',
           value: Number(promo.discountValue || 0),
+          minPurchase: promo.minPurchase ?? '',
+          maxDiscount: promo.maxDiscount ?? '',
+          usageLimit: promo.usageLimit ?? '',
           status: promo.isActive ? 'Aktif' : 'Draft',
         })));
       }
@@ -75,9 +78,12 @@ export default function AdminPromosPage() {
 
     const payload = {
       name: form.name,
-      description: form.code,
+      code: form.code.trim().toUpperCase(),
       discountType: form.type === 'Persentase' ? 'PERCENT' : 'FIXED',
       discountValue: Number(form.value),
+      minPurchase: form.minPurchase ? Number(form.minPurchase) : null,
+      maxDiscount: form.maxDiscount ? Number(form.maxDiscount) : null,
+      usageLimit: form.usageLimit ? Number(form.usageLimit) : null,
       isActive: form.status === 'Aktif',
     };
 
@@ -147,6 +153,9 @@ export default function AdminPromosPage() {
 
             <label>Nama promo<input name="name" value={form.name} onChange={updateField} placeholder="Contoh: Promo Lebaran" /></label>
             <label>Kode promo<input name="code" value={form.code} onChange={updateField} placeholder="LEBARAN15" /></label>
+            <label>Minimal belanja (opsional)<CurrencyInput name="minPurchase" value={form.minPurchase} onValueChange={(value) => setForm((current) => ({ ...current, minPurchase: value }))} placeholder="Rp 0" /></label>
+            <label>Batas potongan maksimum (opsional)<CurrencyInput name="maxDiscount" value={form.maxDiscount} onValueChange={(value) => setForm((current) => ({ ...current, maxDiscount: value }))} placeholder="Tanpa batas" /></label>
+            <label>Kuota penggunaan (opsional)<input name="usageLimit" type="number" min="1" value={form.usageLimit} onChange={updateField} placeholder="Tanpa batas" /></label>
 
             <div className="form-two-columns">
               <label>
@@ -201,7 +210,7 @@ export default function AdminPromosPage() {
                         <div className="row-actions">
                           <button onClick={() => {
                             setEditingId(promo.id);
-                            setForm({ name: promo.name, code: promo.code, type: promo.type, value: promo.value, status: promo.status });
+                            setForm({ name: promo.name, code: promo.code, type: promo.type, value: promo.value, minPurchase: promo.minPurchase, maxDiscount: promo.maxDiscount, usageLimit: promo.usageLimit, status: promo.status });
                           }}>Edit</button>
                           <button onClick={() => handleDelete(promo)} disabled={deletingId === promo.id}>{deletingId === promo.id ? 'Menghapus...' : 'Hapus'}</button>
                         </div>

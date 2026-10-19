@@ -138,6 +138,28 @@ test('cache: dua request berdekatan hanya membaca database sekali, lalu baca lag
   assert.equal(loadCalls, 2);
 });
 
+test('cache: request bersamaan untuk user yang sama berbagi satu query database', async () => {
+  resetUsers();
+  let loadCount = 0;
+  let releaseLoad;
+  const loadGate = new Promise((resolve) => { releaseLoad = resolve; });
+  const concurrentSessions = createSessionService({
+    loadUser: async (id) => {
+      loadCount += 1;
+      await loadGate;
+      return users.get(id) ?? null;
+    },
+  });
+  const token = sign({ id: 'u-owner', tv: 0 });
+  const requests = Array.from({ length: 20 }, () => concurrentSessions.authenticate(token));
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(loadCount, 1);
+  releaseLoad();
+  const results = await Promise.all(requests);
+  assert.equal(results.filter((result) => result.ok).length, 20);
+});
+
 // ---------- Database bermasalah ----------
 test('database mati: endpoint wajib login menjawab 503, endpoint publik tetap jalan sebagai pengunjung', async () => {
   resetUsers();

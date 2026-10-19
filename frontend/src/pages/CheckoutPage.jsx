@@ -90,10 +90,10 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           customerName: trimmedName,
           customerPhone: normalizedPhone,
-          address: 'Ambil di Toko (Glosir)', // Ambil di toko tanpa form alamat
+          address: '',
+          fulfillmentMethod: 'PICKUP',
           note: 'Metode: Ambil di Toko',
           promoCode: promo || '',
-          shippingCost: 0, // Tanpa biaya antar / ongkir Rp 0
           items: items.map((item) => ({
             variantId: item.variantId || undefined,
             parcelId: item.parcelId || undefined,
@@ -124,7 +124,7 @@ export default function CheckoutPage() {
       );
 
       // Format Pesan WhatsApp Sesuai Instruksi
-      const storeNumber = (import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '').replace(/\D/g, '');
+      const storeNumber = normalizeIndonesianPhone(import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '');
       const waLines = items.map(
         (item) => `• ${item.name} x${item.qty} = Rp ${(item.price * item.qty).toLocaleString('id-ID')}`
       );
@@ -333,4 +333,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-

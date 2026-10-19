@@ -20,9 +20,14 @@ export default function ProfilePage() {
 
   useEffect(() => {
     apiFetch('/site-profile')
-      .then((response) => response.json())
-      .then((data) => { if (data.success) setProfile(data.profile); })
-      .catch(() => {});
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success || !data.profile) {
+          throw new Error(data.message || 'Profil publik belum tersedia.');
+        }
+        setProfile((current) => ({ ...current, ...data.profile }));
+      })
+      .catch((error) => console.warn('Public profile unavailable; using frontend defaults:', error.message));
   }, []);
 
   return (

@@ -8,4 +8,11 @@ backend/backups/*.json
 **/uploads/
 release/
 
+# Local diagnostic output and generated project archives
+*.log
+project-clean.zip
 
+# Ignore working Markdown notes, but keep the main project docs
+*.md
+!README.md
+!struktur.md

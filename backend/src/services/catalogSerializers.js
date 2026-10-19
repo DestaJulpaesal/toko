@@ -67,6 +67,7 @@ export function formatProduct(product, audience = AUDIENCE.PUBLIC) {
         sku: item.sku,
         barcode: item.barcode,
         wholesalePrice: toNumberOrNull(item.wholesalePrice),
+        conversionToBase: Number(item.conversionToBase || 1),
       };
       if (audience === AUDIENCE.OWNER) return { ...staffVariant, purchasePrice: Number(item.basePrice || 0) };
       return staffVariant;

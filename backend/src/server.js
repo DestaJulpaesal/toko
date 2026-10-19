@@ -7,6 +7,9 @@ import { startReminderJob } from './jobs/reminderJob.js';
 import { startDailyLoggingReminderJob } from './jobs/dailyLoggingReminder.js';
 import { startBackupJob } from './jobs/backupJob.js';
 import { startEmailNotificationJob } from './jobs/emailNotificationJob.js';
+import { startExpiryNotificationJob } from './jobs/expiryNotificationJob.js';
+import { initializeEmailService } from './services/emailService.js';
+import { warmHomepageCache } from './services/homepageHandler.js';
 
 const PORT = process.env.PORT || 5000;
 
@@ -23,12 +26,17 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    warmHomepageCache(prisma).catch((error) => {
+      console.error('Homepage startup prefetch failed:', error.message);
+    });
     startNightlyRecap();
     startRecurringJob();
     startReminderJob();
     startDailyLoggingReminderJob();
     startBackupJob();
+    initializeEmailService();
     startEmailNotificationJob();
+    startExpiryNotificationJob();
   });
 }
 

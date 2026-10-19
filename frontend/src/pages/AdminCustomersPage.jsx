@@ -1,11 +1,13 @@
-import { useDeferredValue, useEffect, useState } from 'react';
-import { Download, Eye, MessageCircle, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Download, Eye, MessageCircle, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import DebtModal from '../components/DebtModal';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
+import { normalizeIndonesianPhone } from '../utils/phoneUtils';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 const emptyCustomer = {
   name: '',
@@ -21,10 +23,11 @@ export default function AdminCustomersPage() {
   const [debtFilter, setDebtFilter] = useState('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const deferredSearch = useDeferredValue(search);
+  const deferredSearch = useDebouncedValue(search);
   const [form, setForm] = useState(emptyCustomer);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [debts, setDebts] = useState([]);
@@ -33,46 +36,50 @@ export default function AdminCustomersPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [customerPage, setCustomerPage] = useState(1);
+  const [customerPagination, setCustomerPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 0 });
 
   const loadCustomers = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const token = localStorage.getItem('glosir_token');
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      const query = new URLSearchParams({ page: String(customerPage), pageSize: '50' });
+      if (deferredSearch.trim()) query.set('search', deferredSearch.trim());
       const [customerRes, debtRes] = await Promise.all([
-        apiFetch('/customers', { headers: authHeaders }),
+        apiFetch(`/customers?${query}`, { headers: authHeaders }),
         apiFetch('/debts')
       ]);
 
       const customerData = await customerRes.json();
       const debtData = await debtRes.json();
+      if (!customerRes.ok || !customerData.success || !Array.isArray(customerData.customers)) {
+        throw new Error(customerData.message || 'Data pelanggan gagal dimuat.');
+      }
+      if (!debtRes.ok || !debtData.success || !Array.isArray(debtData.debts)) {
+        throw new Error(debtData.message || 'Data piutang pelanggan gagal dimuat.');
+      }
 
       const debtTotals = {};
-      if (debtData.success && Array.isArray(debtData.debts)) {
-        setDebts(debtData.debts);
-        debtData.debts.forEach((debt) => {
-          if (!debt.customerId) return;
-          if (debt.status === 'PAID') return;
-          debtTotals[debt.customerId] = (debtTotals[debt.customerId] || 0) + Number(debt.amount || 0);
-        });
-      }
-
-      if (customerData.success && Array.isArray(customerData.customers)) {
-        setCustomers(customerData.customers.map((customer) => ({
-          ...customer,
-          debtTotal: debtTotals[customer.id] || 0,
-        })));
-      }
+      setDebts(debtData.debts);
+      debtData.debts.forEach((debt) => {
+        if (!debt.customerId || debt.status === 'PAID') return;
+        debtTotals[debt.customerId] = (debtTotals[debt.customerId] || 0) + Number(debt.amount || 0);
+      });
+      setCustomers(customerData.customers.map((customer) => ({
+        ...customer,
+        debtTotal: debtTotals[customer.id] || 0,
+      })));
+      setCustomerPagination(customerData.pagination || { page: customerPage, pageSize: 50, total: customerData.customers.length, totalPages: 1 });
     } catch (err) {
-      console.warn('Backend unavailable, using local demo customers:', err.message);
+      setLoadError(err.message || 'Data pelanggan gagal dimuat dari server.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadCustomers();
-  }, []);
+  useEffect(() => { loadCustomers(); }, [customerPage, deferredSearch]);
 
   const loadDetail = async (customer) => {
     setDetailLoading(true);
@@ -115,12 +122,20 @@ export default function AdminCustomersPage() {
     return (
       c.name.toLowerCase().includes(q) ||
       (c.phone && c.phone.includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
       (c.address && c.address.toLowerCase().includes(q))
     ) && (debtFilter === 'ALL' || (debtFilter === 'OWING' && Number(c.debtTotal || 0) > 0) || (debtFilter === 'CLEAR' && Number(c.debtTotal || 0) <= 0))
       && (!dateFrom || dateKey >= dateFrom) && (!dateTo || dateKey <= dateTo);
   });
 
   const allVisibleCustomersSelected = filteredCustomers.length > 0 && filteredCustomers.every((customer) => selectedCustomerIds.includes(customer.id));
+  const customerSummary = customers.reduce((summary, customer) => {
+    const debt = Number(customer.debtTotal || 0);
+    summary.debt += debt;
+    summary.owing += debt > 0 ? 1 : 0;
+    summary.orders += Number(customer.totalOrders || 0);
+    return summary;
+  }, { debt: 0, owing: 0, orders: 0 });
   const toggleCustomerSelection = (id, checked) => setSelectedCustomerIds((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id));
   const toggleAllCustomers = (checked) => setSelectedCustomerIds(checked ? filteredCustomers.map((customer) => customer.id) : []);
   const deleteSelectedCustomers = async () => {
@@ -241,7 +256,7 @@ export default function AdminCustomersPage() {
   return (
     <AdminShell active="Data Pelanggan" className="admin-crud-shell customer-page-shell">
       <DebtModal isOpen={debtModal.open} customer={debtModal.customer} debt={debtModal.debt} onClose={() => setDebtModal({ open: false, customer: null, debt: null })} onSaved={(message) => { setNotice(message); loadCustomers(); }} />
-        <header className="admin-header">
+        <header className="admin-header customer-page-header">
           <div>
             <p className="eyebrow light">Manajemen Pelanggan</p>
             <h1>Data Pelanggan</h1>
@@ -249,12 +264,32 @@ export default function AdminCustomersPage() {
               Kelola data pembeli toko, piutang, dan riwayat kontak WhatsApp.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span className={`database-status ${loading ? 'loading' : 'ready'}`}>
-              <i /> {loading ? 'Memuat data...' : `${customers.length} Pelanggan`}
+          <div className="customer-header-actions">
+            <span className={`database-status ${loading ? 'loading' : loadError ? 'error' : 'ready'}`}>
+              <i /> {loading ? 'Memuat data...' : loadError ? 'Gagal terhubung' : `${customers.length} pelanggan`}
             </span>
+            <button className="customer-header-button" type="button" onClick={exportCustomers} disabled={!filteredCustomers.length} title="Unduh data pelanggan">
+              <Download size={15} /> Export
+            </button>
+            <button className="customer-header-button" type="button" onClick={loadCustomers} disabled={loading} title="Muat ulang data pelanggan">
+              <RefreshCw size={15} className={loading ? 'is-spinning' : ''} /> {loading ? 'Memuat...' : 'Muat ulang'}
+            </button>
           </div>
         </header>
+
+        <section className="customer-summary-grid" aria-label="Ringkasan pelanggan">
+          <article className="customer-summary-card"><span>Total pelanggan</span><strong>{customers.length.toLocaleString('id-ID')}</strong><small>Semua data terdaftar</small></article>
+          <article className="customer-summary-card"><span>Memiliki piutang</span><strong>{customerSummary.owing.toLocaleString('id-ID')}</strong><small>Pelanggan dengan saldo berjalan</small></article>
+          <article className="customer-summary-card customer-summary-card-debt"><span>Total piutang berjalan</span><strong>Rp {customerSummary.debt.toLocaleString('id-ID')}</strong><small>Belum termasuk piutang lunas</small></article>
+          <article className="customer-summary-card"><span>Total transaksi</span><strong>{customerSummary.orders.toLocaleString('id-ID')}</strong><small>Akumulasi pesanan pelanggan</small></article>
+        </section>
+
+        {loadError && (
+          <div className="customer-load-error" role="alert">
+            <div><strong>Data pelanggan belum berhasil dimuat</strong><span>{loadError}</span></div>
+            <button type="button" onClick={loadCustomers} disabled={loading}>Coba lagi</button>
+          </div>
+        )}
 
         {notice && (
           <div className="crud-notice" role="status">
@@ -290,29 +325,16 @@ export default function AdminCustomersPage() {
                 />
               </label>
 
-              <div className="form-two-columns">
+              <div className="form-two-columns customer-contact-fields">
                 <label>
                   No. WhatsApp / HP
-                  <input
-                    name="phone"
-                    placeholder="081234567890"
-                    value={form.phone}
-                    onChange={handleChange}
-                  />
+                  <input name="phone" type="tel" autoComplete="tel" placeholder="081234567890" value={form.phone} onChange={handleChange} />
                 </label>
-
+                <label>
+                  Email (opsional)
+                  <input name="email" type="email" autoComplete="email" placeholder="nama@email.com" value={form.email} onChange={handleChange} />
+                </label>
               </div>
-
-              <label>
-                Email (Opsional)
-                <input
-                  name="email"
-                  type="email"
-                  placeholder="nama@email.com"
-                  value={form.email}
-                  onChange={handleChange}
-                />
-              </label>
 
               <label>
                 Alamat
@@ -348,13 +370,17 @@ export default function AdminCustomersPage() {
 
           {/* Tabel Daftar Pelanggan */}
           <section className="crud-table-panel customer-table-panel">
+            <div className="customer-list-heading">
+              <div><span className="panel-kicker">Direktori</span><h2>Daftar pelanggan</h2><p>Cari pelanggan, cek saldo piutang, atau buka riwayat belanja.</p></div>
+              <span className="customer-result-count">{customerPagination.total.toLocaleString('id-ID')} hasil</span>
+            </div>
             <div className="crud-toolbar">
               <label className="crud-search">
-                <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
+                <Search size={16} />
                 <input
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Cari nama, no. HP, atau alamat..."
+                  onChange={(e) => { setSearch(e.target.value); setCustomerPage(1); }}
+                  placeholder="Cari nama, no. HP, email, atau alamat..."
                 />
               </label>
               <select value={debtFilter} onChange={(event) => setDebtFilter(event.target.value)} aria-label="Filter status piutang">
@@ -362,9 +388,9 @@ export default function AdminCustomersPage() {
                 <option value="OWING">Masih berutang</option>
                 <option value="CLEAR">Tidak ada piutang</option>
               </select>
-              <label className="date-filter"><span>Daftar dari</span><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
+              <label className="date-filter"><span>Terdaftar dari</span><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
               <label className="date-filter"><span>Sampai</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
-              <button type="button" className="btn btn-secondary" onClick={exportCustomers} title="Export data pelanggan"><Download size={15} /> Export CSV</button>
+              {(search || debtFilter !== 'ALL' || dateFrom || dateTo) && <button type="button" className="customer-filter-reset" onClick={() => { setSearch(''); setDebtFilter('ALL'); setDateFrom(''); setDateTo(''); }}>Reset filter</button>}
             </div>
             <BulkTableActions selectedCount={selectedCustomerIds.length} totalCount={filteredCustomers.length} allSelected={allVisibleCustomersSelected} onToggleAll={toggleAllCustomers} onDelete={deleteSelectedCustomers} deleting={bulkDeleting} />
 
@@ -395,10 +421,10 @@ export default function AdminCustomersPage() {
                       </td>
                       <td>
                         {cust.phone ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div className="customer-contact-line">
                             <span>{cust.phone}</span>
                             <a
-                              href={`https://wa.me/${cust.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')}`}
+                              href={`https://wa.me/${normalizeIndonesianPhone(cust.phone)}`}
                               target="_blank"
                               rel="noreferrer"
                               className="wa-link-btn"
@@ -408,12 +434,12 @@ export default function AdminCustomersPage() {
                             </a>
                           </div>
                         ) : (
-                          <span style={{ color: '#aaa' }}>-</span>
+                          <span className="customer-missing-value">Belum ada</span>
                         )}
                         {cust.email && <small>{cust.email}</small>}
                       </td>
                       <td>
-                        <span>{cust.address || '-'}</span>
+                        <span className={cust.address ? '' : 'customer-missing-value'}>{cust.address || 'Belum ada alamat'}</span>
                       </td>
                       <td>
                         <div className="row-actions">
@@ -428,33 +454,48 @@ export default function AdminCustomersPage() {
                       </td>
                     </tr>
                   ))}
-                  {!loading && !filteredCustomers.length && (
+                  {!loading && !loadError && !filteredCustomers.length && (
                     <tr>
                       <td colSpan="6" className="table-empty">
-                        Data pelanggan tidak ditemukan.
+                        {customers.length ? 'Tidak ada pelanggan yang cocok dengan filter ini.' : 'Belum ada data pelanggan. Tambahkan pelanggan lewat formulir di samping.'}
                       </td>
                     </tr>
                   )}
+                  {!loading && loadError && !filteredCustomers.length && (
+                    <tr>
+                      <td colSpan="6" className="table-empty">Data pelanggan tidak tersedia. Gunakan tombol “Coba lagi” di atas untuk memuat ulang.</td>
+                    </tr>
+                  )}
+                  {loading && !filteredCustomers.length && <tr><td colSpan="6" className="table-empty">Memuat daftar pelanggan...</td></tr>}
                 </tbody>
               </table>
             </div>
+            {customerPagination.totalPages > 1 && (
+              <div className="g-pagination" aria-label="Halaman daftar pelanggan">
+                <span>Halaman {customerPagination.page} dari {customerPagination.totalPages} · {customerPagination.total.toLocaleString('id-ID')} pelanggan</span>
+                <div>
+                  <button type="button" className="g-btn" onClick={() => setCustomerPage((page) => Math.max(1, page - 1))} disabled={loading || customerPage <= 1}>Sebelumnya</button>
+                  <button type="button" className="g-btn" onClick={() => setCustomerPage((page) => Math.min(customerPagination.totalPages, page + 1))} disabled={loading || customerPage >= customerPagination.totalPages}>Berikutnya</button>
+                </div>
+              </div>
+            )}
             {detail && (
-              <section className="customer-detail-panel" style={{ marginTop: 20, padding: 20, border: '1px solid #dce8e0', borderRadius: 12 }}>
+              <section className="customer-detail-panel">
                 <div className="panel-heading">
                   <div><span className="panel-kicker">Profil Belanja</span><h2>{detail.customer.name}</h2></div>
-                  <button type="button" className="text-button" onClick={() => setDetail(null)}>Tutup</button>
+                  <button type="button" className="customer-detail-close" onClick={() => setDetail(null)}>Tutup</button>
                 </div>
-                {detailLoading ? <p>Memuat detail...</p> : (
+                {detailLoading ? <p className="customer-detail-loading">Memuat detail pelanggan...</p> : (
                   <>
-                    <div className="form-two-columns">
+                    <div className="customer-detail-metrics">
                       <div><small>Total belanja</small><strong>Rp {Number(detail.summary.totalSpent).toLocaleString('id-ID')}</strong></div>
                       <div><small>Transaksi</small><strong>{detail.summary.totalOrders}</strong></div>
                       <div><small>Piutang berjalan</small><strong>Rp {Number(detail.summary.outstandingDebt).toLocaleString('id-ID')}</strong></div>
-                      <div><small>WhatsApp</small><strong>{detail.customer.phone || '-'}</strong></div>
+                      <div><small>WhatsApp</small><strong>{detail.customer.phone || 'Belum tersedia'}</strong></div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 18 }}>
-                      <div><h3>Produk sering dibeli</h3>{detail.frequentProducts.length ? detail.frequentProducts.map((item) => <p key={item.name}><strong>{item.name}</strong> · {item.quantity} unit · Rp {Number(item.total).toLocaleString('id-ID')}</p>) : <p>Belum ada riwayat belanja.</p>}</div>
-                      <div><h3>Riwayat belanja</h3>{detail.orders.slice(0, 8).map((order) => <p key={order.id}><strong>{order.orderNumber}</strong> · {new Date(order.createdAt).toLocaleDateString('id-ID')} · Rp {Number(order.total).toLocaleString('id-ID')}</p>)}</div>
+                    <div className="customer-detail-columns">
+                      <div className="customer-detail-list"><h3>Produk sering dibeli</h3>{detail.frequentProducts.length ? detail.frequentProducts.map((item) => <p key={item.name}><strong>{item.name}</strong><span>{item.quantity} unit · Rp {Number(item.total).toLocaleString('id-ID')}</span></p>) : <p className="customer-detail-empty">Belum ada riwayat belanja.</p>}</div>
+                      <div className="customer-detail-list"><h3>Riwayat belanja</h3>{detail.orders.slice(0, 8).map((order) => <p key={order.id}><strong>{order.orderNumber}</strong><span>{new Date(order.createdAt).toLocaleDateString('id-ID')} · Rp {Number(order.total).toLocaleString('id-ID')}</span></p>)}</div>
                     </div>
                     {detail.customer.notes && <p><strong>Catatan:</strong> {detail.customer.notes}</p>}
                   </>

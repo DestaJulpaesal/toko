@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { stripSensitive } from '../utils/catalogStorage';
+import { apiFetch } from '../services/api';
 
 const CartContext = createContext(null);
 const CART_STORAGE_KEY = 'glosir_cart_v1';
@@ -16,6 +17,8 @@ export function CartProvider({ children }) {
     }
   });
   const [promo, setPromo] = useState(() => localStorage.getItem(PROMO_STORAGE_KEY) || '');
+  const [discount, setDiscount] = useState(0);
+  const [promoError, setPromoError] = useState('');
 
   useEffect(() => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
@@ -67,22 +70,70 @@ export function CartProvider({ children }) {
     [items]
   );
 
-  const discount = useMemo(() => {
-    if (promo === 'LEBARAN15') return Math.round(totalPrice * 0.15);
-    if (promo === 'GLOSIR10') return Math.round(totalPrice * 0.1);
-    if (promo === 'HEMAT25') return Math.min(25000, totalPrice);
-    if (promo === 'PARSEL20') return Math.round(totalPrice * 0.2);
-    return 0;
+  useEffect(() => {
+    if (!promo) {
+      setDiscount(0);
+      setPromoError('');
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await apiFetch('/promos/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          silentNotify: true,
+          body: JSON.stringify({ code: promo, subtotal: totalPrice }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Promo tidak dapat digunakan.');
+        if (!cancelled) {
+          setDiscount(Number(result.discountAmount || 0));
+          setPromoError('');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setDiscount(0);
+          setPromoError(error.message || 'Promo belum dapat divalidasi.');
+        }
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [promo, totalPrice]);
 
-  const applyPromo = (code) => {
+  const applyPromo = async (code) => {
     const normalized = (code || '').trim().toUpperCase();
-    if (!['LEBARAN15', 'GLOSIR10', 'HEMAT25', 'PARSEL20'].includes(normalized)) return false;
-    setPromo(normalized);
-    return true;
+    if (!normalized) return false;
+    try {
+      const response = await apiFetch('/promos/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        silentNotify: true,
+        body: JSON.stringify({ code: normalized, subtotal: totalPrice }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        setPromoError(result.message || 'Kode promo tidak dapat digunakan.');
+        return false;
+      }
+      setPromo(normalized);
+      setDiscount(Number(result.discountAmount || 0));
+      setPromoError('');
+      return true;
+    } catch (error) {
+      setPromoError(error.message || 'Promo belum dapat divalidasi.');
+      return false;
+    }
   };
 
-  const removePromo = () => setPromo('');
+  const removePromo = () => {
+    setPromo('');
+    setDiscount(0);
+    setPromoError('');
+  };
 
   const value = {
     items,
@@ -94,6 +145,7 @@ export function CartProvider({ children }) {
     totalPrice,
     promo,
     discount,
+    promoError,
     applyPromo,
     removePromo,
   };

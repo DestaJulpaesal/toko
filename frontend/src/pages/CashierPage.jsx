@@ -10,30 +10,16 @@ import { playBeep } from '../utils/barcodeUtils';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
 import { printReceipt } from '../utils/printReceipt';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { usePublicSettings } from '../context/PublicSettingsContext';
+import { normalizeIndonesianPhone } from '../utils/phoneUtils';
 
 const formatMoney = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 
-// Hitung poin loyalitas:
-// - Minimal 100rb dapat 10 poin (setiap kelipatan 100rb = 10 poin)
-// - Minimal 50rb dapat 2 poin (sisa >= 50rb = +2 poin)
-export const calculateEarnedPoints = (total) => {
-  const amount = Number(total) || 0;
-  if (amount < 50000) return 0;
-  const ratusan = Math.floor(amount / 100000);
-  const sisa = amount % 100000;
-  const bonusSisa = sisa >= 50000 ? 2 : 0;
-  return ratusan * 10 + bonusSisa;
-};
-
-// Daftar Promo Campaign Aktif
-export const availablePromos = [
-  { id: 'none', name: 'Tanpa Promo', code: '', type: 'NONE', value: 0, tag: 'NORMAL' },
-  { id: 'promo-lebaran', name: 'Promo Lebaran', code: 'LEBARAN15', type: 'PERCENT', value: 15, tag: '15% OFF', desc: 'Diskon spesial momen Lebaran 15%' },
-  { id: 'promo-glosir10', name: 'Glosir Hemat 10', code: 'GLOSIR10', type: 'PERCENT', value: 10, tag: '10% OFF', desc: 'Diskon 10% belanja hemat sembako' },
-  { id: 'promo-hemat25', name: 'Hemat 25 Ribu', code: 'HEMAT25', type: 'FIXED', value: 25000, tag: 'POTONGAN 25RB', desc: 'Potongan langsung Rp 25.000' },
-];
+const NO_PROMO = { id: 'none', name: 'Tanpa Promo', code: '', type: 'NONE', value: 0, tag: 'NORMAL' };
 
 export default function CashierPage() {
+  const { storeProfile } = usePublicSettings();
   const [products, setProducts] = useState([]);
   const [databaseCategories, setDatabaseCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -43,6 +29,7 @@ export default function CashierPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [customCustomerName, setCustomCustomerName] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
+  const debouncedCustomerSearch = useDebouncedValue(customerSearch);
   const [customerEnabled, setCustomerEnabled] = useState(false);
   const [customerType, setCustomerType] = useState('RETAIL');
 
@@ -54,6 +41,7 @@ export default function CashierPage() {
 
   // Promo Campaign state
   const [selectedPromoId, setSelectedPromoId] = useState('none');
+  const [availablePromos, setAvailablePromos] = useState([NO_PROMO]);
 
   // Payment states
   const [paymentMethod, setPaymentMethod] = useState('CASH');
@@ -83,6 +71,7 @@ export default function CashierPage() {
   // Completed receipt modal
   const [completedOrder, setCompletedOrder] = useState(null);
   const checkoutInFlightRef = useRef(false);
+  const checkoutRequestRef = useRef({ signature: null, id: null });
 
   // Barcode Scanner Modal State
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -107,10 +96,10 @@ export default function CashierPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [prodRes, categoryRes, customerRes] = await Promise.all([
+      const [prodRes, categoryRes, promoRes] = await Promise.all([
         apiFetch('/products').then((r) => r.json()).catch(() => null),
         apiFetch('/categories').then((r) => r.json()).catch(() => null),
-        apiFetch('/customers').then((r) => r.json()).catch(() => null),
+        apiFetch('/promos?activeOnly=true').then((r) => r.json()).catch(() => null),
       ]);
 
       if (prodRes?.success && Array.isArray(prodRes.products)) {
@@ -126,6 +115,7 @@ export default function CashierPage() {
             price: variant.price,
             wholesalePrice: variant.wholesalePrice,
             stock: variant.stock,
+            conversionToBase: Number(variant.conversionToBase || 1),
           }))
           : [product]));
         setProducts(catalogProducts.filter((p) => p.stock > 0 || p.stock === undefined));
@@ -138,10 +128,21 @@ export default function CashierPage() {
         setDatabaseCategories(categoryRes.categories.map((category) => category.name).filter(Boolean));
       }
 
-      if (customerRes?.success && Array.isArray(customerRes.customers)) {
-        setCustomers(customerRes.customers);
-      } else if (customerRes?.message) {
-        setNotice(customerRes.message);
+      if (promoRes?.success && Array.isArray(promoRes.promos)) {
+        setAvailablePromos([
+          NO_PROMO,
+          ...promoRes.promos.filter((promo) => promo.code).map((promo) => ({
+            id: promo.id,
+            name: promo.name,
+            code: promo.code,
+            type: promo.discountType,
+            value: Number(promo.discountValue || 0),
+            minPurchase: Number(promo.minPurchase || 0),
+            maxDiscount: promo.maxDiscount == null ? null : Number(promo.maxDiscount),
+            tag: promo.discountType === 'PERCENT' ? `${Number(promo.discountValue)}% OFF` : `POTONGAN ${formatMoney(promo.discountValue)}`,
+            desc: promo.description || 'Promo aktif dari database.',
+          })),
+        ]);
       }
     } finally {
       setLoading(false);
@@ -169,6 +170,7 @@ export default function CashierPage() {
         body: JSON.stringify({
           items: items.map((item) => ({
             variantId: item.variantId || item.id,
+            unitId: item.unitId || undefined,
             eventPackageId: item.eventPackageId,
             parcelId: item.parcelId,
             quantity: item.qty,
@@ -176,8 +178,9 @@ export default function CashierPage() {
           customerId: selectedCustomerId && selectedCustomerId !== 'NEW' ? selectedCustomerId : null,
           customerName: activeCustomer?.name || (label.trim() || null),
           customerType,
-          discount: totalDiscount,
+          discount: 0,
           promoId: activePromo.id,
+          promoCode: activePromo.code || '',
           note: label.trim(),
         }),
       });
@@ -204,6 +207,26 @@ export default function CashierPage() {
     refreshAverageTransaction();
     loadHeldCarts();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const query = new URLSearchParams({ page: '1', pageSize: '50' });
+    if (debouncedCustomerSearch.trim()) query.set('search', debouncedCustomerSearch.trim());
+    apiFetch(`/customers?${query}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (!active) return;
+        if (!data.success || !Array.isArray(data.customers)) throw new Error(data.message || 'Daftar pelanggan gagal dimuat.');
+        setCustomers(data.customers);
+      })
+      .catch((error) => {
+        if (active) {
+          console.error('Cashier customer search failed:', error.message);
+          setNotice(error.message || 'Daftar pelanggan gagal dimuat.');
+        }
+      });
+    return () => { active = false; };
+  }, [debouncedCustomerSearch]);
 
   useEffect(() => {
     scanInputRef.current?.focus();
@@ -307,8 +330,8 @@ export default function CashierPage() {
 
   // Active Promo
   const activePromo = useMemo(() => {
-    return availablePromos.find((p) => p.id === selectedPromoId) || availablePromos[0];
-  }, [selectedPromoId]);
+    return availablePromos.find((p) => p.id === selectedPromoId) || NO_PROMO;
+  }, [availablePromos, selectedPromoId]);
 
   // Subtotal from items
   const subtotal = useMemo(
@@ -318,14 +341,11 @@ export default function CashierPage() {
 
   // Promo Discount Calculation
   const promoDiscount = useMemo(() => {
-    if (!activePromo || activePromo.type === 'NONE' || subtotal === 0) return 0;
-    if (activePromo.type === 'PERCENT') {
-      return Math.round((subtotal * activePromo.value) / 100);
-    }
-    if (activePromo.type === 'FIXED') {
-      return Math.min(activePromo.value, subtotal);
-    }
-    return 0;
+    if (!activePromo || activePromo.type === 'NONE' || subtotal < (activePromo.minPurchase || 0)) return 0;
+    const rawDiscount = activePromo.type === 'PERCENT'
+      ? Math.round((subtotal * activePromo.value) / 100)
+      : activePromo.value;
+    return Math.min(rawDiscount, activePromo.maxDiscount ?? rawDiscount, subtotal);
   }, [activePromo, subtotal]);
 
   // Total discounts combined
@@ -333,64 +353,6 @@ export default function CashierPage() {
 
   // Final Total to pay
   const finalTotal = Math.max(subtotal - totalDiscount, 0);
-
-  const earnedPoints = 0;
-
-  // Gamified progress to next point tier
-  const nextPointProgress = useMemo(() => {
-    if (finalTotal <= 0) {
-      return {
-        status: 'empty',
-        title: 'Mulai Kumpulkan Poin',
-        message: 'Belanja minimal Rp 50.000 untuk dapatkan 2 Poin pertama!',
-        percent: 0,
-        badge: '0 Poin',
-      };
-    }
-    if (finalTotal < 50000) {
-      const remaining = 50000 - finalTotal;
-      const pct = Math.min(Math.round((finalTotal / 50000) * 100), 100);
-      return {
-        status: 'tier-0',
-        title: 'Tinggal Sedikit Lagi!',
-        message: `Tambah belanja ${formatMoney(remaining)} lagi untuk dapatkan 2 Poin pertama! ✨`,
-        percent: pct,
-        badge: 'Target 50rb',
-      };
-    }
-    if (finalTotal < 100000) {
-      const remaining = 100000 - finalTotal;
-      const pct = Math.min(Math.round(((finalTotal - 50000) / 50000) * 100), 100);
-      return {
-        status: 'tier-50',
-        title: '🎉 Kamu Mendapat +2 Poin!',
-        message: `Tinggal tambah ${formatMoney(remaining)} lagi untuk langsung tembus 10 Poin! 🚀`,
-        percent: pct,
-        badge: '+2 Poin Aktif',
-      };
-    }
-    const sisa = finalTotal % 100000;
-    const ratusan = Math.floor(finalTotal / 100000);
-    if (sisa < 50000) {
-      const toNext50 = 50000 - sisa;
-      return {
-        status: 'tier-100',
-        title: `🔥 Mantap! Kamu Dapat +${ratusan * 10} Poin!`,
-        message: `Tambah ${formatMoney(toNext50)} lagi untuk dapat bonus +2 Poin tambahan!`,
-        percent: Math.round((sisa / 50000) * 100),
-        badge: `+${ratusan * 10} Poin`,
-      };
-    } else {
-      const toNext100 = 100000 - sisa;
-      return {
-        status: 'tier-100-plus',
-        title: `⭐ Luar Biasa! Kamu Dapat +${ratusan * 10 + 2} Poin!`,
-        message: `Tambah ${formatMoney(toNext100)} lagi untuk naik ke +${(ratusan + 1) * 10} Poin!`,
-        percent: Math.round(((sisa - 50000) / 50000) * 100),
-        badge: `+${ratusan * 10 + 2} Poin`,
-      };
-    }
-  }, [finalTotal]);
 
   // Effective amount paid
   const effectivePaid = useMemo(() => {
@@ -428,15 +390,21 @@ export default function CashierPage() {
     }
 
     // FASE 4: Check if product has units and if one is selected
-    const unit = selectedUnits[product.productId || product.id];
-    if (!unit) {
-      setNotice(`Pilih unit untuk ${product.name} terlebih dahulu.`);
-      return;
-    }
+    const unit = selectedUnits[product.productId || product.id] || {
+      id: null,
+      name: null,
+      conversionToBase: product.conversionToBase,
+      sellPrice: getSellingPrice(product),
+      wholesalePrice: product.wholesalePrice,
+    };
+
+    const unitConversion = Number(unit.conversionToBase) || Number(product.conversionToBase) || 1;
+    const variantConversion = Number(product.conversionToBase) || 1;
+    const availableUnitStock = Math.floor(availableStock * variantConversion / unitConversion);
 
     setItems((current) => {
       const existing = current.find((item) => item.id === product.id && item.unitId === unit.id);
-      const maxStock = product.stock !== undefined ? product.stock : 999;
+      const maxStock = product.stock !== undefined ? availableUnitStock : 999;
       if (existing) {
         const nextQty = Math.min(existing.qty + 1, maxStock);
         if (nextQty <= existing.qty) {
@@ -451,11 +419,9 @@ export default function CashierPage() {
         ...product,
         unitId: unit.id,
         unitName: unit.name,
-        price: getSellingPrice(product),
+        price: Number(customerType === 'WHOLESALE' && unit.wholesalePrice != null ? unit.wholesalePrice : unit.sellPrice),
         qty: 1,
-        availableStock: unit.baseStockQty,
-        minimumStock: unit.minimumStock,
-        maximumStock: unit.maximumStock,
+        availableStock: availableUnitStock,
       }];
     });
   };
@@ -673,12 +639,9 @@ export default function CashierPage() {
     const payload = {
       items: items.map((item) => ({
         variantId: item.variantId || item.id,
-        productId: item.productId || item.id,
+        unitId: item.unitId || undefined,
         eventPackageId: item.eventPackageId,
         parcelId: item.parcelId,
-        name: item.name,
-        price: item.price,
-        unitPrice: item.price,
         quantity: item.qty,
       })),
       paidAmount: paymentMethod === 'DEBT' ? 0 : effectivePaid,
@@ -688,13 +651,19 @@ export default function CashierPage() {
       customerId: selectedCustomerId && selectedCustomerId !== 'NEW' ? selectedCustomerId : null,
       customerName: activeCustomer?.name || null,
       cashierName: 'Kasir Glosir',
-      discount: totalDiscount,
+      discount: 0,
       promoName: activePromo.id !== 'none' ? activePromo.name : null,
-      promoDiscount,
+      promoCode: activePromo.code || '',
       holdOrderId: activeHoldId,
     };
 
     try {
+      const signature = JSON.stringify(payload);
+      if (checkoutRequestRef.current.signature !== signature) {
+        if (!globalThis.crypto?.randomUUID) throw new Error('Browser ini tidak mendukung checkout aman. Perbarui browser lalu coba lagi.');
+        checkoutRequestRef.current = { signature, id: globalThis.crypto.randomUUID() };
+      }
+      payload.clientRequestId = checkoutRequestRef.current.id;
       const response = await apiFetch('/orders/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -706,9 +675,7 @@ export default function CashierPage() {
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Transaksi gagal diproses.');
       }
-
-      const previousCustomerPoints = 0;
-      const currentCustomerPoints = 0;
+      checkoutRequestRef.current = { signature: null, id: null };
 
       const receipt = {
         orderNumber: data.orderNumber || `POS-${Date.now()}`,
@@ -727,13 +694,20 @@ export default function CashierPage() {
         paymentReference: null,
         customer: activeCustomer,
         cashierName: 'Kasir Glosir',
-        earnedPoints,
-        previousPoints: previousCustomerPoints,
-        currentPoints: currentCustomerPoints,
+        earnedPoints: Number(data.earnedPoints || 0),
+        previousPoints: Number(data.previousPoints || 0),
+        currentPoints: Number(data.currentPoints ?? activeCustomer?.points ?? 0),
         createdAt: new Date().toISOString(),
       };
 
       setCompletedOrder(receipt);
+      if (activeCustomer?.id && data.currentPoints !== undefined) {
+        setCustomers((current) => current.map((customer) => (
+          customer.id === activeCustomer.id
+            ? { ...customer, points: Number(data.currentPoints) }
+            : customer
+        )));
+      }
       refreshAverageTransaction();
       if (activeHoldId) {
         setHeldCarts((current) => current.filter((hold) => hold.id !== activeHoldId));
@@ -776,6 +750,7 @@ export default function CashierPage() {
     setSelectedPromoId('none');
     setCustomerType('RETAIL');
     setCompletedOrder(null);
+    checkoutRequestRef.current = { signature: null, id: null };
   };
 
   const handlePrint = () => {
@@ -822,15 +797,9 @@ export default function CashierPage() {
       (order.redeemedPoints > 0 ? `Poin Ditukar: -${order.redeemedPoints} Poin\n` : '') +
       `Total Saldo Poin: ⭐ ${order.currentPoints} Poin ⭐\n` +
       `--------------------------------\n` +
-      `💡 TIPS HEMAT MEMBER:\n` +
-      `• Belanja ≥ 100rb = 10 Poin\n` +
-      `• Belanja ≥ 50rb  = 2 Poin\n` +
-      `Tukarkan 10 Poin = Diskon Rp 5.000 di kasir!\n` +
       `Terima kasih telah berbelanja di Glosir 💚`;
 
-    const phone = order.customer?.phone
-      ? order.customer.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')
-      : '';
+    const phone = normalizeIndonesianPhone(order.customer?.phone || '');
 
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
@@ -857,10 +826,10 @@ export default function CashierPage() {
           {/* Thermal Paper Receipt */}
           <div className="receipt-paper" id="printable-receipt">
             <div className="receipt-shop-head">
-              <h2>GLOSIR</h2>
-              <p>Grosir & Sembako Modern</p>
-              <small>Jl. Raya Glosir No. 88, Jawa Barat</small>
-              <small>WhatsApp: 0812-3456-7890</small>
+              <h2>{storeProfile.name || 'Glosir'}</h2>
+              <p>Toko Grosir & Eceran</p>
+              {storeProfile.address && <small>{storeProfile.address}</small>}
+              {storeProfile.phone && <small>WhatsApp: {storeProfile.phone}</small>}
             </div>
 
             <div className="receipt-divider-dash" />
@@ -1305,11 +1274,11 @@ export default function CashierPage() {
             <div className="pos-badge-row">
               <span className="pos-badge-live">● POS Online</span>
               <span className="pos-badge-points">
-                ⭐ Promo & Poin: Belanja ≥ 100rb = 10 Poin | ≥ 50rb = 2 Poin
+                Promo aktif dan poin dihitung otomatis sesuai aturan toko
               </span>
             </div>
             <h1>Kasir Toko (POS)</h1>
-            <p>Pilih produk, terapkan promo Lebaran/voucher, kumpulkan poin member, dan selesaikan transaksi.</p>
+            <p>Pilih produk, gunakan promo aktif, lalu selesaikan pembayaran.</p>
           </div>
 
           <div className="pos-header-actions">

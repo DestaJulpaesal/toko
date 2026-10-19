@@ -1,0 +1,1 @@
+-- Live schema already includes the ContactMessage table.

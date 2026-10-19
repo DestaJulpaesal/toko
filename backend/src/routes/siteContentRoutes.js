@@ -24,7 +24,6 @@ const PUBLIC_TYPES = Object.keys(TYPE_MAP);
 
 const defaultContent = [
   {
-    id: 'fallback-terms',
     type: 'TERMS',
     title: 'Syarat & Ketentuan',
     content: `1. Pelanggan wajib memastikan data pemesanan yang dikirim sudah benar sebelum order dikonfirmasi.\n\n2. Pembayaran harus dilakukan sesuai metode yang disepakati dan konfirmasi pembayaran segera dikirim setelah transaksi selesai.\n\n3. Produk yang dipesan akan diproses sesuai stok yang tersedia pada saat order dibuat.\n\n4. Pengiriman dilakukan sesuai kesepakatan jadwal, wilayah, dan biaya yang disetujui sebelumnya.\n\n5. Komplain barang dapat diajukan dalam waktu 1x24 jam setelah paket diterima dengan bukti foto dan informasi lengkap.`,
@@ -35,7 +34,6 @@ const defaultContent = [
     updatedAt: new Date(),
   },
   {
-    id: 'fallback-privacy',
     type: 'PRIVACY',
     title: 'Kebijakan Privasi',
     content: `Kami menghormati privasi pelanggan. Data yang kami kumpulkan meliputi nama, nomor telepon, alamat pengiriman, dan kebutuhan pesanan untuk keperluan proses transaksi dan layanan.\n\nData pelanggan tidak akan dibagikan ke pihak ketiga tanpa persetujuan, kecuali untuk kebutuhan pengiriman atau layanan yang dibutuhkan secara teknis.\n\nKami menggunakan data pelanggan secara aman untuk kebutuhan administrasi, komunikasi, dan peningkatan layanan. Pelanggan dapat meminta pembaruan atau penghapusan data sesuai ketentuan yang berlaku.`,
@@ -46,10 +44,9 @@ const defaultContent = [
     updatedAt: new Date(),
   },
   {
-    id: 'fallback-contact',
     type: 'CONTACT',
     title: 'Contact Us',
-    content: `Hubungi Glosir untuk kebutuhan produk, paket acara, atau pertanyaan lain.\n\nWhatsApp: 0812-3456-7890\nEmail: hello@glosir.id\nAlamat: Kota Anda / Area sekitar toko\nJam operasional: Senin - Sabtu, 08.00 - 18.00 WIB`,
+    content: 'Hubungi Glosir untuk kebutuhan produk, paket acara, atau pertanyaan lain melalui informasi kontak pada halaman ini.',
     slug: 'contact-us',
     sortOrder: 0,
     isPublished: true,
@@ -57,7 +54,6 @@ const defaultContent = [
     updatedAt: new Date(),
   },
   {
-    id: 'fallback-faq',
     type: 'FAQ',
     title: 'Pusat Bantuan / FAQ',
     content: `Q: Apakah bisa pesan dengan jumlah banyak?\nA: Ya, kami menerima pesanan untuk kebutuhan rumah tangga, usaha, maupun acara khusus dengan kapasitas yang disesuaikan.\n\nQ: Bagaimana cara proses pembayaran?\nA: Pembayaran dapat dilakukan sesuai metode yang disepakati, lalu konfirmasi akan kami proses setelah data pembayaran diterima.\n\nQ: Apakah tersedia paket custom?\nA: Tersedia, terutama untuk kebutuhan parcel, paket acara, dan kebutuhan usaha dengan pilihan yang bisa disesuaikan.`,
@@ -68,7 +64,6 @@ const defaultContent = [
     updatedAt: new Date(),
   },
   {
-    id: 'fallback-help',
     type: 'HELP',
     title: 'Pusat Bantuan',
     content: `Jika Anda membutuhkan bantuan, kami siap membantu melalui WhatsApp, telepon, atau chat langsung.\n\n- Cek status pesanan\n- Tanya stok produk\n- Konsultasi paket sesuai kebutuhan\n- Permintaan custom order\n\nTim kami akan merespons secepat mungkin untuk membantu proses pembelian.`,
@@ -79,10 +74,9 @@ const defaultContent = [
     updatedAt: new Date(),
   },
   {
-    id: 'fallback-testimonial',
     type: 'TESTIMONIAL',
     title: 'Testimoni / Ulasan',
-    content: `"Pelayanannya ramah dan proses order cepat. Produk sesuai kebutuhan dan kualitas tetap terjaga." - Ibu Sari\n\n"Paket acara yang dibuat sangat rapi dan sesuai budget keluarga kami." - Bapak Rudi\n\n"Cocok untuk kebutuhan usaha kecil, pengiriman tepat waktu, dan komunikasi sangat jelas." - Toko Kue Nusantara`,
+    content: 'Belum ada testimoni pelanggan yang dipublikasikan.',
     slug: 'testimoni-ulasan',
     sortOrder: 0,
     isPublished: true,
@@ -91,7 +85,7 @@ const defaultContent = [
   },
 ];
 
-const defaultContentSeed = defaultContent.map(({ id, ...rest }) => rest);
+const defaultContentSeed = defaultContent;
 
 function slugify(value) {
   return String(value || '')

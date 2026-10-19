@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Pencil, Search, Trash2 } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
@@ -138,6 +138,8 @@ export default function AdminContentPage() {
     return searchable.includes(search.toLowerCase());
   });
   const allSelected = visibleItems.length > 0 && visibleItems.every((item) => selectedIds.includes(item.id));
+  const publishedCount = items.filter((item) => item.isPublished).length;
+  const draftCount = items.length - publishedCount;
   const deleteSelected = async () => {
     if (!selectedIds.length || !await confirmAction(`Hapus ${selectedIds.length} konten terpilih?`)) return;
     setBulkDeleting(true);
@@ -149,23 +151,28 @@ export default function AdminContentPage() {
   };
 
   return (
-    <AdminShell active="Konten Publik" className="admin-crud-shell">
-        <header className="admin-header">
+    <AdminShell active="Konten Publik" className="admin-crud-shell" mainClassName="admin-content-page">
+        <header className="admin-header admin-content-header">
           <div>
-            <p className="eyebrow light">Public content</p>
+            <p className="eyebrow light">KONTEN WEBSITE</p>
             <h1>Kelola Halaman Publik</h1>
             <p className="admin-subtitle">Atur Syarat & Ketentuan, Kebijakan Privasi, FAQ, Contact Us, dan Testimoni.</p>
+            <div className="content-status-summary">
+              <span><strong>{items.length}</strong> total konten</span>
+              <span className="is-published"><strong>{publishedCount}</strong> publik</span>
+              <span className="is-draft"><strong>{draftCount}</strong> draft</span>
+            </div>
           </div>
           <span className={`database-status ${loading ? 'loading' : 'ready'}`}><i /> {loading ? 'Memuat data' : 'Terhubung ke API'}</span>
         </header>
 
         {notice && <div className="crud-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Tutup notifikasi">x</button></div>}
 
-        <section className="crud-layout">
-          <form className="crud-form-panel" onSubmit={submitForm}>
+        <section className="crud-layout admin-content-layout">
+          <form className="crud-form-panel admin-content-editor" onSubmit={submitForm}>
             <div className="panel-heading">
               <div>
-                <span className="panel-kicker">{editingId ? 'Edit konten' : 'Konten baru'}</span>
+                <span className="panel-kicker">{editingId ? 'SEDANG MENGEDIT' : 'KONTEN BARU'}</span>
                 <h2>{editingId ? 'Perbarui halaman publik' : 'Tambah halaman publik'}</h2>
               </div>
               {editingId && <button type="button" className="text-button" onClick={resetForm}>Batal</button>}
@@ -190,25 +197,32 @@ export default function AdminContentPage() {
               <textarea name="content" value={form.content} onChange={updateField} rows="8" placeholder="Tulis isi halaman. Untuk FAQ, gunakan format Q: ... dan A: ..." />
             </label>
 
-            <div className="form-two-columns">
+            <div className="content-editor-options">
               <label>
                 Urutan tampilan
                 <input name="sortOrder" value={form.sortOrder} onChange={updateField} type="number" min="0" />
               </label>
-              <label className="checkbox-label">
-                <span>Status publik</span>
+              <label className="content-publish-field">
                 <input name="isPublished" type="checkbox" checked={form.isPublished} onChange={updateField} />
+                <span className="content-publish-copy">
+                  <strong>Tampilkan ke publik</strong>
+                  <small>{form.isPublished ? 'Konten terlihat di website.' : 'Konten tersimpan sebagai draft.'}</small>
+                </span>
+                <span className={`content-publish-badge${form.isPublished ? ' is-published' : ' is-draft'}`}>{form.isPublished ? 'Publik' : 'Draft'}</span>
               </label>
             </div>
 
-            <button className="btn btn-primary full" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah konten'}</button>
+            <button className="btn btn-primary full content-submit-button" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah konten'}</button>
           </form>
 
-          <section className="crud-table-panel">
-            <div className="crud-toolbar">
+          <section className="crud-table-panel admin-content-list">
+            <div className="content-list-heading">
+              <div><h2>Daftar konten</h2><p>Kelola informasi yang digunakan di halaman website.</p></div>
+            </div>
+            <div className="crud-toolbar content-list-toolbar">
               <label className="crud-search">
                 <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari judul atau isi..." />
+                <input aria-label="Cari konten" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari judul atau isi..." />
               </label>
             </div>
 
@@ -217,7 +231,7 @@ export default function AdminContentPage() {
               <table className="product-table">
                 <thead>
                   <tr>
-                          <th className="bulk-check-column">Pilih</th><th>Judul</th>
+                    <th className="bulk-check-column">Pilih</th><th>Judul</th>
                     <th>Tipe</th>
                     <th>Status</th>
                     <th>Aksi</th>
@@ -231,12 +245,12 @@ export default function AdminContentPage() {
                         <strong>{item.title}</strong>
                         <small>{item.content.slice(0, 60)}{item.content.length > 60 ? '...' : ''}</small>
                       </td>
-                      <td>{typeLabelMap[item.type] || item.type}</td>
-                      <td>{item.isPublished ? 'Publik' : 'Draft'}</td>
+                      <td><span className="content-type-badge">{typeLabelMap[item.type] || item.type}</span></td>
+                      <td><span className={`content-publish-badge${item.isPublished ? ' is-published' : ' is-draft'}`}>{item.isPublished ? 'Publik' : 'Draft'}</span></td>
                       <td>
-                        <div className="row-actions">
-                          <button type="button" onClick={() => editItem(item)}>Edit</button>
-                          <button type="button" onClick={() => deleteItem(item.id)}>Hapus</button>
+                        <div className="content-row-actions">
+                          <button type="button" aria-label={`Edit ${item.title}`} onClick={() => editItem(item)}><Pencil size={15} /> Edit</button>
+                          <button type="button" aria-label={`Hapus ${item.title}`} onClick={() => deleteItem(item.id)}><Trash2 size={15} /> Hapus</button>
                         </div>
                       </td>
                     </tr>

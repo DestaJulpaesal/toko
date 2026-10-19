@@ -185,3 +185,11 @@ on conflict ("id") do update set
   "headline" = excluded."headline",
   "story" = excluded."story",
   "updatedAt" = now();
+
+insert into "AppSetting" ("id", "key", "value", "isPublic", "updatedAt") values
+  ('setting-store-profile', 'storeProfile', '{"name":"Glosir","phone":"","address":"","openingHours":""}'::jsonb, true, now()),
+  ('setting-delivery', 'delivery', '{"enabled":true,"freeDistanceKm":1,"ratePerKm":5000,"minimumSubtotal":0}'::jsonb, true, now()),
+  ('setting-checkout', 'checkout', '{"paymentMethods":["CASH","QRIS","TRANSFER","DEBT"]}'::jsonb, false, now()),
+  ('setting-cashier-discount', 'cashierDiscount', '{"maxPercent":10,"maxAmount":50000}'::jsonb, false, now()),
+  ('setting-inventory', 'inventory', '{"lowStockThreshold":5,"expiryWarningDays":30}'::jsonb, false, now())
+on conflict ("key") do nothing;
