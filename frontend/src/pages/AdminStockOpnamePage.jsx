@@ -13,16 +13,26 @@ export default function AdminStockOpnamePage() {
   const [deletingId, setDeletingId] = useState(null);
 
   const load = async () => {
-    const [productsResponse, recordsResponse] = await Promise.all([
-      apiFetch('/products?all=true'),
-      apiFetch('/stock-opnames'),
-    ]);
-    const productsData = await productsResponse.json();
-    const recordsData = await recordsResponse.json();
-    const eligibleProducts = (productsData.products || []).filter((product) => !['parsel', 'acara'].includes(String(product.category || '').trim().toLowerCase()));
-    setProducts(eligibleProducts);
-    setRecords(recordsData.records || []);
-    setForm((current) => ({ ...current, variantId: current.variantId || eligibleProducts[0]?.variantId || '' }));
+    const loadProducts = async () => {
+      const response = await apiFetch('/products?all=true');
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Produk gagal dimuat.');
+      const eligibleProducts = (data.products || []).filter((product) => !['parsel', 'acara'].includes(String(product.category || '').trim().toLowerCase()));
+      setProducts(eligibleProducts);
+      setForm((current) => ({ ...current, variantId: current.variantId || eligibleProducts[0]?.variantId || '' }));
+    };
+    const loadRecords = async () => {
+      const response = await apiFetch('/stock-opnames');
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Data opname gagal dimuat.');
+      setRecords(data.records || []);
+    };
+    const results = await Promise.allSettled([loadProducts(), loadRecords()]);
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length) {
+      console.error('Some stock opname data failed to load:', failures.map((result) => result.reason));
+      setNotice(`Sebagian data opname gagal dimuat (${failures.length} bagian).`);
+    }
   };
 
   useEffect(() => { load().catch((error) => setNotice(error.message || 'Data opname gagal dimuat')); }, []);

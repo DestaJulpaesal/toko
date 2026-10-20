@@ -64,26 +64,28 @@ export default function AdminDashboard() {
       loadingRequest = true;
       if (initial) setLoading(true);
       try {
-        const [summaryRes, txRes, restockRes] = await Promise.all([
-          apiFetch('/finance/summary', { silentNotify: true }),
-          apiFetch('/finance/transactions?limit=200', { silentNotify: true }),
-          apiFetch('/products/restock-suggestions', { silentNotify: true }),
+        const loadResource = async (path, label, update) => {
+          const response = await apiFetch(path, { silentNotify: true });
+          const data = await response.json();
+          if (!response.ok || !data.success) throw new Error(data.message || `${label} gagal dimuat.`);
+          if (active) update(data);
+        };
+        const results = await Promise.allSettled([
+          loadResource('/finance/summary', 'Ringkasan keuangan', (data) => setSummary(data.summary || data)),
+          loadResource('/finance/transactions?limit=200', 'Transaksi', (data) => {
+            if (Array.isArray(data.transactions)) setTransactions(data.transactions.slice(0, 5));
+          }),
+          loadResource('/products/restock-suggestions', 'Saran restock', (data) => setRestockSuggestions(data.suggestions || [])),
         ]);
-
-        const summaryData = await summaryRes.json();
-        const txData = await txRes.json();
-
         if (!active) return;
-        if (summaryData.success) {
-          setSummary(summaryData.summary || summaryData);
+        const failures = results.filter((result) => result.status === 'rejected');
+        if (failures.length) {
+          console.error('Some dashboard data failed to load:', failures.map((result) => result.reason));
+          setError('Gagal memuat sebagian data dashboard dari server.');
+        } else {
+          setError('');
+          setLastUpdated(new Date());
         }
-
-        if (txData.success && Array.isArray(txData.transactions)) {
-          setTransactions(txData.transactions.slice(0, 5));
-        }
-        const restockData = await restockRes.json();
-        if (restockData.success) setRestockSuggestions(restockData.suggestions || []);
-        setLastUpdated(new Date());
       } catch (error) {
         if (initial) setError('Gagal memuat sebagian data dashboard dari server.');
       } finally {

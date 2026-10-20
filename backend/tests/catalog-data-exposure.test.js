@@ -43,6 +43,11 @@ const makeProduct = (overrides = {}, variantOverrides = {}) => ({
     sellPrice: '6000', basePrice: '4500', wholesalePrice: '5000', stockQty: 12, isDefault: true, isActive: true,
     ...variantOverrides,
   }],
+  units: [{
+    id: 'u-aktif', name: 'Dus', sku: 'SKU-LEMINERAL-DUS', barcode: null,
+    basePrice: '50000', sellPrice: '65000', wholesalePrice: '60000', conversionToBase: '12',
+    isSellable: true, isDefault: true, isActive: true,
+  }],
   ...overrides,
 });
 const products = [
@@ -63,13 +68,19 @@ const eventPackages = [{
 
 const fakeDb = {
   product: {
-    async findMany({ where }) {
+    async findMany({ where, include }) {
       const status = where?.status;
-      if (status === 'ACTIVE') return products.filter((p) => p.status === 'ACTIVE');
-      if (status?.not) return products.filter((p) => p.status !== status.not);
-      return products;
+      const result = status === 'ACTIVE'
+        ? products.filter((p) => p.status === 'ACTIVE')
+        : status?.not
+          ? products.filter((p) => p.status !== status.not)
+          : products;
+      return result.map((product) => include?.units ? product : { ...product, units: undefined });
     },
-    async findUnique({ where }) { return products.find((p) => p.id === where.id) ?? null; },
+    async findUnique({ where, include }) {
+      const product = products.find((p) => p.id === where.id);
+      return product ? (include?.units ? product : { ...product, units: undefined }) : null;
+    },
   },
   eventPackage: {
     async findMany() { return eventPackages.filter((e) => e.isActive); },
@@ -217,6 +228,17 @@ test('kasir: tidak menerima harga modal, tetapi menerima barcode dan harga grosi
   assert.equal(first.barcode, '8996001600399');
   assert.equal(first.wholesalePrice, 5000);
   assert.equal(first.variants[0].wholesalePrice, 5000);
+  assert.equal(first.units[0].id, 'u-aktif');
+  assert.equal(first.units[0].sellPrice, 65000);
+  assert.equal(first.units[0].wholesalePrice, 60000);
+  assert.equal(JSON.stringify(first.units).includes('basePrice'), false);
+});
+
+test('pengunjung publik tidak menerima satuan produk internal pada katalog', async () => {
+  const { body } = await get('/products');
+  const first = body.products.find((p) => p.id === 'p-aktif');
+  assert.equal('units' in first, false);
+  assert.deepEqual(findForbiddenKeys(body), []);
 });
 
 test('detail produk: mengirim deskripsi dan varian publik tanpa data modal', async () => {

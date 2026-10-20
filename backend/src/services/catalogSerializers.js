@@ -91,6 +91,20 @@ export function formatProduct(product, audience = AUDIENCE.PUBLIC) {
     stockWarning: Number(product.stockWarning || 0),
     wholesalePrice: toNumberOrNull(variant?.wholesalePrice),
     isQuickAccess: Boolean(product.isQuickAccess),
+    ...(Array.isArray(product.units) ? {
+      units: product.units.map((unit) => ({
+        id: unit.id,
+        name: unit.name,
+        sku: unit.sku,
+        barcode: unit.barcode,
+        sellPrice: Number(unit.sellPrice || 0),
+        wholesalePrice: toNumberOrNull(unit.wholesalePrice),
+        conversionToBase: Number(unit.conversionToBase || 1),
+        isSellable: Boolean(unit.isSellable),
+        isDefault: Boolean(unit.isDefault),
+        isActive: Boolean(unit.isActive),
+      })),
+    } : {}),
   };
   if (audience === AUDIENCE.OWNER) return { ...staffProduct, purchasePrice: Number(variant?.basePrice || 0) };
   return staffProduct;

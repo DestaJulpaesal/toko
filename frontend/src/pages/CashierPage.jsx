@@ -95,55 +95,76 @@ export default function CashierPage() {
   // Load products & customers
   const loadData = async () => {
     setLoading(true);
-    try {
-      const [prodRes, categoryRes, promoRes] = await Promise.all([
-        apiFetch('/products').then((r) => r.json()).catch(() => null),
-        apiFetch('/categories').then((r) => r.json()).catch(() => null),
-        apiFetch('/promos?activeOnly=true').then((r) => r.json()).catch(() => null),
-      ]);
-
-      if (prodRes?.success && Array.isArray(prodRes.products)) {
-        const catalogProducts = prodRes.products.flatMap((product) => (product.variants?.length
-          ? product.variants.map((variant) => ({
-            ...product,
-            id: variant.id,
-            productId: product.id,
-            variantId: variant.id,
-            name: `${product.name} (${variant.name})`,
-            sku: variant.sku || product.sku,
-            barcode: variant.barcode,
-            price: variant.price,
-            wholesalePrice: variant.wholesalePrice,
-            stock: variant.stock,
-            conversionToBase: Number(variant.conversionToBase || 1),
-          }))
-          : [product]));
-        setProducts(catalogProducts.filter((p) => p.stock > 0 || p.stock === undefined));
-      } else {
+    const loadProducts = async () => {
+      try {
+        const response = await apiFetch('/products');
+        const prodRes = await response.json();
+        if (prodRes?.success && Array.isArray(prodRes.products)) {
+          const catalogProducts = prodRes.products.flatMap((product) => (product.variants?.length
+            ? product.variants.map((variant) => ({
+              ...product,
+              id: variant.id,
+              productId: product.id,
+              variantId: variant.id,
+              name: `${product.name} (${variant.name})`,
+              sku: variant.sku || product.sku,
+              barcode: variant.barcode,
+              price: variant.price,
+              wholesalePrice: variant.wholesalePrice,
+              stock: variant.stock,
+              conversionToBase: Number(variant.conversionToBase || 1),
+            }))
+            : [product]));
+          setProducts(catalogProducts.filter((p) => p.stock > 0 || p.stock === undefined));
+        } else {
+          setProducts([]);
+          setNotice(prodRes?.message || 'Produk tidak bisa dimuat dari database.');
+        }
+      } catch (error) {
         setProducts([]);
-        setNotice(prodRes?.message || 'Produk tidak bisa dimuat dari database.');
+        setNotice(error.message || 'Produk tidak bisa dimuat dari database.');
       }
+    };
 
-      if (categoryRes?.success && Array.isArray(categoryRes.categories)) {
-        setDatabaseCategories(categoryRes.categories.map((category) => category.name).filter(Boolean));
+    const loadCategories = async () => {
+      try {
+        const response = await apiFetch('/categories');
+        const categoryRes = await response.json();
+        if (categoryRes?.success && Array.isArray(categoryRes.categories)) {
+          setDatabaseCategories(categoryRes.categories.map((category) => category.name).filter(Boolean));
+        }
+      } catch (error) {
+        console.warn('Failed to load cashier categories:', error.message);
       }
+    };
 
-      if (promoRes?.success && Array.isArray(promoRes.promos)) {
-        setAvailablePromos([
-          NO_PROMO,
-          ...promoRes.promos.filter((promo) => promo.code).map((promo) => ({
-            id: promo.id,
-            name: promo.name,
-            code: promo.code,
-            type: promo.discountType,
-            value: Number(promo.discountValue || 0),
-            minPurchase: Number(promo.minPurchase || 0),
-            maxDiscount: promo.maxDiscount == null ? null : Number(promo.maxDiscount),
-            tag: promo.discountType === 'PERCENT' ? `${Number(promo.discountValue)}% OFF` : `POTONGAN ${formatMoney(promo.discountValue)}`,
-            desc: promo.description || 'Promo aktif dari database.',
-          })),
-        ]);
+    const loadPromos = async () => {
+      try {
+        const response = await apiFetch('/promos?activeOnly=true');
+        const promoRes = await response.json();
+        if (promoRes?.success && Array.isArray(promoRes.promos)) {
+          setAvailablePromos([
+            NO_PROMO,
+            ...promoRes.promos.filter((promo) => promo.code).map((promo) => ({
+              id: promo.id,
+              name: promo.name,
+              code: promo.code,
+              type: promo.discountType,
+              value: Number(promo.discountValue || 0),
+              minPurchase: Number(promo.minPurchase || 0),
+              maxDiscount: promo.maxDiscount == null ? null : Number(promo.maxDiscount),
+              tag: promo.discountType === 'PERCENT' ? `${Number(promo.discountValue)}% OFF` : `POTONGAN ${formatMoney(promo.discountValue)}`,
+              desc: promo.description || 'Promo aktif dari database.',
+            })),
+          ]);
+        }
+      } catch (error) {
+        console.warn('Failed to load cashier promotions:', error.message);
       }
+    };
+
+    try {
+      await Promise.all([loadProducts(), loadCategories(), loadPromos()]);
     } finally {
       setLoading(false);
     }
@@ -390,13 +411,16 @@ export default function CashierPage() {
     }
 
     // FASE 4: Check if product has units and if one is selected
-    const unit = selectedUnits[product.productId || product.id] || {
+    const unit = selectedUnits[product.productId || product.id]
+      || product.units?.find((item) => item.isDefault)
+      || product.units?.[0]
+      || {
       id: null,
       name: null,
       conversionToBase: product.conversionToBase,
       sellPrice: getSellingPrice(product),
       wholesalePrice: product.wholesalePrice,
-    };
+      };
 
     const unitConversion = Number(unit.conversionToBase) || Number(product.conversionToBase) || 1;
     const variantConversion = Number(product.conversionToBase) || 1;

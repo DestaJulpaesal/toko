@@ -313,6 +313,7 @@ model Parcel {
   participants      ParcelParticipant[]
   basePrice         Decimal?            @db.Decimal(12, 2)
   managerCommission Decimal             @default(0) @db.Decimal(12, 2)
+  adminFee          Decimal             @default(50000) @db.Decimal(12, 2)
 }
 
 model ParcelProgram {
@@ -342,6 +343,7 @@ model ParcelParticipant {
   salePrice          Decimal   @default(0) @db.Decimal(12, 2)
   grossMargin        Decimal   @default(0) @db.Decimal(12, 2)
   managerCommission  Decimal   @default(0) @db.Decimal(12, 2)
+  adminFee           Decimal   @default(0) @db.Decimal(12, 2)
   commissionStatus   String    @default("PENDING")
   contributionAmount Decimal   @db.Decimal(12, 2)
   frequency          String    @default("DAILY")

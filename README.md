@@ -53,18 +53,25 @@ Glosir/
 
 ## Menjalankan secara lokal
 
-1. Gunakan Node.js 20 atau lebih baru.
-2. Salin `backend/.env.example` menjadi `backend/.env`, lalu isi database
-   development, `JWT_SECRET` acak yang kuat, dan nilai integrasi yang diperlukan.
-   `DATABASE_URL` memakai URL pooler transaksi; `DIRECT_URL` dipakai Prisma untuk
-   migrasi. Jangan gunakan database produksi untuk tes atau seed.
-3. Di terminal pertama jalankan `cd backend`, `npm ci`, lalu `npm run dev`.
-4. Salin `frontend/.env.example` menjadi `frontend/.env`, atur `VITE_API_URL`
+1. Gunakan Node.js 20 atau lebih baru dan Docker Desktop.
+2. Dari folder utama project, jalankan `docker compose up -d --wait db` untuk
+   menyalakan PostgreSQL lokal. Data disimpan di Docker volume `postgres_data`.
+3. Jika belum ada, salin `backend/.env.example` menjadi `backend/.env`. Kalau
+   file itu sudah ada, ubah `DATABASE_URL` dan `DIRECT_URL` menjadi
+   `postgresql://glosir:glosir_local_dev@localhost:5432/glosir_db?schema=public`.
+   Isi juga `JWT_SECRET` acak yang kuat dan nilai integrasi lain yang diperlukan.
+   Jangan gunakan database produksi untuk tes atau seed.
+4. Di terminal backend jalankan `cd backend`, `npm ci`, lalu
+   `npx prisma migrate deploy` untuk membuat tabel dari migrasi yang ada.
+   Pastikan URL pada `.env` mengarah ke database lokal sebelum migrasi; migrasi
+   membuat tabel, tetapi tidak menyalin data dari database lama. Setelah migrasi
+   berhasil, jalankan `npm run dev`.
+5. Salin `frontend/.env.example` menjadi `frontend/.env`, atur `VITE_API_URL`
    (lokal: `http://127.0.0.1:5000/api`), kemudian jalankan `cd frontend`,
    `npm ci`, dan `npm run dev`.
-5. Jalankan migrasi hanya setelah memeriksa target database:
-   `cd backend && npx prisma migrate deploy`. Migrasi belum dijalankan oleh
-   perubahan optimasi ini.
+6. Supabase masih dipakai untuk Storage gambar produk. Isi `SUPABASE_URL` dan
+   `SUPABASE_SERVICE_ROLE_KEY` di `backend/.env` jika fitur upload gambar
+   diperlukan; PostgreSQL Docker menggantikan database Supabase, bukan Storage.
 
 ## Pemeriksaan
 
@@ -85,7 +92,11 @@ This is the initial project blueprint. It is meant to be expanded into a product
 Set `VITE_API_URL` in the frontend environment. Use `http://127.0.0.1:5000/api` for local development and the deployed API URL, such as `https://api.example.com/api`, in Vercel/Netlify environment settings.
 Set `VITE_STORE_WHATSAPP_NUMBER` to the store's customer-order number in international format (`62...`, without `+`, spaces, or a leading `0`). Keep it separate from `VITE_SUPPORT_WHATSAPP_NUMBER`.
 
-For the backend, set `DATABASE_URL`, `DIRECT_URL`, and a strong `JWT_SECRET`. `DATABASE_URL` should use the Supabase transaction pooler; `DIRECT_URL` should use the direct PostgreSQL connection for Prisma migrations. Never commit real `.env` files or service-role keys.
+For local development, set `DATABASE_URL` and `DIRECT_URL` to the PostgreSQL
+container URL shown in `backend/.env.example`. For a hosted Supabase database,
+use its transaction pooler for `DATABASE_URL` and its direct PostgreSQL
+connection for `DIRECT_URL`. Never commit real `.env` files or service-role
+keys.
 
 Homepage Glosir mengambil kategori, promo aktif, dan produk pilihan melalui satu endpoint `/api/homepage`; cache homepage ditampilkan segera lalu diperbarui dari API. Halaman katalog menampilkan katalog publik dari cache browser lebih dulu, lalu memperbaruinya dari API. Cache hanya menyimpan data publik yang sudah dibersihkan dari harga modal dan kolom internal.
 

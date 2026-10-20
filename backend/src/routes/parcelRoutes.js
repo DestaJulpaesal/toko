@@ -4,6 +4,7 @@ import { authenticateToken, requireRole, softAuth } from '../middleware/auth.js'
 import { parcelListWhere } from '../services/catalogSerializers.js';
 import { writeAuditLog } from '../services/auditLogService.js';
 const router = express.Router();
+const PARCEL_ADMIN_FEE = 50000;
 
 function makeSlug(value) {
   return String(value)
@@ -13,7 +14,12 @@ function makeSlug(value) {
     .replace(/^-|-$/g, '');
 }
 
-function formatParcel(parcel) {
+function formatParcel(parcel, role) {
+  const canViewCost = role === 'OWNER' || role === 'ADMIN';
+  const calculatedBasePrice = (parcel.items || []).reduce(
+    (sum, item) => sum + Number(item.variant?.basePrice || 0) * Number(item.quantity || 0),
+    0,
+  );
   return {
     id: parcel.id,
     name: parcel.name,
@@ -21,6 +27,8 @@ function formatParcel(parcel) {
     description: parcel.description || '',
     type: parcel.type,
     price: Number(parcel.price || 0),
+    ...(canViewCost ? { basePrice: Number(parcel.basePrice ?? calculatedBasePrice) } : {}),
+    ...(['OWNER', 'ADMIN', 'PARCEL_MANAGER'].includes(role) ? { adminFee: Number(parcel.adminFee || 0) } : {}),
     imageUrl: parcel.imageUrl || null,
     isActive: parcel.isActive,
     itemCount: parcel.items?.length || 0,
@@ -31,6 +39,7 @@ function formatParcel(parcel) {
       productName: item.variant?.product?.name || null,
       variantName: item.variant?.name || null,
       sellPrice: Number(item.variant?.sellPrice || 0),
+      ...(canViewCost ? { basePrice: Number(item.variant?.basePrice || 0) } : {}),
       quantity: item.quantity,
       notes: item.notes || '',
     })),
@@ -43,7 +52,8 @@ function formatParcel(parcel) {
 router.get('/', softAuth, async (req, res) => {
   try {
     const parcels = await prisma.parcel.findMany({
-      where: parcelListWhere(req.user),      include: {
+      where: parcelListWhere(req.user),
+      include: {
         items: {
           include: {
             variant: { include: { product: { select: { id: true, name: true, sku: true } } } },
@@ -53,7 +63,7 @@ router.get('/', softAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    return res.json({ success: true, parcels: parcels.map(formatParcel) });
+    return res.json({ success: true, parcels: parcels.map((parcel) => formatParcel(parcel, req.user?.role)) });
   } catch (error) {
     console.error('Parcel list failed:', error.message);
     return res.status(500).json({ success: false, message: 'Parcel gagal dimuat' });
@@ -69,7 +79,9 @@ async function createParcel(req, res) {
     const variants = await prisma.productVariant.findMany({ where: { id: { in: variantIds }, isActive: true }, include: { product: true } });
     if (normalizedItems.some((item) => !item.variantId || !Number.isInteger(item.quantity) || item.quantity < 1) || variants.length !== variantIds.length) return res.status(400).json({ success: false, message: 'Isi parsel tidak valid' });
     const calculatedPrice = normalizedItems.reduce((sum, item) => sum + Number(variants.find((variant) => variant.id === item.variantId).sellPrice) * item.quantity, 0);
+    const calculatedBasePrice = normalizedItems.reduce((sum, item) => sum + Number(variants.find((variant) => variant.id === item.variantId).basePrice) * item.quantity, 0);
     const normalizedPrice = isManualPrice ? Number(price || 0) : calculatedPrice;
+    const normalizedAdminFee = PARCEL_ADMIN_FEE;
     const slug = makeSlug(trimmedName);
 
     if (!trimmedName || !slug) {
@@ -87,6 +99,8 @@ async function createParcel(req, res) {
         description: String(description).trim() || null,
         type,
         price: normalizedPrice,
+        basePrice: calculatedBasePrice,
+        adminFee: normalizedAdminFee,
         imageUrl: imageUrl ? String(imageUrl).trim() : null,
         isActive: Boolean(isActive),
         items: {
@@ -97,9 +111,9 @@ async function createParcel(req, res) {
       },
       include: { items: { include: { variant: { include: { product: { select: { id: true, name: true, sku: true } } } } } } },
     });
-    await writeAuditLog({ entityType: 'Parcel', entityId: parcel.id, field: 'CREATE', newValue: { name: parcel.name, price: parcel.price, itemCount: parcel.items.length }, changedById: req.user.id });
+    await writeAuditLog({ entityType: 'Parcel', entityId: parcel.id, field: 'CREATE', newValue: { name: parcel.name, price: parcel.price, basePrice: parcel.basePrice, adminFee: parcel.adminFee, itemCount: parcel.items.length }, changedById: req.user.id });
 
-    return res.status(201).json({ success: true, parcel: formatParcel(parcel) });
+    return res.status(201).json({ success: true, parcel: formatParcel(parcel, req.user?.role) });
   } catch (error) {
     return res.status(400).json({
       success: false,
@@ -124,7 +138,9 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
     const variants = await prisma.productVariant.findMany({ where: { id: { in: variantIds }, isActive: true } });
     if (normalizedItems.some((item) => !item.variantId || !Number.isInteger(item.quantity) || item.quantity < 1) || variants.length !== variantIds.length) return res.status(400).json({ success: false, message: 'Isi parsel tidak valid' });
     const calculatedPrice = normalizedItems.reduce((sum, item) => sum + Number(variants.find((variant) => variant.id === item.variantId).sellPrice) * item.quantity, 0);
+    const calculatedBasePrice = normalizedItems.reduce((sum, item) => sum + Number(variants.find((variant) => variant.id === item.variantId).basePrice) * item.quantity, 0);
     const normalizedPrice = isManualPrice ? Number(price || 0) : calculatedPrice;
+    const normalizedAdminFee = PARCEL_ADMIN_FEE;
     const slug = makeSlug(trimmedName);
 
     if (!trimmedName || !slug) {
@@ -135,7 +151,7 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
       return res.status(400).json({ success: false, message: 'Harga parcel tidak valid' });
     }
 
-    const existing = await prisma.parcel.findUnique({ where: { id: req.params.id }, select: { name: true, price: true, isActive: true } });
+    const existing = await prisma.parcel.findUnique({ where: { id: req.params.id }, select: { name: true, price: true, basePrice: true, adminFee: true, isActive: true } });
     if (!existing) return res.status(404).json({ success: false, message: 'Parcel tidak ditemukan' });
     const parcel = await prisma.parcel.update({
       where: { id: req.params.id },
@@ -145,6 +161,8 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
         description: String(description).trim() || null,
         type,
         price: normalizedPrice,
+        basePrice: calculatedBasePrice,
+        adminFee: normalizedAdminFee,
         imageUrl: imageUrl ? String(imageUrl).trim() : null,
         isActive: Boolean(isActive),
         items: {
@@ -154,9 +172,9 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), async (re
       },
       include: { items: { include: { variant: { include: { product: { select: { id: true, name: true, sku: true } } } } } } },
     });
-    await writeAuditLog({ entityType: 'Parcel', entityId: parcel.id, field: 'UPDATE', oldValue: existing, newValue: { name: parcel.name, price: parcel.price, isActive: parcel.isActive }, changedById: req.user.id });
+    await writeAuditLog({ entityType: 'Parcel', entityId: parcel.id, field: 'UPDATE', oldValue: existing, newValue: { name: parcel.name, price: parcel.price, basePrice: parcel.basePrice, adminFee: parcel.adminFee, isActive: parcel.isActive }, changedById: req.user.id });
 
-    return res.json({ success: true, parcel: formatParcel(parcel) });
+    return res.json({ success: true, parcel: formatParcel(parcel, req.user?.role) });
   } catch (error) {
     return res.status(error.code === 'P2025' ? 404 : 400).json({
       success: false,

@@ -13,13 +13,22 @@ export function createCatalogHandlers(db) {
     try {
       // `?all=true` (termasuk produk Draft) hanya dihormati untuk OWNER/ADMIN.
       // Untuk selain itu parameternya diabaikan, bukan ditolak, supaya halaman publik tidak error.
+      const audience = getAudience(req.user);
       const includeDrafts = req.query.all === 'true' && isOwnerAudience(req.user);
       const products = await db.product.findMany({
         where: includeDrafts ? { status: { not: 'HIDDEN' } } : { status: 'ACTIVE' },
-        include: { category: true, variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } } },
+        include: {
+          category: true,
+          variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } },
+          ...(audience !== 'public' ? {
+            units: {
+              where: { isActive: true, isSellable: true },
+              orderBy: { conversionToBase: 'desc' },
+            },
+          } : {}),
+        },
         orderBy: { createdAt: 'desc' },
       });
-      const audience = getAudience(req.user);
 
       return res.json({
         success: true,
@@ -37,11 +46,18 @@ export function createCatalogHandlers(db) {
 
   const getProduct = async (req, res) => {
     try {
+      const audience = getAudience(req.user);
       const product = await db.product.findUnique({
         where: { id: req.params.id },
         include: {
           category: true,
           variants: { where: { isActive: true }, orderBy: { isDefault: 'desc' } },
+          ...(audience !== 'public' ? {
+            units: {
+              where: { isActive: true, isSellable: true },
+              orderBy: { conversionToBase: 'desc' },
+            },
+          } : {}),
         },
       });
 
@@ -53,7 +69,7 @@ export function createCatalogHandlers(db) {
       return res.json({
         success: true,
         source: 'database',
-        product: formatProduct(product, getAudience(req.user)),
+        product: formatProduct(product, audience),
       });
     } catch (error) {
       console.error('Product detail query failed:', error.message);

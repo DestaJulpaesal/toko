@@ -15,11 +15,21 @@ export default function AdminEventPackagesPage() {
   const [editingId, setEditingId] = useState(null);
 
   const load = async () => {
-    const [productsResponse, packagesResponse] = await Promise.all([apiFetch('/products?all=true'), apiFetch('/event-packages')]);
-    const productsData = await productsResponse.json();
-    const packagesData = await packagesResponse.json();
-    setProducts(productsData.products || []);
-    setPackages(packagesData.packages || []);
+    const loadProducts = async () => {
+      const response = await apiFetch('/products?all=true');
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Produk gagal dimuat.');
+      setProducts(data.products || []);
+    };
+    const loadPackages = async () => {
+      const response = await apiFetch('/event-packages');
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Paket acara gagal dimuat.');
+      setPackages(data.packages || []);
+    };
+    const results = await Promise.allSettled([loadProducts(), loadPackages()]);
+    const failure = results.find((result) => result.status === 'rejected');
+    if (failure) throw failure.reason;
   };
   useEffect(() => { load().catch((error) => setNotice(error.message || 'Paket gagal dimuat')); }, []);
 

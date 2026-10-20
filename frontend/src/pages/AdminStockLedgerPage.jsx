@@ -12,18 +12,26 @@ export default function AdminStockLedgerPage() {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    const [productsResponse, movementsResponse] = await Promise.all([
-      apiFetch('/products?all=true'),
-      apiFetch('/stock-movements?limit=250'),
-    ]);
-    const productsData = await productsResponse.json();
-    const movementsData = await movementsResponse.json();
-    if (!productsResponse.ok || !productsData.success) throw new Error(productsData.message || 'Produk gagal dimuat');
-    if (!movementsResponse.ok || !movementsData.success) throw new Error(movementsData.message || 'Kartu stok gagal dimuat');
-    const list = productsData.products || [];
-    setProducts(list);
-    setMovements(movementsData.movements || []);
-    setSelectedId((current) => current || list[0]?.variantId || '');
+    const loadProducts = async () => {
+      const response = await apiFetch('/products?all=true');
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Produk gagal dimuat');
+      const list = data.products || [];
+      setProducts(list);
+      setSelectedId((current) => current || list[0]?.variantId || '');
+    };
+    const loadMovements = async () => {
+      const response = await apiFetch('/stock-movements?limit=250');
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Kartu stok gagal dimuat');
+      setMovements(data.movements || []);
+    };
+    const results = await Promise.allSettled([loadProducts(), loadMovements()]);
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length) {
+      console.error('Some stock ledger data failed to load:', failures.map((result) => result.reason));
+      setNotice(`Sebagian data kartu stok gagal dimuat (${failures.length} bagian).`);
+    }
   };
 
   useEffect(() => { load().catch((error) => setNotice(error.message)); }, []);

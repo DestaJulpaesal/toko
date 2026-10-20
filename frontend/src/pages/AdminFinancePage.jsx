@@ -38,31 +38,50 @@ export default function AdminFinancePage() {
 
   const load = async () => {
     setLoading(true);
+    const loadResource = async (path, label, update) => {
+      const response = await apiFetch(path);
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || `${label} gagal dimuat.`);
+      update(data);
+    };
+
     try {
-      const [summaryResponse, transactionResponse, unifiedResponse, categoryResponse, accountResponse, cashflowResponse, breakdownResponse, tagResponse] = await Promise.all([
-        apiFetch('/finance/summary'), apiFetch('/finance/transactions'), apiFetch('/finance/unified-history'), apiFetch(`/finance/categories?type=${form.type}`), apiFetch('/finance/accounts'), apiFetch('/finance/cashflow?period=daily&months=1'), apiFetch('/finance/breakdown?type=EXPENSE'), apiFetch('/finance/tags'),
+      const results = await Promise.allSettled([
+        loadResource('/finance/summary', 'Ringkasan keuangan', (data) => setSummary(data.summary || {})),
+        loadResource('/finance/transactions', 'Transaksi', (data) => setTransactions(data.transactions || [])),
+        loadResource('/finance/unified-history', 'Riwayat keuangan', (data) => setUnifiedHistory(data.data || [])),
+        loadResource('/finance/accounts', 'Akun keuangan', (data) => setAccounts(data.data || data.accounts || [])),
+        loadResource('/finance/cashflow?period=daily&months=1', 'Arus kas', (data) => setCashflow(data.data || [])),
+        loadResource('/finance/breakdown?type=EXPENSE', 'Rincian pengeluaran', (data) => setBreakdown(data.data || [])),
+        loadResource('/finance/tags', 'Tag keuangan', (data) => setTags(data.data || [])),
       ]);
-      const summaryData = await summaryResponse.json();
-      const transactionData = await transactionResponse.json();
-      const unifiedData = await unifiedResponse.json();
-      const categoryData = await categoryResponse.json();
-      const accountData = await accountResponse.json();
-      const cashflowData = await cashflowResponse.json();
-      const breakdownData = await breakdownResponse.json();
-      const tagData = await tagResponse.json();
-      if (summaryData.success) setSummary(summaryData.summary || {});
-      if (transactionData.success) setTransactions(transactionData.transactions || []);
-      if (unifiedData.success) setUnifiedHistory(unifiedData.data || []);
-      if (categoryData.success) setCategories(categoryData.data || categoryData.categories || []);
-      if (accountData.success) setAccounts(accountData.data || accountData.accounts || []);
-      if (cashflowData.success) setCashflow(cashflowData.data || []);
-      if (breakdownData.success) setBreakdown(breakdownData.data || []);
-      if (tagData.success) setTags(tagData.data || []);
-    } catch (error) { setNotice('Data keuangan gagal dimuat dari backend.'); }
-    finally { setLoading(false); }
+      const failures = results.filter((result) => result.status === 'rejected');
+      if (failures.length) {
+        console.error('Some finance data failed to load:', failures.map((result) => result.reason));
+        setNotice(`Sebagian data keuangan gagal dimuat (${failures.length} bagian).`);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, [form.type]);
+  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    const loadCategories = async () => {
+      try {
+        const response = await apiFetch(`/finance/categories?type=${form.type}`);
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Kategori keuangan gagal dimuat.');
+        if (active) setCategories(data.data || data.categories || []);
+      } catch (error) {
+        console.error('Finance categories failed to load:', error);
+        if (active) setNotice(error.message || 'Kategori keuangan gagal dimuat.');
+      }
+    };
+    loadCategories();
+    return () => { active = false; };
+  }, [form.type]);
   const update = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const reset = () => { setForm(emptyForm); setEditingId(null); };
 

@@ -24,12 +24,14 @@ export default function AdminRestockPage() {
   };
 
   useEffect(() => {
-    Promise.all([apiFetch('/categories'), load()]).then(async ([categoriesResponse]) => {
-      const data = await categoriesResponse.json();
-      setCategories(data.categories || []);
-    }).catch((error) => setNotice(error.message || 'Data restock gagal dimuat'));
+    apiFetch('/categories')
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Kategori gagal dimuat.');
+        setCategories(data.categories || []);
+      })
+      .catch((error) => setNotice(error.message || 'Kategori restock gagal dimuat'));
   }, []);
-
   useEffect(() => { load().catch((error) => setNotice(error.message || 'Data restock gagal dimuat')); }, [category]);
 
   const totalUnits = useMemo(() => items.reduce((sum, item) => sum + Number(item.requestedQty || 0), 0), [items]);

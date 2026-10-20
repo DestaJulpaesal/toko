@@ -39,7 +39,6 @@ const AdminNetWorthPage = lazy(() => import('./pages/AdminNetWorthPage'));
 const AdminApprovalsPage = lazy(() => import('./pages/AdminApprovalsPage'));
 const FinanceAuditLogPage = lazy(() => import('./pages/FinanceAuditLogPage'));
 const AdminParcelParticipantsPage = lazy(() => import('./pages/AdminParcelParticipantsPage'));
-const AdminParcelProgramsPage = lazy(() => import('./pages/AdminParcelProgramsPage'));
 const AdminParcelRegionsPage = lazy(() => import('./pages/AdminParcelRegionsPage'));
 const ParcelCollectionPage = lazy(() => import('./pages/ParcelCollectionPage'));
 const AdminStockOpnamePage = lazy(() => import('./pages/AdminStockOpnamePage'));
@@ -150,7 +149,6 @@ export default function App() {
             <Route path="/admin/finance/approvals" element={<AuthRoute roles={['OWNER']}><AdminApprovalsPage /></AuthRoute>} />
             <Route path="/admin/finance/audit" element={<AuthRoute roles={['OWNER']}><FinanceAuditLogPage /></AuthRoute>} />
             <Route path="/admin/parcel-participants" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelParticipantsPage /></AuthRoute>} />
-            <Route path="/admin/parcel-programs" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelProgramsPage /></AuthRoute>} />
             <Route path="/admin/parcel-regions" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelRegionsPage /></AuthRoute>} />
             <Route path="/admin/parcel-collections" element={<AuthRoute roles={['OWNER', 'ADMIN']}><ParcelCollectionPage /></AuthRoute>} />
             <Route path="/admin/stock-opname" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminStockOpnamePage /></AuthRoute>} />

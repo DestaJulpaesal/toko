@@ -38,6 +38,7 @@ function formatParticipant(item) {
     salePrice: Number(item.salePrice || 0),
     grossMargin: Number(item.grossMargin || 0),
     managerCommission: Number(item.managerCommission || 0),
+    adminFee: Number(item.adminFee || 0),
     commissionStatus: item.commissionStatus,
     frequency: item.frequency,
     startDate: item.startDate,
@@ -58,7 +59,7 @@ function formatParticipant(item) {
 
 const includeData = {
   customer: { select: { id: true, name: true, phone: true } },
-  parcel: { select: { id: true, name: true } },
+  parcel: { select: { id: true, name: true, price: true, adminFee: true } },
   program: { select: { id: true, name: true, year: true } },
   region: { select: { id: true, name: true, code: true } },
   contributions: { orderBy: { paidAt: 'desc' } },
@@ -92,12 +93,29 @@ router.post('/', validateBody(parcelParticipantCreateSchema), async (req, res) =
   try {
     const { customerId, participantPhone, participantName, parcelId, programId, name, contributionAmount, frequency = 'DAILY', startDate, endDate, notes } = req.body || {};
     const participantDisplayName = String(participantName || name || '').trim();
-    if (!participantDisplayName || !programId || Number(contributionAmount) <= 0) return res.status(400).json({ success: false, message: 'Nama peserta, program, dan nominal setoran wajib diisi.' });
-    const program = await prisma.parcelProgram.findUnique({ where: { id: String(programId) }, select: { name: true, targetAmount: true } });
-    if (!program) return res.status(400).json({ success: false, message: 'Program tahunan tidak ditemukan.' });
-    const officialTargetAmount = Number(program.targetAmount || 0);
+    if (!participantDisplayName || (!parcelId && !programId) || Number(contributionAmount) <= 0) return res.status(400).json({ success: false, message: 'Nama peserta, paket parsel, dan nominal setoran wajib diisi.' });
+    const parcel = parcelId
+      ? await prisma.parcel.findUnique({ where: { id: String(parcelId) }, select: { id: true, price: true, basePrice: true, adminFee: true } })
+      : null;
+    if (parcelId && !parcel) return res.status(400).json({ success: false, message: 'Paket parsel tidak ditemukan.' });
+    const program = !parcel && programId
+      ? await prisma.parcelProgram.findUnique({ where: { id: String(programId) }, select: { name: true, targetAmount: true } })
+      : null;
+    if (!parcel && !program) return res.status(400).json({ success: false, message: 'Paket parsel tidak ditemukan.' });
+    const officialAdminFee = parcel ? Number(parcel.adminFee || 0) : 0;
+    const officialSalePrice = parcel ? Number(parcel.price || 0) : 0;
+    const officialTargetAmount = parcel
+      ? officialSalePrice + officialAdminFee
+      : Number(program.targetAmount || 0);
+    const officialGrossMargin = parcel
+      ? officialSalePrice - Number(parcel.basePrice || 0)
+      : 0;
+    const normalizedFrequency = String(frequency).toUpperCase();
+    const officialContributionAmount = parcel
+      ? Math.ceil(officialTargetAmount / (normalizedFrequency === 'WEEKLY' ? 52 : 365))
+      : Number(contributionAmount);
     const regionId = req.user?.role === 'PARCEL_MANAGER' ? req.user.regionId || null : (req.body?.regionId || null);
-    const created = await prisma.parcelParticipant.create({ data: { customerId: customerId ? String(customerId) : null, participantPhone: participantPhone ? String(participantPhone).trim() : null, parcelId: parcelId || null, programId: programId || null, regionId, name: participantDisplayName, targetAmount: officialTargetAmount, salePrice: Number(req.body?.salePrice || 0), grossMargin: Number(req.body?.grossMargin || 0), managerCommission: Number(req.body?.managerCommission || 0), contributionAmount: Number(contributionAmount), frequency: String(frequency).toUpperCase(), startDate: startDate ? new Date(startDate) : new Date(), endDate: endDate ? new Date(endDate) : null, notes: notes ? String(notes).trim() : null }, include: includeData });
+    const created = await prisma.parcelParticipant.create({ data: { customerId: customerId ? String(customerId) : null, participantPhone: participantPhone ? String(participantPhone).trim() : null, parcelId: parcel?.id || null, programId: program ? programId : null, regionId, name: participantDisplayName, targetAmount: officialTargetAmount, salePrice: officialSalePrice, grossMargin: officialGrossMargin, adminFee: officialAdminFee, managerCommission: Number(req.body?.managerCommission || 0), contributionAmount: officialContributionAmount, frequency: normalizedFrequency, startDate: startDate ? new Date(startDate) : new Date(), endDate: endDate ? new Date(endDate) : null, notes: notes ? String(notes).trim() : null }, include: includeData });
     await writeAuditLog({ entityType: 'ParcelParticipant', entityId: created.id, field: 'CREATE', newValue: { name: created.name, programId: created.programId, regionId: created.regionId, targetAmount: created.targetAmount }, changedById: req.user.id });
     return res.status(201).json({ success: true, participant: formatParticipant(created) });
   } catch (error) { return res.status(400).json({ success: false, message: error.message || 'Peserta parsel gagal dibuat.' }); }
@@ -108,8 +126,18 @@ router.patch('/:id', validateBody(parcelParticipantUpdateSchema), async (req, re
     const { customerId, participantName, participantPhone, parcelId, programId, name, targetAmount, contributionAmount, frequency, startDate, endDate, status, notes } = req.body || {};
     const existing = await prisma.parcelParticipant.findUnique({ where: { id: req.params.id } });
     if (req.user?.role === 'PARCEL_MANAGER' && existing?.regionId !== req.user.regionId) return res.status(403).json({ success: false, message: 'Peserta ini bukan bagian dari wilayah Anda.' });
+    const effectiveParcelId = parcelId !== undefined ? parcelId : existing?.parcelId;
+    const parcel = effectiveParcelId
+      ? await prisma.parcel.findUnique({ where: { id: String(effectiveParcelId) }, select: { id: true, price: true, basePrice: true, adminFee: true } })
+      : null;
+    if (effectiveParcelId && !parcel) return res.status(400).json({ success: false, message: 'Paket parsel tidak ditemukan.' });
     const program = programId ? await prisma.parcelProgram.findUnique({ where: { id: String(programId) }, select: { name: true, targetAmount: true } }) : null;
-    const updated = await prisma.parcelParticipant.update({ where: { id: req.params.id }, data: { ...(customerId !== undefined ? { customerId: customerId ? String(customerId) : null } : {}), ...(participantPhone !== undefined ? { participantPhone: participantPhone ? String(participantPhone).trim() : null } : {}), parcelId: parcelId || null, programId: programId || null, ...(participantName !== undefined || name !== undefined ? { name: String(participantName || name || '').trim() } : {}), ...(program?.targetAmount !== undefined ? { targetAmount: Number(program.targetAmount) } : targetAmount !== undefined ? { targetAmount: Number(targetAmount) } : {}), ...(contributionAmount !== undefined ? { contributionAmount: Number(contributionAmount) } : {}), ...(frequency ? { frequency: String(frequency).toUpperCase() } : {}), ...(startDate ? { startDate: new Date(startDate) } : {}), endDate: endDate ? new Date(endDate) : null, ...(status ? { status: String(status).toUpperCase() } : {}), notes: notes ? String(notes).trim() : null }, include: includeData });
+    const normalizedFrequency = String(frequency || existing?.frequency || 'DAILY').toUpperCase();
+    const parcelTargetAmount = parcel ? Number(parcel.price) + Number(parcel.adminFee || 0) : null;
+    const officialContributionAmount = parcel
+      ? Math.ceil(parcelTargetAmount / (normalizedFrequency === 'WEEKLY' ? 52 : 365))
+      : contributionAmount !== undefined ? Number(contributionAmount) : undefined;
+    const updated = await prisma.parcelParticipant.update({ where: { id: req.params.id }, data: { ...(customerId !== undefined ? { customerId: customerId ? String(customerId) : null } : {}), ...(participantPhone !== undefined ? { participantPhone: participantPhone ? String(participantPhone).trim() : null } : {}), ...(parcelId !== undefined ? { parcelId: parcel?.id || null } : {}), ...(programId !== undefined ? { programId: programId || null } : {}), ...(participantName !== undefined || name !== undefined ? { name: String(participantName || name || '').trim() } : {}), ...(parcel ? { targetAmount: parcelTargetAmount, salePrice: Number(parcel.price), grossMargin: Number(parcel.price) - Number(parcel.basePrice || 0), adminFee: Number(parcel.adminFee || 0) } : program?.targetAmount !== undefined ? { targetAmount: Number(program.targetAmount), adminFee: 0 } : targetAmount !== undefined ? { targetAmount: Number(targetAmount) } : {}), ...(officialContributionAmount !== undefined ? { contributionAmount: officialContributionAmount } : {}), ...(frequency ? { frequency: normalizedFrequency } : {}), ...(startDate ? { startDate: new Date(startDate) } : {}), endDate: endDate ? new Date(endDate) : null, ...(status ? { status: String(status).toUpperCase() } : {}), notes: notes ? String(notes).trim() : null }, include: includeData });
     await writeAuditLog({ entityType: 'ParcelParticipant', entityId: updated.id, field: 'UPDATE', oldValue: { name: existing?.name, status: existing?.status, targetAmount: existing?.targetAmount }, newValue: { name: updated.name, status: updated.status, targetAmount: updated.targetAmount }, changedById: req.user.id });
     return res.json({ success: true, participant: formatParticipant(updated) });
   } catch (error) { return res.status(error.code === 'P2025' ? 404 : 400).json({ success: false, message: error.message || 'Peserta parsel gagal diperbarui.' }); }
@@ -122,6 +150,12 @@ router.post('/:id/contributions', validateBody(parcelContributionSchema), async 
     if (req.user?.role === 'PARCEL_MANAGER' && participant.regionId !== req.user.regionId) return res.status(403).json({ success: false, message: 'Peserta ini bukan bagian dari wilayah Anda.' });
     const amount = Number(req.body?.amount || participant.contributionAmount);
     if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'Nominal setoran tidak valid.' });
+    const paid = await prisma.parcelContribution.aggregate({
+      where: { participantId: participant.id },
+      _sum: { amount: true },
+    });
+    const remaining = Math.max(Number(participant.targetAmount || 0) - Number(paid._sum.amount || 0), 0);
+    if (amount > remaining) return res.status(400).json({ success: false, message: `Nominal setoran melebihi sisa tabungan ${remaining}.` });
     const contribution = await prisma.parcelContribution.create({ data: { participantId: participant.id, amount, paidAt: req.body?.paidAt ? new Date(req.body.paidAt) : new Date(), note: req.body?.note ? String(req.body.note).trim() : null } });
     await writeAuditLog({ entityType: 'ParcelContribution', entityId: contribution.id, field: 'CREATE', newValue: { participantId: participant.id, amount: contribution.amount }, changedById: req.user.id });
     const updated = await prisma.parcelParticipant.findUnique({ where: { id: participant.id }, include: includeData });

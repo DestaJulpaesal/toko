@@ -13,7 +13,7 @@ const ownerSecondaryGroups = [
   { label: 'Operasional Lanjutan', links: [['07', 'Piutang', '/admin/debts'], ['08', 'Restock', '/admin/restock'], ['23', 'Kartu Stok', '/admin/stock-ledger'], ['24', 'Stok Opname', '/admin/stock-opname']] },
   { label: 'Pelanggan', links: [['05', 'Data Pelanggan', '/admin/customers']] },
   { label: 'Katalog', links: [['09', 'Kategori', '/admin/categories'], ['10', 'Promo', '/admin/promos'], ['10b', 'Performa Produk', '/admin/product-performance']] },
-  { label: 'Parsel', links: [['11', 'Parsel', '/admin/parcels'], ['12', 'Peserta Parsel', '/admin/parcel-participants'], ['13', 'Program Parsel', '/admin/parcel-programs'], ['14', 'Wilayah Parsel', '/admin/parcel-regions']] },
+  { label: 'Parsel', links: [['11', 'Parsel', '/admin/parcels'], ['12', 'Peserta Parsel', '/admin/parcel-participants'], ['14', 'Wilayah Parsel', '/admin/parcel-regions']] },
   { label: 'Keuangan Lanjutan', links: [['15', 'Catatan Pribadi', '/admin/personal-finance'], ['16', 'Laporan Keuangan', '/admin/finance/reports'], ['17', 'Kalender Keuangan', '/admin/finance/calendar'], ['18', 'Total Kekayaan', '/admin/finance/networth'], ['19', 'Persetujuan Keuangan', '/admin/finance/approvals'], ['20', 'Audit Keuangan', '/admin/finance/audit']] },
   { label: 'Website & Kontrol', links: [['21', 'Konten Publik', '/admin/content'], ['22', 'Profil', '/admin/profile'], ['25', 'Pengaturan Toko', '/admin/settings'], ['24', 'Paket Acara', '/admin/event-packages']] },
 ];
@@ -105,13 +105,19 @@ export default function AdminSidebar({ active = '' }) {
 
   const isCashier = currentUser?.role === 'CASHIER';
   const isParcelManager = currentUser?.role === 'PARCEL_MANAGER';
+  const isAdmin = currentUser?.role === 'ADMIN';
   const filterGroups = (groups) => groups.map((group) => ({
     ...group,
     links: group.links.filter(([, label]) => label.toLowerCase().includes(sidebarSearch.toLowerCase().trim())),
   })).filter((group) => group.links.length > 0);
   const isOwner = !isCashier && !isParcelManager;
   const visibleGroups = filterGroups(isParcelManager ? parcelManagerGroups : isCashier ? cashierGroups : ownerPrimaryGroups);
-  const visibleSecondaryGroups = isOwner && displayMode === 'complete' ? filterGroups(ownerSecondaryGroups) : [];
+  const visibleSecondaryGroups = isOwner && displayMode === 'complete'
+    ? filterGroups(ownerSecondaryGroups.map((group) => ({
+      ...group,
+      links: group.links.filter(([, label]) => !isAdmin || !['Persetujuan Keuangan', 'Audit Keuangan'].includes(label)),
+    })))
+    : [];
   const toggleDisplayMode = () => {
     const nextMode = displayMode === 'simple' ? 'complete' : 'simple';
     setDisplayMode(nextMode);
@@ -229,7 +235,6 @@ function getSidebarIcon(label, fallback) {
     Parsel: Archive,
     'Peserta Parsel': Users,
     'Penagihan Wilayah': WalletCards,
-    'Program Parsel': CalendarRange,
     'Wilayah Parsel': MapPinned,
     Keuangan: WalletCards,
     'Catatan Pribadi': FileText,
