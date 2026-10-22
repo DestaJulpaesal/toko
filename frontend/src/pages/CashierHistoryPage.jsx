@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { CircleX, FileText } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import { apiFetch } from '../services/api';
 import { normalizeIndonesianPhone } from '../utils/phoneUtils';
@@ -389,15 +390,16 @@ export default function CashierHistoryPage() {
                         </span>
                       </td>
                       <td>
-                        <div className="row-actions">
+                        <div className="row-actions cashier-history-actions">
                           <button
                             className="btn-view-struk"
                             onClick={() => setSelectedOrder(ord)}
                             title="Lihat struk & cetak"
                           >
-                            📄 Lihat Struk
+                            <FileText size={15} aria-hidden="true" />
+                            Lihat struk
                           </button>
-                          {ord.status !== 'VOIDED' && <button className="btn-view-struk void-action" onClick={() => { setVoidTarget(ord); setVoidReason(''); }}>Batalkan</button>}
+                          {ord.status !== 'VOIDED' && <button type="button" className="btn-view-struk void-action" onClick={() => { setVoidTarget(ord); setVoidReason(''); }}><CircleX size={15} aria-hidden="true" />Batalkan</button>}
                         </div>
                       </td>
                     </tr>

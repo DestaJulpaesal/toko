@@ -83,7 +83,14 @@ export function CartProvider({ children }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           silentNotify: true,
-          body: JSON.stringify({ code: promo, subtotal: totalPrice }),
+          body: JSON.stringify({
+            code: promo,
+            subtotal: totalPrice,
+            items: items.filter((item) => item.variantId).map((item) => ({
+              variantId: item.variantId,
+              amount: Number(item.price || 0) * Number(item.qty || 0),
+            })),
+          }),
         });
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message || 'Promo tidak dapat digunakan.');
@@ -112,7 +119,14 @@ export function CartProvider({ children }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         silentNotify: true,
-        body: JSON.stringify({ code: normalized, subtotal: totalPrice }),
+        body: JSON.stringify({
+          code: normalized,
+          subtotal: totalPrice,
+          items: items.filter((item) => item.variantId).map((item) => ({
+            variantId: item.variantId,
+            amount: Number(item.price || 0) * Number(item.qty || 0),
+          })),
+        }),
       });
       const result = await response.json();
       if (!response.ok || !result.success) {

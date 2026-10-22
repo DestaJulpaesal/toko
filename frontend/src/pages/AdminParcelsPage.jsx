@@ -103,6 +103,7 @@ export default function AdminParcelsPage() {
   const sellingPrice = form.isManualPrice ? Number(form.price || 0) : autoPrice;
   const grossMargin = sellingPrice - basePrice;
   const annualTarget = form.items.length ? sellingPrice + PARCEL_ADMIN_FEE : 0;
+  const selectedQuantity = form.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   const filteredProducts = products.filter((product) => `${product.name} ${product.sku} ${product.barcode || ''}`.toLowerCase().includes(productSearch.toLowerCase().trim()));
 
   const incompleteParcels = parcels.filter((parcel) => !(parcel.itemCount || parcel.items?.length || 0));
@@ -269,7 +270,7 @@ export default function AdminParcelsPage() {
               </div>
 
               <aside className="parcel-price-panel" aria-label="Ringkasan harga paket">
-                <div className="parcel-form-section-heading"><span>3</span><div><h3>Harga & ringkasan</h3><p>Periksa perhitungan paket.</p></div></div>
+                <div className="parcel-form-section-heading"><span>3</span><div><h3>Harga & ringkasan</h3><p>Periksa perhitungan paket.</p></div><span className="parcel-summary-selection-badge">{selectedQuantity} barang</span></div>
                 <div className="parcel-price-mode" role="group" aria-label="Cara menentukan harga">
                   <button type="button" className={!form.isManualPrice ? 'active' : ''} onClick={() => setForm((current) => ({ ...current, isManualPrice: false }))}><strong>Otomatis</strong><small>Ikuti harga satuan</small></button>
                   <button type="button" className={form.isManualPrice ? 'active' : ''} onClick={() => setForm((current) => ({ ...current, isManualPrice: true, price: current.price || String(autoPrice) }))}><strong>Atur sendiri</strong><small>Tentukan harga jual</small></button>
@@ -357,7 +358,7 @@ export default function AdminParcelsPage() {
                       <td><span className={`status-chip parcel-status-chip ${parcel.status === 'Aktif' ? 'good' : 'neutral'}`}>{parcel.status}</span></td>
                       <td>
                         <div className="row-actions">
-                          <button type="button" className="parcel-row-edit" onClick={() => editParcel(parcel)} title={(parcel.itemCount || parcel.items?.length || 0) > 0 ? 'Edit paket' : 'Lengkapi isi paket'} aria-label={`${(parcel.itemCount || parcel.items?.length || 0) > 0 ? 'Edit paket' : 'Lengkapi isi paket'} ${parcel.name}`}><Pencil size={15} /></button>
+                          <button type="button" className="parcel-row-edit" data-action="edit" data-action-label={(parcel.itemCount || parcel.items?.length || 0) > 0 ? 'Edit' : 'Lengkapi'} onClick={() => editParcel(parcel)} title={(parcel.itemCount || parcel.items?.length || 0) > 0 ? 'Edit' : 'Lengkapi'} aria-label={`${(parcel.itemCount || parcel.items?.length || 0) > 0 ? 'Edit paket' : 'Lengkapi isi paket'} ${parcel.name}`}><Pencil size={15} /></button>
                           <button type="button" onClick={async () => {
                             if (deletingId) return;
                             if (!await confirmAction(`Hapus parsel "${parcel.name}"?`)) return;
@@ -373,7 +374,7 @@ export default function AdminParcelsPage() {
                             } finally {
                               setDeletingId(null);
                             }
-                          }} disabled={deletingId === parcel.id} className="parcel-row-delete" title="Hapus paket" aria-label={`Hapus ${parcel.name}`}>{deletingId === parcel.id ? <span className="parcel-delete-loading">...</span> : <Trash2 size={15} />}</button>
+                          }} disabled={deletingId === parcel.id} className="parcel-row-delete" data-action="delete" data-action-label="Hapus" title="Hapus" aria-label={`Hapus ${parcel.name}`}>{deletingId === parcel.id ? <span className="parcel-delete-loading">...</span> : <Trash2 size={15} />}<span>Hapus</span></button>
                         </div>
                       </td>
                     </tr>

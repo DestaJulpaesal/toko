@@ -30,10 +30,22 @@ function formatPromo(promo) {
     usedCount: promo.usedCount,
     startsAt: promo.startsAt,
     endsAt: promo.endsAt,
+    categoryIds: promo.categoryIds || [],
+    productIds: promo.productIds || [],
     isActive: promo.isActive,
     createdAt: promo.createdAt,
     updatedAt: promo.updatedAt,
   };
+}
+
+async function validatePromoTargets(categoryIds = [], productIds = []) {
+  const [categoryCount, productCount] = await Promise.all([
+    categoryIds.length ? prisma.category.count({ where: { id: { in: categoryIds } } }) : 0,
+    productIds.length ? prisma.product.count({ where: { id: { in: productIds } } }) : 0,
+  ]);
+  if (categoryCount !== categoryIds.length || productCount !== productIds.length) {
+    throw new Error('Kategori atau barang promo sudah tidak tersedia. Muat ulang halaman lalu pilih kembali.');
+  }
 }
 
 router.get('/', async (req, res) => {
@@ -79,6 +91,37 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/admin/list', authenticateToken, requireRole('OWNER', 'ADMIN'), async (req, res) => {
+  try {
+    const promos = await prisma.promoCampaign.findMany({ orderBy: { createdAt: 'desc' } });
+    return res.json({ success: true, promos: promos.map(formatPromo) });
+  } catch (error) {
+    console.error('Admin promo list failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Promo gagal dimuat' });
+  }
+});
+
+router.get('/staff/active', authenticateToken, requireRole('OWNER', 'ADMIN', 'CASHIER'), async (req, res) => {
+  try {
+    const now = new Date();
+    const promos = await prisma.promoCampaign.findMany({
+      where: {
+        isActive: true,
+        AND: [
+          { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+          { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.set('Cache-Control', 'no-store');
+    return res.json({ success: true, promos: promos.map(formatPromo) });
+  } catch (error) {
+    console.error('Staff active promo list failed:', error.message);
+    return res.status(500).json({ success: false, message: 'Promo aktif gagal dimuat' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const promo = await prisma.promoCampaign.findUnique({ where: { id: req.params.id } });
@@ -93,7 +136,27 @@ router.get('/:id', async (req, res) => {
 
 router.post('/validate', validateBody(promoValidationSchema), async (req, res) => {
   try {
-    const result = await validatePromoCode(prisma, req.body.code, req.body.subtotal);
+    const items = req.body.items || [];
+    const variantIds = [...new Set(items.map((item) => item.variantId))];
+    const variants = variantIds.length
+      ? await prisma.productVariant.findMany({
+        where: { id: { in: variantIds }, isActive: true },
+        select: { id: true, product: { select: { id: true, categoryId: true } } },
+      })
+      : [];
+    if (variants.length !== variantIds.length) {
+      return res.status(400).json({ success: false, message: 'Produk dalam keranjang sudah tidak tersedia.' });
+    }
+    const variantById = new Map(variants.map((variant) => [variant.id, variant]));
+    const lines = items.map((item) => {
+      const variant = variantById.get(item.variantId);
+      return {
+        productId: variant?.product.id,
+        categoryId: variant?.product.categoryId,
+        total: Number(item.amount),
+      };
+    }).filter((line) => line.productId);
+    const result = await validatePromoCode(prisma, req.body.code, req.body.subtotal, lines);
     return res.json({
       success: true,
       promo: formatPromo(result.promo),
@@ -106,13 +169,22 @@ router.post('/validate', validateBody(promoValidationSchema), async (req, res) =
 
 router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(promoCreateSchema), async (req, res) => {
   try {
-    const { name, code, description = '', discountType = 'PERCENT', discountValue, minPurchase, maxDiscount, usageLimit, startsAt, endsAt, isActive = true } = req.body || {};
+    const { name, code, description = '', discountType = 'PERCENT', discountValue, minPurchase, maxDiscount, usageLimit, startsAt, endsAt, categoryIds = [], productIds = [], isActive = true } = req.body || {};
     const trimmedName = String(name || '').trim();
     const slug = makeSlug(trimmedName);
 
     if (!trimmedName || !slug) {
       return res.status(400).json({ success: false, message: 'Nama promo wajib diisi' });
     }
+    const startDate = startsAt ? new Date(startsAt) : null;
+    const endDate = endsAt ? new Date(endsAt) : null;
+    if ((startDate && Number.isNaN(startDate.getTime())) || (endDate && Number.isNaN(endDate.getTime()))) {
+      return res.status(400).json({ success: false, message: 'Tanggal promo tidak valid.' });
+    }
+    if (startDate && endDate && startDate > endDate) {
+      return res.status(400).json({ success: false, message: 'Tanggal akhir tidak boleh sebelum tanggal mulai.' });
+    }
+    await validatePromoTargets(categoryIds, productIds);
 
     const promo = await prisma.promoCampaign.create({
       data: {
@@ -125,8 +197,10 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
         minPurchase: minPurchase == null ? null : Number(minPurchase),
         maxDiscount: maxDiscount == null ? null : Number(maxDiscount),
         usageLimit: usageLimit == null ? null : Number(usageLimit),
-        startsAt: startsAt ? new Date(startsAt) : null,
-        endsAt: endsAt ? new Date(endsAt) : null,
+        startsAt: startDate,
+        endsAt: endDate,
+        categoryIds,
+        productIds,
         isActive: Boolean(isActive),
       },
     });
@@ -143,8 +217,22 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
 
 router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(promoUpdateSchema), async (req, res) => {
   try {
-    const { name, code, description, discountType, discountValue, minPurchase, maxDiscount, usageLimit, startsAt, endsAt, isActive } = req.body || {};
+    const { name, code, description, discountType, discountValue, minPurchase, maxDiscount, usageLimit, startsAt, endsAt, categoryIds, productIds, isActive } = req.body || {};
     const payload = {};
+    const current = (startsAt !== undefined || endsAt !== undefined)
+      ? await prisma.promoCampaign.findUnique({ where: { id: req.params.id }, select: { startsAt: true, endsAt: true } })
+      : null;
+    const effectiveStart = startsAt === undefined ? current?.startsAt : startsAt ? new Date(startsAt) : null;
+    const effectiveEnd = endsAt === undefined ? current?.endsAt : endsAt ? new Date(endsAt) : null;
+    if ((effectiveStart && Number.isNaN(effectiveStart.getTime())) || (effectiveEnd && Number.isNaN(effectiveEnd.getTime()))) {
+      return res.status(400).json({ success: false, message: 'Tanggal promo tidak valid.' });
+    }
+    if (effectiveStart && effectiveEnd && effectiveStart > effectiveEnd) {
+      return res.status(400).json({ success: false, message: 'Tanggal akhir tidak boleh sebelum tanggal mulai.' });
+    }
+    if (categoryIds !== undefined || productIds !== undefined) {
+      await validatePromoTargets(categoryIds || [], productIds || []);
+    }
 
     if (name !== undefined) {
       const trimmedName = String(name || '').trim();
@@ -164,6 +252,8 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
     if (usageLimit !== undefined) payload.usageLimit = usageLimit == null ? null : Number(usageLimit);
     if (startsAt !== undefined) payload.startsAt = startsAt ? new Date(startsAt) : null;
     if (endsAt !== undefined) payload.endsAt = endsAt ? new Date(endsAt) : null;
+    if (categoryIds !== undefined) payload.categoryIds = categoryIds;
+    if (productIds !== undefined) payload.productIds = productIds;
     if (isActive !== undefined) payload.isActive = Boolean(isActive);
 
     const promo = await prisma.promoCampaign.update({

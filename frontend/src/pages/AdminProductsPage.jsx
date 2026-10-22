@@ -1,8 +1,9 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, PackagePlus, Pencil, Search, ShoppingBag, Trash2 } from 'lucide-react';
+import { Eye, PackagePlus, Pencil, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
+import ModalForm from '../components/ModalForm';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import BulkProductModal from '../components/BulkProductModal';
 import BarcodePrintModal from '../components/BarcodePrintModal';
@@ -49,6 +50,7 @@ export default function AdminProductsPage() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [productModalOpen, setProductModalOpen] = useState(false);
   const [printModalProduct, setPrintModalProduct] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -165,6 +167,7 @@ export default function AdminProductsPage() {
 
   const fillFormFromProduct = (product, scannedCode = '') => {
     setEditingId(product.id);
+    setProductModalOpen(true);
     setForm({
       ...product,
       name: product.name || '',
@@ -203,6 +206,8 @@ export default function AdminProductsPage() {
     if (matchedProduct) {
       fillFormFromProduct(matchedProduct, rawCode);
     } else {
+      setForm((current) => ({ ...current, barcode: rawCode, sku: current.sku || rawCode }));
+      setProductModalOpen(true);
       setNotice(`Barcode "${rawCode}" terbaca, tetapi belum terdaftar. Isi nama produk lalu simpan.`);
     }
     window.setTimeout(() => barcodeInputRef.current?.focus(), 0);
@@ -242,6 +247,11 @@ export default function AdminProductsPage() {
     setForm(emptyForm);
     setEditingId(null);
     setAuditLogs([]);
+    setProductModalOpen(false);
+  };
+
+  const closeProductModal = () => {
+    if (!saving) resetForm();
   };
 
   // 1-Click Auto Barcode
@@ -457,11 +467,11 @@ export default function AdminProductsPage() {
         stock: variant.stock ?? '',
       })),
     });
+    setProductModalOpen(true);
     apiFetch(`/audit-logs?entityId=${encodeURIComponent(product.variantId || product.id)}`)
       .then((response) => response.json())
       .then((data) => setAuditLogs(data.logs || []))
       .catch(() => setAuditLogs([]));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const deleteProduct = async (id) => {
@@ -511,6 +521,7 @@ export default function AdminProductsPage() {
             fillFormFromProduct(matchedProduct, scannedSku);
           } else {
             setForm((prev) => ({ ...prev, barcode: scannedSku, sku: prev.sku || scannedSku }));
+            setProductModalOpen(true);
             setNotice(`Barcode "${scannedSku}" berhasil dibaca, tetapi belum terdaftar. Lengkapi nama produk lalu simpan.`);
           }
         }}
@@ -542,9 +553,12 @@ export default function AdminProductsPage() {
           <div>
             <p className="eyebrow light">Product management</p>
             <h1>Kelola Produk & Barcode</h1>
-            <p className="admin-subtitle">Tambah produk, buat barcode otomatis, atau scan kemasan fisik.</p>
+            <p className="admin-subtitle">Cari, pantau stok, dan kelola seluruh produk dari satu tabel.</p>
           </div>
-          <div className="admin-header-actions" style={{ display: 'flex', gap: '10px' }}>
+          <div className="admin-header-actions">
+            <button type="button" className="btn btn-primary" onClick={() => { resetForm(); setProductModalOpen(true); }}>
+              <Plus size={16} /> Tambah produk
+            </button>
             <button
               type="button"
               className="btn btn-primary"
@@ -565,22 +579,30 @@ export default function AdminProductsPage() {
           </div>
         </header>
 
-        {notice && (
+        {notice && !productModalOpen && (
           <div className="crud-notice" role="status">
             {notice}
             <button onClick={() => setNotice('')} aria-label="Tutup notifikasi">×</button>
           </div>
         )}
 
-        <section className="crud-layout">
-          <form className="crud-form-panel" onSubmit={submitForm}>
-            <div className="panel-heading">
-              <div>
-                <span className="panel-kicker">{editingId ? 'Edit produk' : 'Produk baru'}</span>
-                <h2>{editingId ? 'Perbarui informasi' : 'Tambah produk'}</h2>
+        <section className="crud-layout-full">
+          <ModalForm
+            isOpen={productModalOpen}
+            onClose={closeProductModal}
+            title={editingId ? 'Edit produk' : 'Tambah produk'}
+            subtitle="Lengkapi informasi produk, harga, stok, dan barcode."
+            kicker={editingId ? 'Perbarui katalog' : 'Produk baru'}
+            maxWidth="1080px"
+            cardClassName="product-editor-modal"
+          >
+            {notice && (
+              <div className="crud-notice" role="status">
+                {notice}
+                <button type="button" onClick={() => setNotice('')} aria-label="Tutup notifikasi">×</button>
               </div>
-              {editingId && <button type="button" className="text-button" onClick={resetForm}>Batal</button>}
-            </div>
+            )}
+            <form className="crud-form-panel product-editor-form" onSubmit={submitForm}>
 
             <label>
               Nama produk
@@ -647,7 +669,7 @@ export default function AdminProductsPage() {
 
             <CatalogImageField value={form.imageUrl || ''} onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))} group="products" label="Foto produk" />
 
-            <div className="form-two-columns">
+            <div className="form-two-columns product-price-fields">
               <label>
                 Harga Jual (Promo)
                 <CurrencyInput name="price" value={form.price} onValueChange={(value) => setForm((current) => ({ ...current, price: value }))} placeholder="Rp 48.000" />
@@ -656,15 +678,10 @@ export default function AdminProductsPage() {
                 Harga warung / grosir
                 <CurrencyInput name="wholesalePrice" value={form.wholesalePrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, wholesalePrice: value }))} placeholder="Opsional, mis. Rp 45.000" />
               </label>
-            </div>
-            <div className="form-two-columns">
               <label>
                 Harga beli / modal
                 <CurrencyInput name="purchasePrice" value={form.purchasePrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, purchasePrice: value }))} placeholder="Rp 40.000" />
               </label>
-            </div>
-
-            <div className="form-two-columns">
               <label>
                 Harga Normal / Coret (Opsional)
                 <CurrencyInput name="originalPrice" value={form.originalPrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, originalPrice: value }))} placeholder="Rp 60.000" />
@@ -703,14 +720,26 @@ export default function AdminProductsPage() {
 
             <label className="quick-access-toggle"><input type="checkbox" checked={Boolean(form.isQuickAccess)} onChange={(event) => setForm((current) => ({ ...current, isQuickAccess: event.target.checked }))} /><span><strong>Tampilkan sebagai tombol cepat di Kasir</strong><small>Untuk barang yang sering dijual tanpa perlu mencari.</small></span></label>
 
-            <button className="btn btn-primary full" type="submit" disabled={saving}>
-              {saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah produk'}
-            </button>
-          </form>
+              <div className="product-form-actions">
+                <button className="btn btn-secondary" type="button" onClick={closeProductModal} disabled={saving}>Batal</button>
+                <button className="btn btn-primary" type="submit" disabled={saving}>
+                  {saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah produk'}
+                </button>
+              </div>
+            </form>
 
-          {editingId && <section className="product-audit-panel"><div className="panel-heading"><div><span className="panel-kicker">Kontrol perubahan</span><h2>Riwayat Perubahan</h2></div><span className="tool-count">{auditLogs.length} catatan</span></div>{auditLogs.length ? <div className="product-audit-list">{auditLogs.map((log) => <div className="product-audit-row" key={log.id}><strong>{log.field}</strong><span>{log.oldValue || '-'} → {log.newValue || '-'}</span><small>{log.changedBy?.name || 'User'} · {new Date(log.createdAt).toLocaleString('id-ID')}</small></div>)}</div> : <p className="tool-empty">Belum ada perubahan harga atau stok yang tercatat.</p>}</section>}
+            {editingId && <section className="product-audit-panel"><div className="panel-heading"><div><span className="panel-kicker">Kontrol perubahan</span><h2>Riwayat Perubahan</h2></div><span className="tool-count">{auditLogs.length} catatan</span></div>{auditLogs.length ? <div className="product-audit-list">{auditLogs.map((log) => <div className="product-audit-row" key={log.id}><strong>{log.field}</strong><span>{log.oldValue || '-'} → {log.newValue || '-'}</span><small>{log.changedBy?.name || 'User'} · {new Date(log.createdAt).toLocaleString('id-ID')}</small></div>)}</div> : <p className="tool-empty">Belum ada perubahan harga atau stok yang tercatat.</p>}</section>}
+          </ModalForm>
 
           <section className="crud-table-panel">
+            <div className="product-table-heading">
+              <div>
+                <span className="panel-kicker">Inventaris</span>
+                <h2>Daftar produk</h2>
+                <p>Gunakan pencarian dan filter untuk menemukan barang yang ingin dikelola.</p>
+              </div>
+              <span className="product-count-badge">{visibleProducts.length} dari {products.length} produk</span>
+            </div>
             <div className="crud-toolbar">
               <label className="crud-search">
                 <Search className="w-4 h-4 text-emerald-600 inline mr-1" />
@@ -792,8 +821,8 @@ export default function AdminProductsPage() {
                       </td>
                       <td>
                         <div className="row-actions">
-                          <button className="icon-action" onClick={() => editProduct(product)} title="Edit produk" aria-label={`Edit produk ${product.name}`}><Pencil size={14} /></button>
-                          <button className="icon-action icon-action-danger" onClick={() => deleteProduct(product.id)} title="Hapus produk" aria-label={`Hapus produk ${product.name}`}><Trash2 size={14} /></button>
+                          <button className="icon-action" data-action="edit" data-action-label="Edit" onClick={() => editProduct(product)} title="Edit" aria-label={`Edit produk ${product.name}`}><Pencil size={14} /></button>
+                          <button className="icon-action icon-action-danger" data-action="delete" data-action-label="Hapus" onClick={() => deleteProduct(product.id)} title="Hapus" aria-label={`Hapus produk ${product.name}`}><Trash2 size={14} /></button>
                         </div>
                       </td>
                     </tr>

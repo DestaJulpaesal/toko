@@ -9,7 +9,7 @@
     "start": "node src/server.js",
     "lint": "eslint .",
     "test": "npm run test:all",
-    "test:all": "node --test tests/admin-dashboard-service.test.js tests/app-setting-service.test.js tests/catalog-data-exposure.test.js tests/finance-summary-service.test.js tests/order-reversal.test.js tests/pagination.test.js tests/phone-utils.test.js tests/phase0-security.test.js tests/phase5-loyalty-expiry.test.js tests/promo-service.test.js tests/route-structure.test.js tests/session-auth.test.js tests/webhook-security.test.js",
+    "test:all": "node --test tests/admin-dashboard-service.test.js tests/app-setting-service.test.js tests/catalog-data-exposure.test.js tests/finance-summary-service.test.js tests/order-reversal.test.js tests/pagination.test.js tests/phone-utils.test.js tests/phase0-security.test.js tests/phase5-loyalty-expiry.test.js tests/promo-service.test.js tests/route-structure.test.js tests/savings-goal-schema.test.js tests/session-auth.test.js tests/webhook-security.test.js",
     "preflight": "node scripts/dailyPreflight.js",
     "test:security": "node tests/phase0-security.test.js",
     "test:phase1": "node tests/phase1-email-auth.integration.js",

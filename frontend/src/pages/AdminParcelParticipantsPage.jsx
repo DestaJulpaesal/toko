@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, FileText, Pencil, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { FileText, HandCoins, Pencil, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import CurrencyInput from '../components/CurrencyInput';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
@@ -533,10 +533,10 @@ export default function AdminParcelParticipantsPage() {
                       </td>
                       <td>
                         <div className="row-actions">
-                          <button className="icon-action icon-action-debt" onClick={() => openCollection(item)} disabled={item.remainingAmount <= 0} title="Catat setoran" aria-label="Catat setoran"><Check size={15} /></button>
-                          <button className="icon-action" onClick={() => printReceipt(item)} title="Cetak bukti" aria-label="Cetak bukti"><Printer size={14} /></button>
-                          <button className="icon-action" onClick={() => edit(item)} title="Edit peserta" aria-label="Edit peserta"><Pencil size={14} /></button>
-                          <button className="icon-action icon-action-danger" onClick={() => remove(item)} disabled={deletingId === item.id} title="Hapus peserta" aria-label="Hapus peserta">{deletingId === item.id ? '...' : <Trash2 size={14} />}</button>
+                          <button className="icon-action icon-action-debt" onClick={() => openCollection(item)} disabled={item.remainingAmount <= 0} title="Catat setoran" aria-label="Catat setoran"><HandCoins size={15} /><span>Catat setoran</span></button>
+                          <button className="icon-action" onClick={() => printReceipt(item)} title="Cetak bukti" aria-label="Cetak bukti"><Printer size={14} /><span>Cetak bukti</span></button>
+                          <button className="icon-action" onClick={() => edit(item)} title="Edit peserta" aria-label="Edit peserta"><Pencil size={14} /><span>Edit</span></button>
+                          <button className="icon-action icon-action-danger" onClick={() => remove(item)} disabled={deletingId === item.id} title="Hapus peserta" aria-label="Hapus peserta">{deletingId === item.id ? '...' : <Trash2 size={14} />}<span>Hapus</span></button>
                         </div>
                       </td>
                     </tr>

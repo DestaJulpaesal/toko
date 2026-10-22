@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { Download, Eye, MessageCircle, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import DebtModal from '../components/DebtModal';
+import ModalForm from '../components/ModalForm';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
 import { normalizeIndonesianPhone } from '../utils/phoneUtils';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import CurrencyInput from '../components/CurrencyInput';
 
 const emptyCustomer = {
   name: '',
@@ -26,16 +28,24 @@ export default function AdminCustomersPage() {
   const deferredSearch = useDebouncedValue(search);
   const [form, setForm] = useState(emptyCustomer);
   const [editingId, setEditingId] = useState(null);
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [debts, setDebts] = useState([]);
   const [debtModal, setDebtModal] = useState({ open: false, customer: null, debt: null });
+  const [debtPayment, setDebtPayment] = useState(null);
+  const [debtPaymentAccounts, setDebtPaymentAccounts] = useState([]);
+  const [debtPaymentLoading, setDebtPaymentLoading] = useState(false);
+  const [debtPaymentSaving, setDebtPaymentSaving] = useState(false);
+  const [debtPaymentError, setDebtPaymentError] = useState('');
   const [selectedCustomerIds, setSelectedCustomerIds] = useState([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [detailCustomer, setDetailCustomer] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
   const [customerPage, setCustomerPage] = useState(1);
   const [customerPagination, setCustomerPagination] = useState({ page: 1, pageSize: 50, total: 0, totalPages: 0 });
 
@@ -47,6 +57,7 @@ export default function AdminCustomersPage() {
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
       const query = new URLSearchParams({ page: String(customerPage), pageSize: '50' });
       if (deferredSearch.trim()) query.set('search', deferredSearch.trim());
+      if (debtFilter !== 'ALL') query.set('debtStatus', debtFilter);
       const [customerRes, debtRes] = await Promise.all([
         apiFetch(`/customers?${query}`, { headers: authHeaders }),
         apiFetch('/debts')
@@ -64,8 +75,9 @@ export default function AdminCustomersPage() {
       const debtTotals = {};
       setDebts(debtData.debts);
       debtData.debts.forEach((debt) => {
-        if (!debt.customerId || debt.status === 'PAID') return;
-        debtTotals[debt.customerId] = (debtTotals[debt.customerId] || 0) + Number(debt.amount || 0);
+        const remainingAmount = Number(debt.remainingAmount ?? (Number(debt.amount || 0) - Number(debt.paidAmount || 0)));
+        if (!debt.customerId || remainingAmount <= 0) return;
+        debtTotals[debt.customerId] = (debtTotals[debt.customerId] || 0) + remainingAmount;
       });
       setCustomers(customerData.customers.map((customer) => ({
         ...customer,
@@ -79,17 +91,20 @@ export default function AdminCustomersPage() {
     }
   };
 
-  useEffect(() => { loadCustomers(); }, [customerPage, deferredSearch]);
+  useEffect(() => { loadCustomers(); }, [customerPage, deferredSearch, debtFilter]);
 
   const loadDetail = async (customer) => {
+    setDetailCustomer(customer);
+    setDetail(null);
     setDetailLoading(true);
+    setDetailError('');
     try {
       const response = await apiFetch(`/customers/${customer.id}/detail`);
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Detail pelanggan gagal dimuat');
       setDetail(data);
     } catch (error) {
-      setNotice(error.message);
+      setDetailError(error.message || 'Detail pelanggan gagal dimuat.');
     } finally {
       setDetailLoading(false);
     }
@@ -156,6 +171,7 @@ export default function AdminCustomersPage() {
 
   const handleEdit = (customer) => {
     setEditingId(customer.id);
+    setCustomerModalOpen(true);
     setForm({
       name: customer.name || '',
       phone: customer.phone || '',
@@ -163,12 +179,23 @@ export default function AdminCustomersPage() {
       address: customer.address || '',
       notes: customer.notes || '',
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
     setForm(emptyCustomer);
+    setCustomerModalOpen(false);
+  };
+
+  const closeCustomerModal = () => {
+    if (!saving) handleCancelEdit();
+  };
+
+  const handleAddCustomer = () => {
+    setEditingId(null);
+    setForm(emptyCustomer);
+    setNotice('');
+    setCustomerModalOpen(true);
   };
 
   const handleSubmit = async (e) => {
@@ -204,20 +231,7 @@ export default function AdminCustomersPage() {
         throw new Error(data.message || 'Gagal menyimpan pelanggan');
       }
     } catch (err) {
-      if (editingId) {
-        setCustomers((prev) => prev.map((c) => (c.id === editingId ? { ...c, ...form } : c)));
-        setNotice('Data pelanggan berhasil diperbarui (mode lokal).');
-      } else {
-        const newCust = {
-          id: `cust-local-${Date.now()}`,
-          ...form,
-          createdAt: new Date().toISOString(),
-          totalOrders: 0,
-        };
-        setCustomers((prev) => [newCust, ...prev]);
-        setNotice('Pelanggan baru berhasil ditambahkan (mode lokal).');
-      }
-      handleCancelEdit();
+      setNotice(err.message || 'Data pelanggan gagal disimpan. Periksa koneksi lalu coba lagi.');
     } finally {
       setSaving(false);
     }
@@ -229,33 +243,189 @@ export default function AdminCustomersPage() {
     try {
       const res = await apiFetch(`/customers/${id}`, { method: 'DELETE' });
       const data = await res.json();
-      if (res.ok && data.success) {
-        setNotice(`Pelanggan "${name}" telah dihapus.`);
-        loadCustomers();
-        return;
-      }
+      if (!res.ok || !data.success) throw new Error(data.message || 'Pelanggan gagal dihapus.');
+      setNotice(`Pelanggan "${name}" telah dihapus.`);
+      await loadCustomers();
     } catch (error) {
       setNotice(error.message || 'Pelanggan gagal dihapus. Data tetap tersimpan.');
-      return;
     }
-
-    setNotice(`Pelanggan "${name}" gagal dihapus. Data tetap tersimpan.`);
   };
 
-  const deleteDebt = async (debt) => {
-    if (!await confirmAction(`Hapus piutang ${debt.customerName || 'pelanggan'} sebesar Rp ${Number(debt.amount).toLocaleString('id-ID')}?`)) return;
+  const deleteDebt = async (debt, customer = customers.find((item) => item.id === debt.customerId)) => {
+    if (!await confirmAction(`Hapus catatan utang sebesar Rp ${Number(debt.amount).toLocaleString('id-ID')}? Catatan utang ini akan dihapus.`)) return;
     try {
       const response = await apiFetch(`/debts/${debt.id}`, { method: 'DELETE' });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Piutang gagal dihapus.');
-      setNotice('Piutang berhasil dihapus.');
+      setNotice('Catatan utang berhasil dihapus.');
       loadCustomers();
-    } catch (error) { setNotice(error.message || 'Piutang gagal dihapus.'); }
+      if (customer && detailCustomer?.id === customer.id) loadDetail(customer);
+    } catch (error) { setNotice(error.message || 'Catatan utang gagal dihapus.'); }
+  };
+
+  const openDebtPayment = async (debt) => {
+    setDebtPaymentError('');
+    setDebtPaymentLoading(true);
+    try {
+      const response = await apiFetch('/finance/accounts');
+      const data = await response.json();
+      const accounts = data.data || data.accounts;
+      if (!response.ok || !data.success || !Array.isArray(accounts)) {
+        throw new Error(data.message || 'Akun penerimaan gagal dimuat.');
+      }
+      if (!accounts.length) throw new Error('Belum ada akun penerimaan aktif untuk mencatat pembayaran.');
+      setDebtPaymentAccounts(accounts);
+      setDebtPayment({
+        id: debt.id,
+        amount: Number(debt.remainingAmount ?? Math.max(Number(debt.amount) - Number(debt.paidAmount || 0), 0)),
+        accountId: accounts[0].id,
+      });
+    } catch (error) {
+      setDebtPaymentError(error.message || 'Form pembayaran gagal dibuka.');
+      setDebtPayment({ id: debt.id, amount: '', accountId: '' });
+    } finally {
+      setDebtPaymentLoading(false);
+    }
+  };
+
+  const submitDebtPayment = async (event) => {
+    event.preventDefault();
+    if (!debtPayment || debtPaymentSaving) return;
+    const amount = Number(debtPayment.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setDebtPaymentError('Jumlah pembayaran harus lebih dari Rp 0.');
+      return;
+    }
+    if (!debtPayment.accountId) {
+      setDebtPaymentError('Pilih akun penerimaan pembayaran.');
+      return;
+    }
+    if (!await confirmAction(`Catat pembayaran Rp ${amount.toLocaleString('id-ID')} dari ${detailCustomer?.name || 'pelanggan'}?`)) return;
+    setDebtPaymentSaving(true);
+    setDebtPaymentError('');
+    try {
+      const response = await apiFetch(`/debts/${debtPayment.id}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, accountId: debtPayment.accountId }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Pembayaran gagal dicatat.');
+      setDebtPayment(null);
+      setNotice('Pembayaran utang berhasil dicatat.');
+      await Promise.all([loadCustomers(), detailCustomer ? loadDetail(detailCustomer) : Promise.resolve()]);
+    } catch (error) {
+      setDebtPaymentError(error.message || 'Pembayaran gagal dicatat.');
+    } finally {
+      setDebtPaymentSaving(false);
+    }
   };
 
   return (
     <AdminShell active="Data Pelanggan" className="admin-crud-shell customer-page-shell">
-      <DebtModal isOpen={debtModal.open} customer={debtModal.customer} debt={debtModal.debt} onClose={() => setDebtModal({ open: false, customer: null, debt: null })} onSaved={(message) => { setNotice(message); loadCustomers(); }} />
+      <DebtModal isOpen={debtModal.open} customer={debtModal.customer} debt={debtModal.debt} onClose={() => setDebtModal({ open: false, customer: null, debt: null })} onSaved={(message) => { setNotice(message); loadCustomers(); if (detailCustomer?.id === debtModal.customer?.id) loadDetail(debtModal.customer); }} />
+      <ModalForm
+        isOpen={customerModalOpen}
+        onClose={closeCustomerModal}
+        title={editingId ? 'Edit pelanggan' : 'Tambah pelanggan'}
+        subtitle={editingId ? 'Perbarui informasi kontak pelanggan. Data utang tidak berubah di sini.' : 'Simpan informasi kontak dan catatan pelanggan toko.'}
+        kicker={editingId ? 'Perbarui data' : 'Pelanggan baru'}
+        maxWidth="780px"
+        cardClassName="customer-form-modal"
+      >
+        {notice && (
+          <div className="crud-notice" role="status">
+            <span>{notice}</span>
+            <button type="button" onClick={() => setNotice('')} aria-label="Tutup">×</button>
+          </div>
+        )}
+        <form className="customer-editor-form" onSubmit={handleSubmit}>
+          <label>
+            Nama lengkap / toko *
+            <input name="name" required autoFocus value={form.name} onChange={handleChange} placeholder="Contoh: Budi Santoso / Warung Berkah" />
+          </label>
+          <div className="form-two-columns customer-contact-fields">
+            <label>No. WhatsApp / HP<input name="phone" type="tel" autoComplete="tel" value={form.phone} onChange={handleChange} placeholder="081234567890" /></label>
+            <label>Email (opsional)<input name="email" type="email" autoComplete="email" value={form.email} onChange={handleChange} placeholder="nama@email.com" /></label>
+          </div>
+          <label>Alamat<textarea name="address" rows="3" value={form.address} onChange={handleChange} placeholder="Alamat lengkap pengiriman atau toko..." /></label>
+          <label>Catatan pelanggan<textarea name="notes" rows="3" value={form.notes} onChange={handleChange} placeholder="Catatan belanja, preferensi produk, dan informasi penting lainnya" /></label>
+          <div className="crud-modal-actions">
+            <button type="button" className="btn btn-secondary" onClick={closeCustomerModal} disabled={saving}>Batal</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Daftarkan pelanggan'}</button>
+          </div>
+        </form>
+      </ModalForm>
+      {detailCustomer && (
+        <div className="crud-modal-backdrop customer-action-modal" onClick={() => setDetailCustomer(null)}>
+          <section className="crud-modal-box customer-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="customer-detail-title" onClick={(event) => event.stopPropagation()}>
+            <div className="panel-heading">
+              <div><span className="panel-kicker">Profil pelanggan</span><h2 id="customer-detail-title">{detailCustomer.name}</h2><p>Informasi kontak, ringkasan belanja, utang, dan riwayat transaksi.</p></div>
+              <button type="button" className="customer-detail-close" onClick={() => setDetailCustomer(null)}>Tutup</button>
+            </div>
+            {detailLoading ? <p className="customer-detail-loading" role="status">Memuat detail pelanggan...</p>
+              : detailError ? <div className="customer-load-error" role="alert"><div><strong>Detail belum bisa dimuat</strong><span>{detailError}</span></div><button type="button" onClick={() => loadDetail(detailCustomer)}>Coba lagi</button></div>
+                : detail && (
+                  <>
+                    <div className="customer-detail-metrics">
+                      <div><small>Total belanja</small><strong>Rp {Number(detail.summary.totalSpent).toLocaleString('id-ID')}</strong></div>
+                      <div><small>Jumlah transaksi</small><strong>{detail.summary.totalOrders}</strong></div>
+                      <div><small>Sisa utang</small><strong>Rp {Number(detail.summary.outstandingDebt).toLocaleString('id-ID')}</strong></div>
+                      <div><small>WhatsApp</small><strong>{detail.customer.phone || 'Belum tersedia'}</strong></div>
+                    </div>
+                    <div className="customer-detail-list customer-detail-debts">
+                      <div className="customer-detail-section-heading"><div><h3>Utang aktif</h3><p>Sisa utang yang masih perlu dibayar.</p></div><button type="button" className="customer-detail-add-debt" onClick={() => setDebtModal({ open: true, customer: detailCustomer, debt: null })}><Plus size={14} /> Tambah utang</button></div>
+                      {detail.debts.filter((debt) => Number(debt.remainingAmount) > 0).length ? detail.debts.filter((debt) => Number(debt.remainingAmount) > 0).map((debt) => (
+                        <div className="customer-detail-debt-row" key={debt.id}>
+                          <div><strong>{debt.description || 'Tanpa keterangan'}</strong><span>{Number(debt.remainingAmount) > 0 ? `Masih berutang · Sisa Rp ${Number(debt.remainingAmount).toLocaleString('id-ID')}` : 'Lunas'} · Total Rp {Number(debt.amount).toLocaleString('id-ID')} · Dicatat {new Date(debt.createdAt).toLocaleDateString('id-ID')}{debt.dueDate ? ` · Jatuh tempo ${new Date(debt.dueDate).toLocaleDateString('id-ID')}` : ''}</span></div>
+                          <div className="customer-debt-actions debt-row-actions">
+                            {Number(debt.remainingAmount) > 0 && <button type="button" className="customer-debt-pay" onClick={() => openDebtPayment(debt)} disabled={debtPaymentLoading || debtPaymentSaving}>Catat pembayaran</button>}
+                            <button className="icon-action" data-action="edit" data-action-label="Edit utang" onClick={() => setDebtModal({ open: true, customer: detailCustomer, debt })} title="Edit catatan utang" aria-label="Edit catatan utang"><Pencil size={12} /></button>
+                            <button className="icon-action icon-action-danger" data-action="delete" data-action-label="Hapus utang" onClick={() => deleteDebt(debt, detailCustomer)} title="Hapus catatan utang" aria-label="Hapus catatan utang"><Trash2 size={12} /></button>
+                          </div>
+                        </div>
+                      )) : <p className="customer-detail-empty">Tidak ada utang yang perlu dibayar.</p>}
+                      {detail.debts.some((debt) => Number(debt.remainingAmount) <= 0) && (
+                        <div className="customer-paid-debts">
+                          <h4>Riwayat utang lunas</h4>
+                          {detail.debts.filter((debt) => Number(debt.remainingAmount) <= 0).map((debt) => (
+                            <div className="customer-detail-debt-row customer-paid-debt-row" key={debt.id}>
+                              <div><strong>{debt.description || 'Tanpa keterangan'}</strong><span>Lunas · Dibayar Rp {Number(debt.paidAmount).toLocaleString('id-ID')} dari Rp {Number(debt.amount).toLocaleString('id-ID')} · Dicatat {new Date(debt.createdAt).toLocaleDateString('id-ID')}{debt.paidAt ? ` · Lunas ${new Date(debt.paidAt).toLocaleDateString('id-ID')}` : ''}</span></div>
+                              <span className="customer-paid-badge">Lunas</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="customer-detail-columns">
+                      <div className="customer-detail-list"><h3>Produk yang sering dibeli</h3>{detail.frequentProducts.length ? detail.frequentProducts.map((item) => <p key={item.name}><strong>{item.name}</strong><span>{item.quantity} unit · Rp {Number(item.total).toLocaleString('id-ID')}</span></p>) : <p className="customer-detail-empty">Belum ada riwayat belanja.</p>}</div>
+                      <div className="customer-detail-list"><h3>Riwayat transaksi</h3>{detail.orders.length ? detail.orders.slice(0, 8).map((order) => <p key={order.id}><strong>{order.orderNumber}</strong><span>{new Date(order.createdAt).toLocaleDateString('id-ID')} · Rp {Number(order.total).toLocaleString('id-ID')}</span></p>) : <p className="customer-detail-empty">Belum ada transaksi.</p>}</div>
+                    </div>
+                    <div className="customer-detail-contact">
+                      <p><strong>Email</strong><span>{detail.customer.email || 'Belum tersedia'}</span></p>
+                      <p><strong>Alamat</strong><span>{detail.customer.address || 'Belum tersedia'}</span></p>
+                      {detail.customer.notes && <p><strong>Catatan</strong><span>{detail.customer.notes}</span></p>}
+                    </div>
+                  </>
+                )}
+          </section>
+        </div>
+      )}
+      {debtPayment && (
+        <div className="crud-modal-backdrop debt-payment-modal" onClick={() => !debtPaymentSaving && setDebtPayment(null)}>
+          <form className="crud-modal-box debt-payment-dialog" onSubmit={submitDebtPayment} onClick={(event) => event.stopPropagation()}>
+            <div className="panel-heading">
+              <div><span className="panel-kicker">Pembayaran utang</span><h2>{detailCustomer?.name || 'Pelanggan'}</h2><p>Catat uang yang benar-benar diterima. Pembayaran sebagian juga bisa dicatat.</p></div>
+              <button type="button" className="text-button" onClick={() => setDebtPayment(null)} disabled={debtPaymentSaving}>Tutup</button>
+            </div>
+            <label>Jumlah dibayar<CurrencyInput name="amount" value={debtPayment.amount} onValueChange={(value) => setDebtPayment((current) => ({ ...current, amount: value }))} placeholder="Rp 10.000" /></label>
+            <label>Uang diterima ke akun<select value={debtPayment.accountId} onChange={(event) => setDebtPayment((current) => ({ ...current, accountId: event.target.value }))} disabled={debtPaymentLoading || !debtPaymentAccounts.length}><option value="">Pilih akun penerimaan</option>{debtPaymentAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+            {debtPaymentLoading && <p className="customer-detail-loading" role="status">Memuat akun penerimaan...</p>}
+            {debtPaymentError && <p className="form-error" role="alert">{debtPaymentError}</p>}
+            <div className="crud-modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setDebtPayment(null)} disabled={debtPaymentSaving}>Batal</button><button type="submit" className="btn btn-primary" disabled={debtPaymentLoading || debtPaymentSaving || !debtPaymentAccounts.length}>{debtPaymentSaving ? 'Menyimpan...' : 'Simpan pembayaran'}</button></div>
+          </form>
+        </div>
+      )}
         <header className="admin-header customer-page-header">
           <div>
             <p className="eyebrow light">Manajemen Pelanggan</p>
@@ -268,6 +438,9 @@ export default function AdminCustomersPage() {
             <span className={`database-status ${loading ? 'loading' : loadError ? 'error' : 'ready'}`}>
               <i /> {loading ? 'Memuat data...' : loadError ? 'Gagal terhubung' : `${customers.length} pelanggan`}
             </span>
+            <button className="btn btn-primary customer-add-button" type="button" onClick={handleAddCustomer}>
+              <Plus size={15} /> Tambah pelanggan
+            </button>
             <button className="customer-header-button" type="button" onClick={exportCustomers} disabled={!filteredCustomers.length} title="Unduh data pelanggan">
               <Download size={15} /> Export
             </button>
@@ -291,83 +464,14 @@ export default function AdminCustomersPage() {
           </div>
         )}
 
-        {notice && (
+        {notice && !customerModalOpen && (
           <div className="crud-notice" role="status">
             <span>{notice}</span>
             <button onClick={() => setNotice('')} aria-label="Tutup">×</button>
           </div>
         )}
 
-        <div className="crud-layout">
-          {/* Form Tambah / Edit Pelanggan */}
-          <section className={`crud-form-panel customer-form-panel ${editingId ? 'customer-edit-modal' : ''}`}>
-            <div className="panel-heading">
-              <div>
-                <span className="panel-kicker">{editingId ? 'Mode Edit' : 'Input Baru'}</span>
-                <h2>{editingId ? 'Ubah Data Pelanggan' : 'Tambah Pelanggan'}</h2>
-              </div>
-              {editingId && (
-                <button className="text-button" type="button" onClick={handleCancelEdit}>
-                  Batal
-                </button>
-              )}
-            </div>
-
-            <form onSubmit={handleSubmit}>
-              <label>
-                Nama Lengkap / Toko *
-                <input
-                  name="name"
-                  required
-                  placeholder="Contoh: Budi Santoso / Warung Berkah"
-                  value={form.name}
-                  onChange={handleChange}
-                />
-              </label>
-
-              <div className="form-two-columns customer-contact-fields">
-                <label>
-                  No. WhatsApp / HP
-                  <input name="phone" type="tel" autoComplete="tel" placeholder="081234567890" value={form.phone} onChange={handleChange} />
-                </label>
-                <label>
-                  Email (opsional)
-                  <input name="email" type="email" autoComplete="email" placeholder="nama@email.com" value={form.email} onChange={handleChange} />
-                </label>
-              </div>
-
-              <label>
-                Alamat
-                <textarea
-                  name="address"
-                  rows="2"
-                  placeholder="Alamat lengkap pengiriman atau toko..."
-                  value={form.address}
-                  onChange={handleChange}
-                />
-              </label>
-
-              <label>
-                Catatan Khusus
-                <textarea
-                  name="notes"
-                  rows="2"
-                  placeholder="Catatan belanja, preferensi produk, dll..."
-                  value={form.notes}
-                  onChange={handleChange}
-                />
-              </label>
-
-              <button type="submit" className="btn btn-primary full" disabled={saving}>
-                {saving
-                  ? 'Menyimpan...'
-                  : editingId
-                  ? 'Simpan Perubahan Data'
-                  : '+ Daftarkan Pelanggan Baru'}
-              </button>
-            </form>
-          </section>
-
+        <div className="crud-layout-full">
           {/* Tabel Daftar Pelanggan */}
           <section className="crud-table-panel customer-table-panel">
             <div className="customer-list-heading">
@@ -383,7 +487,7 @@ export default function AdminCustomersPage() {
                   placeholder="Cari nama, no. HP, email, atau alamat..."
                 />
               </label>
-              <select value={debtFilter} onChange={(event) => setDebtFilter(event.target.value)} aria-label="Filter status piutang">
+              <select value={debtFilter} onChange={(event) => { setDebtFilter(event.target.value); setCustomerPage(1); }} aria-label="Filter status piutang">
                 <option value="ALL">Semua status piutang</option>
                 <option value="OWING">Masih berutang</option>
                 <option value="CLEAR">Tidak ada piutang</option>
@@ -442,22 +546,20 @@ export default function AdminCustomersPage() {
                         <span className={cust.address ? '' : 'customer-missing-value'}>{cust.address || 'Belum ada alamat'}</span>
                       </td>
                       <td>
-                        <div className="row-actions">
-                          <button className="icon-action" onClick={() => loadDetail(cust)} title="Lihat detail pelanggan" aria-label={`Lihat detail ${cust.name}`}><Eye size={14} /></button>
-                          <button className="icon-action icon-action-debt" onClick={() => setDebtModal({ open: true, customer: cust, debt: null })} title="Tambah piutang" aria-label={`Tambah piutang ${cust.name}`}><Plus size={15} strokeWidth={2.5} /></button>
-                          <button className="icon-action" onClick={() => handleEdit(cust)} title="Edit pelanggan" aria-label={`Edit pelanggan ${cust.name}`}><Pencil size={14} /></button>
-                          <button className="icon-action icon-action-danger" onClick={() => handleDelete(cust.id, cust.name)} title="Hapus pelanggan" aria-label={`Hapus pelanggan ${cust.name}`}><Trash2 size={14} /></button>
+                        <div className="customer-row-actions">
+                          <div className="row-actions">
+                            <button className="icon-action" data-action="detail" data-action-label="Detail" onClick={() => loadDetail(cust)} title="Lihat detail pelanggan" aria-label={`Lihat detail ${cust.name}`}><Eye size={14} /></button>
+                            <button className="icon-action" data-action="edit" data-action-label="Edit" onClick={() => handleEdit(cust)} title="Edit data pelanggan" aria-label={`Edit data pelanggan ${cust.name}`}><Pencil size={14} /></button>
+                            <button className="icon-action icon-action-danger" data-action="delete" data-action-label="Hapus" onClick={() => handleDelete(cust.id, cust.name)} title="Hapus data pelanggan" aria-label={`Hapus data pelanggan ${cust.name}`}><Trash2 size={14} /></button>
+                          </div>
                         </div>
-                        {debts.filter((debt) => debt.customerId === cust.id).map((debt) => (
-                          <div className="debt-row-actions" key={debt.id}><small>{debt.status === 'PAID' ? 'Lunas' : 'Belum lunas'}: Rp {Number(debt.amount).toLocaleString('id-ID')}</small><button className="icon-action" onClick={() => setDebtModal({ open: true, customer: cust, debt })} title="Edit piutang" aria-label="Edit piutang"><Pencil size={12} /></button><button className="icon-action icon-action-danger" onClick={() => deleteDebt(debt)} title="Hapus piutang" aria-label="Hapus piutang"><Trash2 size={12} /></button></div>
-                        ))}
                       </td>
                     </tr>
                   ))}
                   {!loading && !loadError && !filteredCustomers.length && (
                     <tr>
                       <td colSpan="6" className="table-empty">
-                        {customers.length ? 'Tidak ada pelanggan yang cocok dengan filter ini.' : 'Belum ada data pelanggan. Tambahkan pelanggan lewat formulir di samping.'}
+                        {customers.length ? 'Tidak ada pelanggan yang cocok dengan filter ini.' : 'Belum ada data pelanggan. Pilih “Tambah pelanggan” untuk mulai mengisi direktori.'}
                       </td>
                     </tr>
                   )}
@@ -478,29 +580,6 @@ export default function AdminCustomersPage() {
                   <button type="button" className="g-btn" onClick={() => setCustomerPage((page) => Math.min(customerPagination.totalPages, page + 1))} disabled={loading || customerPage >= customerPagination.totalPages}>Berikutnya</button>
                 </div>
               </div>
-            )}
-            {detail && (
-              <section className="customer-detail-panel">
-                <div className="panel-heading">
-                  <div><span className="panel-kicker">Profil Belanja</span><h2>{detail.customer.name}</h2></div>
-                  <button type="button" className="customer-detail-close" onClick={() => setDetail(null)}>Tutup</button>
-                </div>
-                {detailLoading ? <p className="customer-detail-loading">Memuat detail pelanggan...</p> : (
-                  <>
-                    <div className="customer-detail-metrics">
-                      <div><small>Total belanja</small><strong>Rp {Number(detail.summary.totalSpent).toLocaleString('id-ID')}</strong></div>
-                      <div><small>Transaksi</small><strong>{detail.summary.totalOrders}</strong></div>
-                      <div><small>Piutang berjalan</small><strong>Rp {Number(detail.summary.outstandingDebt).toLocaleString('id-ID')}</strong></div>
-                      <div><small>WhatsApp</small><strong>{detail.customer.phone || 'Belum tersedia'}</strong></div>
-                    </div>
-                    <div className="customer-detail-columns">
-                      <div className="customer-detail-list"><h3>Produk sering dibeli</h3>{detail.frequentProducts.length ? detail.frequentProducts.map((item) => <p key={item.name}><strong>{item.name}</strong><span>{item.quantity} unit · Rp {Number(item.total).toLocaleString('id-ID')}</span></p>) : <p className="customer-detail-empty">Belum ada riwayat belanja.</p>}</div>
-                      <div className="customer-detail-list"><h3>Riwayat belanja</h3>{detail.orders.slice(0, 8).map((order) => <p key={order.id}><strong>{order.orderNumber}</strong><span>{new Date(order.createdAt).toLocaleDateString('id-ID')} · Rp {Number(order.total).toLocaleString('id-ID')}</span></p>)}</div>
-                    </div>
-                    {detail.customer.notes && <p><strong>Catatan:</strong> {detail.customer.notes}</p>}
-                  </>
-                )}
-              </section>
             )}
           </section>
         </div>

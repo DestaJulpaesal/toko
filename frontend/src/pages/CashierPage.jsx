@@ -140,7 +140,7 @@ export default function CashierPage() {
 
     const loadPromos = async () => {
       try {
-        const response = await apiFetch('/promos?activeOnly=true');
+        const response = await apiFetch('/promos/staff/active');
         const promoRes = await response.json();
         if (promoRes?.success && Array.isArray(promoRes.promos)) {
           setAvailablePromos([
@@ -153,6 +153,8 @@ export default function CashierPage() {
               value: Number(promo.discountValue || 0),
               minPurchase: Number(promo.minPurchase || 0),
               maxDiscount: promo.maxDiscount == null ? null : Number(promo.maxDiscount),
+              categoryIds: promo.categoryIds || [],
+              productIds: promo.productIds || [],
               tag: promo.discountType === 'PERCENT' ? `${Number(promo.discountValue)}% OFF` : `POTONGAN ${formatMoney(promo.discountValue)}`,
               desc: promo.description || 'Promo aktif dari database.',
             })),
@@ -362,12 +364,21 @@ export default function CashierPage() {
 
   // Promo Discount Calculation
   const promoDiscount = useMemo(() => {
-    if (!activePromo || activePromo.type === 'NONE' || subtotal < (activePromo.minPurchase || 0)) return 0;
+    if (!activePromo || activePromo.type === 'NONE') return 0;
+    const hasScope = activePromo.categoryIds?.length || activePromo.productIds?.length;
+    const eligibleSubtotal = hasScope
+      ? items.reduce((sum, item) => {
+        const matches = activePromo.productIds?.includes(item.productId)
+          || activePromo.categoryIds?.includes(item.categoryId);
+        return matches ? sum + (Number(item.price) || 0) * (Number(item.qty) || 0) : sum;
+      }, 0)
+      : subtotal;
+    if (eligibleSubtotal < (activePromo.minPurchase || 0)) return 0;
     const rawDiscount = activePromo.type === 'PERCENT'
-      ? Math.round((subtotal * activePromo.value) / 100)
+      ? Math.round((eligibleSubtotal * activePromo.value) / 100)
       : activePromo.value;
-    return Math.min(rawDiscount, activePromo.maxDiscount ?? rawDiscount, subtotal);
-  }, [activePromo, subtotal]);
+    return Math.min(rawDiscount, activePromo.maxDiscount ?? rawDiscount, eligibleSubtotal);
+  }, [activePromo, items, subtotal]);
 
   // Total discounts combined
   const totalDiscount = promoDiscount;

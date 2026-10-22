@@ -200,7 +200,6 @@ export const customerUpdateSchema = customerCreateSchema.partial().extend({
 export const debtCreateSchema = z.object({
   customerId: z.string().min(1, 'Customer wajib diisi'),
   amount: z.coerce.number('Nominal hutang wajib diisi'),
-  status: z.enum(['OPEN', 'PAID']).optional().default('OPEN'),
   dueDate: z.union([z.string(), z.date()]).optional().nullable(),
   description: z.string().trim().optional().nullable(),
   customerName: z.string().trim().optional(),
@@ -208,7 +207,6 @@ export const debtCreateSchema = z.object({
 }).passthrough();
 export const debtUpdateSchema = z.object({
   amount: z.coerce.number().optional(),
-  status: z.enum(['OPEN', 'PAID']).optional(),
   dueDate: z.union([z.string(), z.date()]).optional().nullable(),
   description: z.string().trim().optional().nullable(),
 });
@@ -272,12 +270,19 @@ export const recurringTransactionSchema = z.object({
   endDate: z.union([z.string(), z.date()]).optional().nullable(),
   isActive: z.coerce.boolean().optional().default(true),
 });
-export const savingsGoalSchema = z.object({
+const savingsGoalFields = z.object({
   name: z.string().trim().min(1, 'Nama target wajib diisi'),
   targetAmount: z.coerce.number().positive(),
-  dailyAmount: z.coerce.number().positive(),
+  contributionAmount: z.coerce.number().positive().optional(),
+  dailyAmount: z.coerce.number().positive().optional(),
+  contributionFrequency: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']).optional().default('DAILY'),
   status: z.enum(['ACTIVE', 'COMPLETED', 'ARCHIVED']).optional(),
 });
+export const savingsGoalSchema = savingsGoalFields.refine(
+  (value) => value.contributionAmount !== undefined || value.dailyAmount !== undefined,
+  { path: ['contributionAmount'], message: 'Nominal setoran wajib diisi.' },
+);
+export const savingsGoalUpdateSchema = savingsGoalFields.partial();
 export const savingsDepositSchema = z.object({
   amount: z.coerce.number().positive().optional(),
   date: z.union([z.string(), z.date()]).optional(),
@@ -431,12 +436,18 @@ export const promoCreateSchema = z.object({
   usageLimit: z.coerce.number().int().positive().optional().nullable(),
   startsAt: z.union([z.string(), z.date()]).optional().nullable(),
   endsAt: z.union([z.string(), z.date()]).optional().nullable(),
+  categoryIds: z.array(z.string().trim().min(1)).optional(),
+  productIds: z.array(z.string().trim().min(1)).optional(),
   isActive: z.coerce.boolean().optional().default(true),
 });
 export const promoUpdateSchema = promoCreateSchema.partial();
 export const promoValidationSchema = z.object({
   code: z.string().trim().min(1).max(64),
   subtotal: z.coerce.number().nonnegative(),
+  items: z.array(z.object({
+    variantId: z.string().trim().min(1),
+    amount: z.coerce.number().nonnegative(),
+  })).optional(),
 });
 
 // ---- Konten situs ----

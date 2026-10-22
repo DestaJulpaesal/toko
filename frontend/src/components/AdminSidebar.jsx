@@ -106,6 +106,7 @@ export default function AdminSidebar({ active = '' }) {
   const isCashier = currentUser?.role === 'CASHIER';
   const isParcelManager = currentUser?.role === 'PARCEL_MANAGER';
   const isAdmin = currentUser?.role === 'ADMIN';
+  const canSwitchDisplayMode = currentUser?.role === 'OWNER';
   const filterGroups = (groups) => groups.map((group) => ({
     ...group,
     links: group.links.filter(([, label]) => label.toLowerCase().includes(sidebarSearch.toLowerCase().trim())),
@@ -158,24 +159,13 @@ export default function AdminSidebar({ active = '' }) {
           <div className="sidebar-nav-group" key={group.label}>
             <span className="nav-label">{group.label}</span>
             {group.links.map(([number, label, to]) => (
-              <Link key={to} title={label} className={active === label || (label === 'Kasir' && active === 'Kasir') ? 'active' : ''} to={to} onClick={() => label === 'Riwayat Transaksi' && localStorage.setItem('glosir_orders_last_seen', new Date().toISOString())}>
+              <Link key={to} title={label} aria-current={active === label ? 'page' : undefined} className={active === label || (label === 'Kasir' && active === 'Kasir') ? 'active' : ''} to={to} onClick={() => label === 'Riwayat Transaksi' && localStorage.setItem('glosir_orders_last_seen', new Date().toISOString())}>
                 <span className="sidebar-icon" aria-hidden="true">{getSidebarIcon(label, number)}</span>
                 <span className="sidebar-link-label">{label}</span>{label === 'Riwayat Transaksi' && pendingOrderCount > 0 && <span className="sidebar-order-badge">{pendingOrderCount > 99 ? '99+' : pendingOrderCount}</span>}
               </Link>
             ))}
           </div>
         ))}
-        {isOwner && (
-          <button
-            type="button"
-            className="sidebar-mode-toggle"
-            onClick={toggleDisplayMode}
-            title={`Beralih ke mode ${displayMode === 'simple' ? 'lengkap' : 'simpel'}`}
-          >
-            <span className="sidebar-icon" aria-hidden="true"><LayoutDashboard size={16} strokeWidth={1.9} /></span>
-            <span className="sidebar-link-label">Mode {displayMode === 'simple' ? 'Lengkap' : 'Simpel'}</span>
-          </button>
-        )}
         {isOwner && visibleSecondaryGroups.length > 0 && (
           <div className="sidebar-secondary-section">
             <span className="nav-label">Menu Lainnya</span>
@@ -183,7 +173,7 @@ export default function AdminSidebar({ active = '' }) {
               <div className="sidebar-nav-group sidebar-secondary-group" key={group.label}>
                 <span className="nav-label">{group.label}</span>
                 {group.links.map(([number, label, to]) => (
-                  <Link key={to} title={label} className={active === label ? 'active' : ''} to={to} onClick={() => setMenuOpen(false)}>
+                  <Link key={to} title={label} aria-current={active === label ? 'page' : undefined} className={active === label ? 'active' : ''} to={to} onClick={() => setMenuOpen(false)}>
                     <span className="sidebar-icon" aria-hidden="true">{getSidebarIcon(label, number)}</span>
                     <span className="sidebar-link-label">{label}</span>
                   </Link>
@@ -199,6 +189,25 @@ export default function AdminSidebar({ active = '' }) {
         <small>{isParcelManager ? 'Pantau peserta wilayah' : isCashier ? 'Operasional siap digunakan' : 'Akses fitur lanjutan toko'}</small>
         <Link to={isParcelManager ? '/parcel-manager' : '/kasir'}>{isParcelManager ? 'Buka wilayah' : 'Buka kasir'} <span aria-hidden="true">→</span></Link>
       </div>}
+
+      {canSwitchDisplayMode && (
+        <section className="sidebar-appearance" aria-label="Pengaturan tampilan">
+          <div className="sidebar-appearance-copy">
+            <span className="sidebar-appearance-icon" aria-hidden="true"><LayoutDashboard size={16} /></span>
+            <span><small>Tampilan dashboard</small><strong>Mode {displayMode === 'simple' ? 'Simpel' : 'Lengkap'}</strong></span>
+          </div>
+          <button
+            type="button"
+            className="sidebar-mode-toggle"
+            onClick={toggleDisplayMode}
+            title={`Beralih ke mode ${displayMode === 'simple' ? 'lengkap' : 'simpel'}`}
+            aria-label={`Beralih ke mode ${displayMode === 'simple' ? 'lengkap' : 'simpel'}`}
+          >
+            <span className="sidebar-mode-icon" aria-hidden="true"><LayoutDashboard size={15} /></span>
+            <span>Ganti mode</span>
+          </button>
+        </section>
+      )}
 
       <div className="sidebar-profile">
         <span className="avatar">{isParcelManager ? 'PM' : isCashier ? 'KS' : 'OG'}</span>

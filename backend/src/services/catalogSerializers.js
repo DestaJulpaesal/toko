@@ -44,6 +44,7 @@ export function formatProduct(product, audience = AUDIENCE.PUBLIC) {
 
   const formatted = {
     id: product.id,
+    categoryId: product.categoryId,
     variantId: variant?.id,
     name: product.name,
     category: product.category?.name || 'Glosir',

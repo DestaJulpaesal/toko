@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { X } from 'lucide-react';
 
 /**
@@ -17,7 +17,9 @@ export default function ModalForm({
   children,
   maxWidth = '740px',
   mode = 'modal',
+  cardClassName = '',
 }) {
+  const titleId = useId();
   // Tangani tombol ESC untuk menutup modal
   useEffect(() => {
     if (!isOpen) return;
@@ -62,9 +64,10 @@ export default function ModalForm({
       }}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div
-        className={`modal-form-card ${isDrawer ? 'modal-form-drawer' : 'modal-form-dialog'}`}
+        className={`modal-form-card ${isDrawer ? 'modal-form-drawer' : 'modal-form-dialog'} ${cardClassName}`}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
@@ -113,6 +116,7 @@ export default function ModalForm({
               </span>
             )}
             <h2
+              id={titleId}
               style={{
                 margin: 0,
                 fontSize: '1.25rem',

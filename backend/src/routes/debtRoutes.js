@@ -91,10 +91,10 @@ router.get('/summary', async (req, res) => {
 
 router.post('/', requireRole('OWNER', 'ADMIN'), validateBody(debtCreateSchema), async (req, res) => {
   try {
-    const { customerId, amount, status = 'OPEN', dueDate, description } = req.body;
+    const { customerId, amount, dueDate, description } = req.body;
     const customer = await prisma.customer.findUnique({ where: { id: customerId } });
     if (!customer) return res.status(400).json({ success: false, message: 'Customer tidak ditemukan.' });
-    const record = await prisma.debtRecord.create({ data: { customerId, amount, status: String(status).toUpperCase(), dueDate: dueDate ? new Date(dueDate) : null, description: description || null }, include });
+    const record = await prisma.debtRecord.create({ data: { customerId, amount, paidAmount: 0, status: 'OPEN', dueDate: dueDate ? new Date(dueDate) : null, description: description || null }, include });
     return res.status(201).json({ success: true, data: formatDebt(record), debt: formatDebt(record) });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Piutang gagal dibuat.' });
@@ -105,8 +105,16 @@ router.patch('/:id', requireRole('OWNER', 'ADMIN'), validateBody(debtUpdateSchem
   try {
     const existing = await prisma.debtRecord.findFirst({ where: { id: req.params.id, deletedAt: null } });
     if (!existing) return res.status(404).json({ success: false, message: 'Data piutang tidak ditemukan.' });
-    const data = { ...req.body };
-    if (data.dueDate !== undefined) data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    const data = {
+      ...(req.body.amount !== undefined ? { amount: Number(req.body.amount) } : {}),
+      ...(req.body.dueDate !== undefined ? { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null } : {}),
+      ...(req.body.description !== undefined ? { description: req.body.description || null } : {}),
+    };
+    if (data.amount !== undefined) {
+      const remainingAmount = Math.max(data.amount - Number(existing.paidAmount || 0), 0);
+      data.status = remainingAmount > 0 ? 'OPEN' : 'PAID';
+      data.paidAt = remainingAmount > 0 ? null : existing.paidAt || new Date();
+    }
     const record = await prisma.debtRecord.update({ where: { id: req.params.id }, data, include });
     return res.json({ success: true, data: formatDebt(record), debt: formatDebt(record) });
   } catch (error) {

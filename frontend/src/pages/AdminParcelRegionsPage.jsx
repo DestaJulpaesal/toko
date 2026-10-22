@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, CircleDollarSign, KeyRound, MapPinned, Pencil, RefreshCw, Target, Trash2, UserPlus, Users, WalletCards, X } from 'lucide-react';
+import { CheckCircle2, CircleDollarSign, KeyRound, MapPinned, Pencil, Plus, RefreshCw, Target, UserRoundX, UserPlus, Users, WalletCards } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
+import ModalForm from '../components/ModalForm';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
 
@@ -15,6 +16,7 @@ export default function AdminParcelRegionsPage() {
   const [managerForm, setManagerForm] = useState({ name: '', email: '', password: '', phone: '', regionId: '' });
   const [saving, setSaving] = useState(false);
   const [editingManagerId, setEditingManagerId] = useState(null);
+  const [activeForm, setActiveForm] = useState(null);
   const totalParticipants = regions.reduce((sum, region) => sum + Number(region.participantCount || 0), 0);
   const totalTarget = regions.reduce((sum, region) => sum + Number(region.targetAmount || 0), 0);
   const totalPaid = regions.reduce((sum, region) => sum + Number(region.paidAmount || 0), 0);
@@ -60,7 +62,7 @@ export default function AdminParcelRegionsPage() {
       const response = await apiFetch('/parcel-regions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(regionForm) });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Wilayah gagal dibuat.');
-      setRegionForm({ name: '', code: '' }); setNotice('Wilayah berhasil dibuat.'); await loadRegions();
+      setRegionForm({ name: '', code: '' }); setActiveForm(null); setNotice('Wilayah berhasil dibuat.'); await loadRegions();
     } catch (error) { setNotice(error.message); } finally { setSaving(false); }
   };
 
@@ -72,14 +74,29 @@ export default function AdminParcelRegionsPage() {
       const response = await apiFetch(editingManagerId ? `/parcel-managers/${editingManagerId}` : '/parcel-managers', { method: editingManagerId ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(managerForm) });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Akun manager gagal dibuat.');
-      setManagerForm({ name: '', email: '', password: '', phone: '', regionId: '' }); setEditingManagerId(null); setNotice(editingManagerId ? 'Akun berhasil diperbarui.' : 'Akun manager berhasil dibuat.'); await loadRegions();
+      setManagerForm({ name: '', email: '', password: '', phone: '', regionId: '' }); setEditingManagerId(null); setActiveForm(null); setNotice(editingManagerId ? 'Akun berhasil diperbarui.' : 'Akun manager berhasil dibuat.'); await loadRegions();
     } catch (error) { setNotice(error.message); } finally { setSaving(false); }
   };
 
   const editManager = (manager) => {
     setEditingManagerId(manager.id);
     setManagerForm({ name: manager.name, email: manager.email, password: '', phone: manager.phone || '', regionId: manager.regionId || '' });
-    document.querySelector('.region-setup-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setNotice('');
+    setActiveForm('manager');
+  };
+
+  const openManagerForm = () => {
+    setEditingManagerId(null);
+    setManagerForm({ name: '', email: '', password: '', phone: '', regionId: '' });
+    setNotice('');
+    setActiveForm('manager');
+  };
+
+  const closeManagerForm = () => {
+    setEditingManagerId(null);
+    setManagerForm({ name: '', email: '', password: '', phone: '', regionId: '' });
+    setNotice('');
+    setActiveForm(null);
   };
 
   const removeManager = async (manager) => {
@@ -112,24 +129,14 @@ export default function AdminParcelRegionsPage() {
           <div className="dashboard-stat-card"><span className="region-stat-icon is-green"><WalletCards size={16} /></span><span>Total setoran</span><strong>{money(totalPaid)}</strong><small>Sudah terkumpul</small></div>
           <div className="dashboard-stat-card"><span className="region-stat-icon is-amber"><Target size={16} /></span><span>Sisa target</span><strong>{money(totalRemaining)}</strong><small>Dari target {money(totalTarget)}</small></div>
         </section>
-        <section className="region-setup-grid">
-          <form className="dashboard-panel region-setup-card region-create-form" onSubmit={createRegion}>
-            <div className="dashboard-panel-heading"><div><span className="panel-kicker">Langkah 1 · Lokasi penagihan</span><h2><MapPinned size={17} /> Buat wilayah</h2></div></div>
-            <p className="region-form-help">Wilayah membantu mengelompokkan peserta dan setoran berdasarkan area.</p>
-            <label>Nama wilayah<input required maxLength="80" value={regionForm.name} onChange={(event) => setRegionForm((current) => ({ ...current, name: event.target.value }))} placeholder="Contoh: Area Timur" /></label>
-            <label>Kode wilayah<input required maxLength="20" value={regionForm.code} onChange={(event) => setRegionForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="Contoh: TIMUR" /><small>Kode singkat untuk membedakan wilayah.</small></label>
-            <button className="btn btn-primary full" disabled={saving || loading}><MapPinned size={15} /> {saving ? 'Menyimpan...' : 'Simpan wilayah'}</button>
-          </form>
-          <form className="dashboard-panel region-setup-card region-manager-form" onSubmit={createManager}>
-            <div className="dashboard-panel-heading"><div><span className="panel-kicker">Langkah 2 · Petugas lapangan</span><h2>{editingManagerId ? <Pencil size={17} /> : <UserPlus size={17} />} {editingManagerId ? 'Perbarui akun manager' : 'Buat akun manager parsel'}</h2></div>{editingManagerId && <button type="button" className="region-cancel-button" onClick={() => { setEditingManagerId(null); setManagerForm({ name: '', email: '', password: '', phone: '', regionId: '' }); }} title="Batal edit" aria-label="Batal edit"><X size={15} /></button>}</div>
-            <p className="region-form-help">Manager dapat mencatat setoran peserta di wilayah yang dipilih. Akun baru bisa digunakan untuk login.</p>
-            <div className="form-two-columns"><label>Nama manager<input required maxLength="100" autoComplete="name" value={managerForm.name} onChange={(event) => setManagerForm((current) => ({ ...current, name: event.target.value }))} placeholder="Contoh: Andi Pratama" /></label><label>No. HP <span className="region-optional-label">(opsional)</span><input autoComplete="tel" value={managerForm.phone} onChange={(event) => setManagerForm((current) => ({ ...current, phone: event.target.value }))} placeholder="08..." /></label></div>
-            <label>Email untuk login<input required type="email" autoComplete="email" value={managerForm.email} onChange={(event) => setManagerForm((current) => ({ ...current, email: event.target.value }))} placeholder="andi@contoh.com" /></label>
-            <label>{editingManagerId ? 'Password baru (opsional)' : 'Password awal'}<input type="password" required={!editingManagerId} minLength="6" autoComplete={editingManagerId ? 'new-password' : 'new-password'} value={managerForm.password} onChange={(event) => setManagerForm((current) => ({ ...current, password: event.target.value }))} placeholder={editingManagerId ? 'Kosongkan jika tidak ingin mengganti' : 'Minimal 6 karakter'} /><small>{editingManagerId ? 'Isi hanya jika ingin mengganti password manager.' : 'Gunakan minimal 6 karakter dan sampaikan kepada manager.'}</small></label>
-            <label>Wilayah penugasan<select required value={managerForm.regionId} onChange={(event) => setManagerForm((current) => ({ ...current, regionId: event.target.value }))}><option value="">Pilih wilayah</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} ({region.code})</option>)}</select></label>
-            <button className="btn btn-primary full" disabled={saving || loading || !regions.length}>{saving ? 'Menyimpan...' : editingManagerId ? <><Pencil size={15} /> Simpan perubahan akun</> : <><KeyRound size={15} /> Buat akun & hubungkan ke wilayah</>}</button>
-          </form>
+        <section className="region-management-toolbar" aria-label="Aksi pengelolaan wilayah">
+          <div><span className="panel-kicker">Kelola wilayah & petugas</span><strong>Atur area penagihan dan akses tim lapangan</strong></div>
+          <div className="region-management-actions">
+            <button type="button" className="btn btn-secondary" onClick={() => { setRegionForm({ name: '', code: '' }); setNotice(''); setActiveForm('region'); }}><Plus size={16} /> Tambah wilayah</button>
+            <button type="button" className="btn btn-primary" onClick={openManagerForm} disabled={!regions.length || loading}><UserPlus size={16} /> Buat akun manager</button>
+          </div>
         </section>
+        <section className="region-data-grid">
         <section className="dashboard-panel region-grid-panel">
           <div className="dashboard-panel-heading"><div><span className="panel-kicker">Langkah 3 · Pantau pembayaran</span><h2>Progres setoran per wilayah</h2></div><span className="dashboard-panel-total">{regions.length} wilayah</span></div>
           <p className="region-section-help">Progres menunjukkan berapa bagian dari target peserta yang sudah dibayarkan.</p>
@@ -146,7 +153,7 @@ export default function AdminParcelRegionsPage() {
                 <div className="region-commission"><CircleDollarSign size={14} /><span>Komisi manager</span><strong>{money(region.managerCommission)}</strong></div>
               </article>;
             })}
-            {!loading && !regions.length && <div className="region-empty-state"><MapPinned size={24} /><strong>Belum ada wilayah parsel</strong><span>Mulai dengan mengisi nama dan kode wilayah pada formulir “Buat wilayah” di atas.</span></div>}
+            {!loading && !regions.length && <div className="region-empty-state"><MapPinned size={24} /><strong>Belum ada wilayah parsel</strong><span>Mulai dengan menambahkan wilayah melalui tombol “Tambah wilayah”.</span></div>}
             {loading && <div className="region-empty-state" role="status">Memuat data wilayah...</div>}
           </div>
         </section>
@@ -154,11 +161,46 @@ export default function AdminParcelRegionsPage() {
           <div className="dashboard-panel-heading"><div><span className="panel-kicker">Petugas penagihan</span><h2>Akun manager parsel</h2></div><span className="dashboard-panel-total">{managers.length} akun</span></div>
           <p className="region-section-help">Kelola akun yang bertugas mencatat pembayaran peserta. Nonaktifkan akun jika petugas sudah tidak bertugas.</p>
           <div className="manager-account-list">
-            {managers.map((manager) => <div className="manager-account-row" key={manager.id}><div className="manager-account-avatar">{(manager.name || 'PM').slice(0, 2).toUpperCase()}</div><div className="manager-account-info"><strong>{manager.name}</strong><small>{manager.email}{manager.phone ? ` · ${manager.phone}` : ''}</small></div><span className={`manager-role-badge ${manager.role === 'PARCEL_MANAGER' ? 'parcel' : 'cashier'}`}>{manager.role === 'PARCEL_MANAGER' ? 'Manager Parsel' : 'Kasir'}</span><span className="manager-region-label">{manager.regionName || 'Belum terhubung wilayah'}</span><div className="manager-account-actions"><button type="button" className="icon-action" onClick={() => editManager(manager)} title="Edit akun" aria-label={`Edit akun ${manager.name}`}><Pencil size={14} /></button><button type="button" className="icon-action icon-action-danger" onClick={() => removeManager(manager)} title="Nonaktifkan akun" aria-label={`Nonaktifkan akun ${manager.name}`}><Trash2 size={14} /></button></div></div>)}
-            {!loading && !managers.length && <div className="region-empty-state"><Users size={24} /><strong>Belum ada akun manager</strong><span>Buat akun manager parsel dari formulir di atas agar petugas bisa mencatat setoran wilayah.</span></div>}
+            {managers.map((manager) => <div className="manager-account-row" key={manager.id}><div className="manager-account-avatar">{(manager.name || 'PM').slice(0, 2).toUpperCase()}</div><div className="manager-account-info"><strong>{manager.name}</strong><small>{manager.email}{manager.phone ? ` · ${manager.phone}` : ''}</small></div><div className="manager-account-meta"><span className={`manager-role-badge ${manager.role === 'PARCEL_MANAGER' ? 'parcel' : 'cashier'}`}>{manager.role === 'PARCEL_MANAGER' ? 'Manager Parsel' : 'Kasir'}</span><span className="manager-region-label">{manager.regionName || 'Belum terhubung wilayah'}</span></div><div className="manager-account-actions"><button type="button" className="icon-action" data-action="edit" data-action-label="Edit" onClick={() => editManager(manager)} title="Edit" aria-label={`Edit akun ${manager.name}`}><Pencil size={14} /></button><button type="button" className="icon-action icon-action-danger" data-action="delete" data-action-label="Nonaktifkan" onClick={() => removeManager(manager)} title="Nonaktifkan" aria-label={`Nonaktifkan akun ${manager.name}`}><UserRoundX size={14} /></button></div></div>)}
+            {!loading && !managers.length && <div className="region-empty-state"><Users size={24} /><strong>Belum ada akun manager</strong><span>Buat akun manager parsel agar petugas bisa mencatat setoran wilayah.</span></div>}
             {loading && <div className="region-empty-state" role="status">Memuat akun manager...</div>}
           </div>
         </section>
+        </section>
+        <ModalForm
+          isOpen={activeForm === 'region'}
+          onClose={() => setActiveForm(null)}
+          title="Tambah wilayah parsel"
+          subtitle="Buat area untuk mengelompokkan peserta dan setoran."
+          kicker="Lokasi penagihan"
+          maxWidth="540px"
+          cardClassName="region-modal-card"
+        >
+          <form className="region-setup-card region-modal-form" onSubmit={createRegion}>
+            {notice && <div className="region-modal-notice" role="alert">{notice}</div>}
+            <label>Nama wilayah<input required maxLength="80" autoFocus value={regionForm.name} onChange={(event) => setRegionForm((current) => ({ ...current, name: event.target.value }))} placeholder="Contoh: Area Timur" /></label>
+            <label>Kode wilayah<input required maxLength="20" value={regionForm.code} onChange={(event) => setRegionForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="Contoh: TIMUR" /><small>Kode singkat untuk membedakan wilayah.</small></label>
+            <div className="region-modal-actions"><button type="button" className="btn btn-secondary" onClick={() => setActiveForm(null)}>Batal</button><button className="btn btn-primary" disabled={saving || loading}><MapPinned size={15} /> {saving ? 'Menyimpan...' : 'Simpan wilayah'}</button></div>
+          </form>
+        </ModalForm>
+        <ModalForm
+          isOpen={activeForm === 'manager'}
+          onClose={closeManagerForm}
+          title={editingManagerId ? 'Perbarui akun manager' : 'Buat akun manager parsel'}
+          subtitle="Hubungkan petugas lapangan ke wilayah untuk mencatat setoran."
+          kicker="Akses petugas"
+          maxWidth="660px"
+          cardClassName="region-modal-card"
+        >
+          <form className="region-setup-card region-modal-form" onSubmit={createManager}>
+            {notice && <div className="region-modal-notice" role="alert">{notice}</div>}
+            <div className="form-two-columns"><label>Nama manager<input required maxLength="100" autoComplete="name" autoFocus value={managerForm.name} onChange={(event) => setManagerForm((current) => ({ ...current, name: event.target.value }))} placeholder="Contoh: Andi Pratama" /></label><label>No. HP <span className="region-optional-label">(opsional)</span><input autoComplete="tel" value={managerForm.phone} onChange={(event) => setManagerForm((current) => ({ ...current, phone: event.target.value }))} placeholder="08..." /></label></div>
+            <label>Email untuk login<input required type="email" autoComplete="email" value={managerForm.email} onChange={(event) => setManagerForm((current) => ({ ...current, email: event.target.value }))} placeholder="andi@contoh.com" /></label>
+            <label>{editingManagerId ? 'Password baru (opsional)' : 'Password awal'}<input type="password" required={!editingManagerId} minLength="6" autoComplete="new-password" value={managerForm.password} onChange={(event) => setManagerForm((current) => ({ ...current, password: event.target.value }))} placeholder={editingManagerId ? 'Kosongkan jika tidak ingin mengganti' : 'Minimal 6 karakter'} /><small>{editingManagerId ? 'Isi hanya jika ingin mengganti password manager.' : 'Gunakan minimal 6 karakter dan sampaikan kepada manager.'}</small></label>
+            <label>Wilayah penugasan<select required value={managerForm.regionId} onChange={(event) => setManagerForm((current) => ({ ...current, regionId: event.target.value }))}><option value="">Pilih wilayah</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} ({region.code})</option>)}</select></label>
+            <div className="region-modal-actions"><button type="button" className="btn btn-secondary" onClick={closeManagerForm}>Batal</button><button className="btn btn-primary" disabled={saving || loading || !regions.length}>{saving ? 'Menyimpan...' : editingManagerId ? <><Pencil size={15} /> Simpan perubahan akun</> : <><KeyRound size={15} /> Buat akun & hubungkan</>}</button></div>
+          </form>
+        </ModalForm>
       </AdminShell>
   );
 }

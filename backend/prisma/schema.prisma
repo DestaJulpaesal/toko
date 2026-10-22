@@ -636,7 +636,8 @@ model SavingsGoal {
   userId       String
   name         String
   targetAmount Decimal   @db.Decimal(14, 2)
-  dailyAmount  Decimal   @db.Decimal(14, 2)
+  contributionAmount Decimal @map("dailyAmount") @db.Decimal(14, 2)
+  contributionFrequency String @default("DAILY")
   status       String    @default("ACTIVE")
   deletedAt    DateTime?
   createdAt    DateTime  @default(now())
@@ -834,6 +835,8 @@ model PromoCampaign {
   usedCount     Int       @default(0)
   startsAt      DateTime?
   endsAt        DateTime?
+  categoryIds   String[]  @default([])
+  productIds    String[]  @default([])
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

@@ -271,7 +271,7 @@ router.post('/online', checkoutLimiter, validateBody(onlineOrderSchema), async (
         const variant = variants.find((candidate) => candidate.id === item.variantId);
         if (!variant) throw new Error('Produk pada keranjang sudah tidak tersedia');
         if (variant.stockQty < quantity) throw new Error(`Stok ${variant.product.name} tidak mencukupi.`);
-        return { variantId: variant.id, productId: variant.productId, name: variant.product.name, quantity, unitPrice: Number(variant.sellPrice), total: Number(variant.sellPrice) * quantity };
+        return { variantId: variant.id, productId: variant.productId, categoryId: variant.product.categoryId, name: variant.product.name, quantity, unitPrice: Number(variant.sellPrice), total: Number(variant.sellPrice) * quantity };
       }
       if (item.parcelId) {
         const parcel = parcels.find((candidate) => candidate.id === item.parcelId);
@@ -321,7 +321,7 @@ router.post('/online', checkoutLimiter, validateBody(onlineOrderSchema), async (
     const shippingCost = fulfillmentMethod === 'DELIVERY'
       ? Math.max(0, Math.ceil(Number(distanceKm) - Number(deliverySettings.freeDistanceKm || 0))) * Number(deliverySettings.ratePerKm || 0)
       : 0;
-    const promoResult = promoCode ? await validatePromoCode(prisma, promoCode, subtotal) : null;
+    const promoResult = promoCode ? await validatePromoCode(prisma, promoCode, subtotal, lines) : null;
     const promoDiscount = promoResult?.discountAmount || 0;
     const total = Math.max(subtotal - promoDiscount + Number(shippingCost || 0), 0);
     const orderNumber = createOrderNumber('WEB');
@@ -372,7 +372,7 @@ router.post('/online', checkoutLimiter, validateBody(onlineOrderSchema), async (
       }
 
       if (promoResult) {
-        const currentPromo = await validatePromoCode(transaction, promoCode, subtotal);
+        const currentPromo = await validatePromoCode(transaction, promoCode, subtotal, lines);
         if (currentPromo.discountAmount !== promoDiscount) throw new Error('Nilai promo berubah. Silakan kirim ulang pesanan.');
         await recordPromoUse(transaction, currentPromo.promo);
       }
@@ -476,11 +476,11 @@ router.post('/hold', checkoutLimiter, authenticateToken, staffOnly, validateBody
         const unitPrice = unit
           ? Number(customerType === 'WHOLESALE' && unit.wholesalePrice != null ? unit.wholesalePrice : unit.sellPrice)
           : Number(customerType === 'WHOLESALE' && variant.wholesalePrice != null ? variant.wholesalePrice : variant.sellPrice);
-        return { variant, productUnit: unit, quantity, unitPrice, total: unitPrice * quantity };
+        return { variant, productId: variant.productId, categoryId: variant.product.categoryId, productUnit: unit, quantity, unitPrice, total: unitPrice * quantity };
       });
 
       const subtotal = lines.reduce((sum, line) => sum + line.total, 0);
-      const promoResult = promoCode ? await validatePromoCode(transaction, promoCode, subtotal) : null;
+      const promoResult = promoCode ? await validatePromoCode(transaction, promoCode, subtotal, lines) : null;
       const discountAmount = Math.min(
         (Number(discount) || 0) + (promoResult?.discountAmount || 0),
         subtotal,
@@ -991,6 +991,8 @@ router.post('/checkout', authenticateToken, staffOnly, checkoutLimiter, validate
             if (!Number.isFinite(unitPrice)) throw new Error(`Harga produk ${variant.product.name} tidak valid`);
             return {
               variant,
+              productId: variant.productId,
+              categoryId: variant.product.categoryId,
               quantity,
               stockQuantity: variantQuantity,
               unitPrice,
@@ -1009,12 +1011,12 @@ router.post('/checkout', authenticateToken, staffOnly, checkoutLimiter, validate
             ? Number(variant.wholesalePrice)
             : Number(variant.sellPrice);
           if (!Number.isFinite(unitPrice)) throw new Error(`Harga produk ${variant.product.name} tidak valid`);
-          return { variant, quantity, stockQuantity: quantity, unitPrice, basePrice: Number(variant.basePrice), total: unitPrice * quantity };
+          return { variant, productId: variant.productId, categoryId: variant.product.categoryId, quantity, stockQuantity: quantity, unitPrice, basePrice: Number(variant.basePrice), total: unitPrice * quantity };
         });
 
         const subtotal = lines.reduce((sum, line) => sum + line.total, 0);
         const promoResult = effectivePromoCode
-          ? await validatePromoCode(transaction, effectivePromoCode, subtotal)
+          ? await validatePromoCode(transaction, effectivePromoCode, subtotal, lines)
           : null;
 
         let linkedCustomerId = effectiveCustomerId;

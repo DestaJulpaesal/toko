@@ -67,7 +67,8 @@ router.get('/:id/detail', async (req, res) => {
     const debts = customer.debts.map((debt) => ({
       id: debt.id, amount: Number(debt.amount || 0), paidAmount: Number(debt.paidAmount || 0),
       remainingAmount: Math.max(Number(debt.amount || 0) - Number(debt.paidAmount || 0), 0),
-      status: debt.status, dueDate: debt.dueDate, description: debt.description || '', createdAt: debt.createdAt,
+      status: debt.status, dueDate: debt.dueDate, paidAt: debt.paidAt,
+      description: debt.description || '', createdAt: debt.createdAt,
     }));
     return res.json({
       success: true,
@@ -96,19 +97,30 @@ router.get('/', async (req, res) => {
   const pagination = parsePagination(req.query);
 
   try {
-    const where = search
-      ? {
-          OR: [
-            { name: { contains: String(search), mode: 'insensitive' } },
-            { phone: { contains: String(search) } },
-            { email: { contains: String(search), mode: 'insensitive' } },
-          ],
-        }
-      : undefined;
+    const where = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: String(search), mode: 'insensitive' } },
+        { phone: { contains: String(search) } },
+        { email: { contains: String(search), mode: 'insensitive' } },
+      ];
+    }
+
+    const debtStatus = String(req.query.debtStatus || '').toUpperCase();
+    if (debtStatus === 'OWING' || debtStatus === 'CLEAR') {
+      const debts = await prisma.debtRecord.findMany({
+        where: { deletedAt: null },
+        select: { customerId: true, amount: true, paidAmount: true },
+      });
+      const owingCustomerIds = [...new Set(debts
+        .filter((debt) => debt.customerId && Number(debt.amount || 0) - Number(debt.paidAmount || 0) > 0)
+        .map((debt) => debt.customerId))];
+      where.id = debtStatus === 'OWING' ? { in: owingCustomerIds } : { notIn: owingCustomerIds };
+    }
 
     const [customers, total] = await Promise.all([
       prisma.customer.findMany({
-        where,
+        where: Object.keys(where).length ? where : undefined,
         orderBy: { createdAt: 'desc' },
         skip: pagination.skip,
         take: pagination.take,
@@ -117,7 +129,7 @@ router.get('/', async (req, res) => {
           points: true, createdAt: true, _count: { select: { orders: true } },
         },
       }),
-      prisma.customer.count({ where }),
+      prisma.customer.count({ where: Object.keys(where).length ? where : undefined }),
     ]);
 
     return res.json({
