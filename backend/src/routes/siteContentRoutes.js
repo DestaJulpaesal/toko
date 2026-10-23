@@ -171,10 +171,49 @@ router.post('/messages', contactMessageLimiter, validateBody(contactMessageSchem
     await prisma.contactMessage.create({
       data: { name, phone, message },
     });
-    return res.status(201).json({ success: true, message: 'Pesan berhasil dikirim. Tim Glosir akan segera menghubungi Anda.' });
+    return res.status(201).json({ success: true, message: 'Pesan berhasil dikirim. Tim Glosir akan meninjau pesan Anda.' });
   } catch (error) {
     console.error('Contact message submission failed:', error.message);
     return res.status(500).json({ success: false, message: 'Pesan belum bisa disimpan. Silakan coba lagi.' });
+  }
+});
+
+router.get('/messages', authenticateToken, requireRole('OWNER'), async (_req, res) => {
+  try {
+    const [messages, unreadCount, totalCount] = await Promise.all([
+      prisma.contactMessage.findMany({
+        select: { id: true, name: true, phone: true, message: true, status: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      prisma.contactMessage.count({ where: { status: 'NEW' } }),
+      prisma.contactMessage.count(),
+    ]);
+    return res.json({ success: true, messages, unreadCount, totalCount });
+  } catch (error) {
+    console.error('Contact inbox load failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Pesan masuk belum bisa dimuat.' });
+  }
+});
+
+router.patch('/messages/:id/read', authenticateToken, requireRole('OWNER'), async (req, res) => {
+  try {
+    const result = await prisma.contactMessage.updateMany({
+      where: { id: req.params.id, status: 'NEW' },
+      data: { status: 'READ' },
+    });
+    if (!result.count) {
+      const message = await prisma.contactMessage.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, status: true },
+      });
+      if (!message) return res.status(404).json({ success: false, message: 'Pesan tidak ditemukan.' });
+      return res.json({ success: true, message: 'Pesan sudah dibaca.' });
+    }
+    return res.json({ success: true, message: 'Pesan ditandai sudah dibaca.' });
+  } catch (error) {
+    console.error('Contact message read update failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Status pesan belum bisa diperbarui.' });
   }
 });
 

@@ -1,3 +1,4 @@
+
 import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 // Halaman publik: tetap eager-loaded karena ini yang paling sering diakses pengunjung pertama kali.
@@ -28,6 +29,8 @@ const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage'));
 const AdminParcelsPage = lazy(() => import('./pages/AdminParcelsPage'));
 const AdminPromosPage = lazy(() => import('./pages/AdminPromosPage'));
 const AdminProfilePage = lazy(() => import('./pages/AdminProfilePage'));
+const AccountManagementPage = lazy(() => import('./pages/AccountManagementPage'));
+const OwnerMessagesPage = lazy(() => import('./pages/OwnerMessagesPage'));
 const AdminCategoriesPage = lazy(() => import('./pages/AdminCategoriesPage'));
 const AdminContentPage = lazy(() => import('./pages/AdminContentPage'));
 const AdminFinancePage = lazy(() => import('./pages/AdminFinancePage'));
@@ -73,7 +76,7 @@ function AuthRoute({ children, roles }) {
   if (roles && !roles.includes(user.role)) {
     return <Navigate to={user.role === 'CASHIER' ? '/kasir' : user.role === 'PARCEL_MANAGER' ? '/parcel-manager' : '/admin'} replace />;
   }
-  const simpleOwnerPaths = ['/admin', '/admin/products', '/admin/parcel-collections', '/admin/finance'];
+  const simpleOwnerPaths = ['/admin', '/admin/products', '/admin/parcel-collections', '/admin/finance', '/admin/accounts', '/admin/messages'];
   const displayMode = localStorage.getItem(`glosir_display_mode_${user.id}`) || 'simple';
   if (
     user.role === 'OWNER'
@@ -138,6 +141,8 @@ export default function App() {
             <Route path="/admin/parcels" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminParcelsPage /></AuthRoute>} />
             <Route path="/admin/promos" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminPromosPage /></AuthRoute>} />
             <Route path="/admin/profile" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminProfilePage /></AuthRoute>} />
+            <Route path="/admin/accounts" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AccountManagementPage /></AuthRoute>} />
+            <Route path="/admin/messages" element={<AuthRoute roles={['OWNER']}><OwnerMessagesPage /></AuthRoute>} />
             <Route path="/admin/settings" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminSettingsPage /></AuthRoute>} />
             <Route path="/admin/content" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminContentPage /></AuthRoute>} />
             <Route path="/admin/finance" element={<AuthRoute roles={['OWNER', 'ADMIN']}><AdminFinancePage /></AuthRoute>} />

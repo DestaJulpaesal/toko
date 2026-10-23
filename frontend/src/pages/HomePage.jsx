@@ -233,20 +233,32 @@ export default function HomePage() {
       <PublicHeader />
 
       <main className="glosir-home-content">
-        {/* 1. HERO SEDERHANA */}
-        <section className="glosir-hero">
-          <div className="glosir-hero-inner">
-            <span className="hero-eyebrow">Toko Sembako & Grosir Kampung</span>
-            <h1 className="hero-title">Pesan dari rumah, ambil di toko.</h1>
-            <p className="hero-subtitle">
-              Pilih kebutuhan harian dan sembako lewat HP tanpa repot antre. Belanja disiapkan, tinggal ambil dan bayar di toko.
+        {/* 1. Banner toko */}
+        <section className="home-hero" aria-labelledby="home-hero-title">
+          <div className="home-hero-copy">
+            <span className="home-hero-eyebrow">Sembako &amp; Grosir Bu Wida</span>
+            <h1 id="home-hero-title" className="home-hero-title">
+              <span className="home-hero-title-line">Belanja Sembako Lengkap</span>
+              <span className="home-hero-title-line home-hero-title-highlight">Harga Tetap Hemat!</span>
+            </h1>
+            <p className="home-hero-description">
+              Dari beras, minyak, gula, sampai telur tersedia untuk kebutuhan rumah maupun stok warung.
             </p>
-            <div className="hero-cta-wrap">
-              <Link to="/products" className="btn-hero-primary">
-                Mulai Belanja <ChevronRight size={20} />
+            <div className="home-hero-actions">
+              <Link to="/products" className="home-hero-button home-hero-button-primary">
+                Mulai Belanja <ChevronRight size={19} aria-hidden="true" />
+              </Link>
+              <Link to="/products" className="home-hero-button home-hero-button-secondary">
+                Lihat Katalog
               </Link>
             </div>
           </div>
+
+          <div className="home-hero-product" aria-hidden="true">
+            <span className="home-hero-product-glow" />
+            <img src="/hero-products.png" alt="" />
+          </div>
+
         </section>
 
         {/* 2. KATEGORI BELANJA */}

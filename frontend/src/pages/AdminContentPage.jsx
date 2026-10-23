@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Search, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
+import ModalForm from '../components/ModalForm';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
@@ -29,6 +30,8 @@ export default function AdminContentPage() {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formError, setFormError] = useState('');
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
@@ -65,19 +68,29 @@ export default function AdminContentPage() {
   const resetForm = () => {
     setForm(emptyForm);
     setEditingId(null);
+    setFormError('');
+    setFormOpen(false);
+  };
+
+  const openNewForm = () => {
+    setForm(emptyForm);
+    setEditingId(null);
+    setFormError('');
+    setFormOpen(true);
   };
 
   const submitForm = async (event) => {
     event.preventDefault();
 
     if (!form.title.trim() || !form.content.trim()) {
-      setNotice('Judul dan isi konten wajib diisi.');
+      setFormError('Judul dan isi konten wajib diisi.');
       return;
     }
 
     if (!await confirmAction(`Yakin ingin ${editingId ? 'memperbarui konten publik ini' : 'menambahkan konten publik baru'}?`)) return;
 
     setSaving(true);
+    setFormError('');
     try {
       const payload = {
         type: form.type,
@@ -99,7 +112,7 @@ export default function AdminContentPage() {
       setNotice(editingId ? 'Konten berhasil diperbarui.' : 'Konten berhasil ditambahkan.');
       resetForm();
     } catch (error) {
-      setNotice(error.message || 'Konten gagal disimpan.');
+      setFormError(error.message || 'Konten gagal disimpan.');
     } finally {
       setSaving(false);
     }
@@ -114,7 +127,8 @@ export default function AdminContentPage() {
       sortOrder: item.sortOrder,
       isPublished: item.isPublished,
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setFormError('');
+    setFormOpen(true);
   };
 
   const deleteItem = async (id) => {
@@ -163,58 +177,15 @@ export default function AdminContentPage() {
               <span className="is-draft"><strong>{draftCount}</strong> draft</span>
             </div>
           </div>
-          <span className={`database-status ${loading ? 'loading' : 'ready'}`}><i /> {loading ? 'Memuat data' : 'Terhubung ke API'}</span>
+          <div className="content-header-actions">
+            <span className={`database-status ${loading ? 'loading' : 'ready'}`}><i /> {loading ? 'Memuat data' : 'Terhubung ke API'}</span>
+            <button type="button" className="btn btn-primary content-add-button" onClick={openNewForm}><Plus size={16} /> Tambah konten</button>
+          </div>
         </header>
 
         {notice && <div className="crud-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Tutup notifikasi">x</button></div>}
 
         <section className="crud-layout admin-content-layout">
-          <form className="crud-form-panel admin-content-editor" onSubmit={submitForm}>
-            <div className="panel-heading">
-              <div>
-                <span className="panel-kicker">{editingId ? 'SEDANG MENGEDIT' : 'KONTEN BARU'}</span>
-                <h2>{editingId ? 'Perbarui halaman publik' : 'Tambah halaman publik'}</h2>
-              </div>
-              {editingId && <button type="button" className="text-button" onClick={resetForm}>Batal</button>}
-            </div>
-
-            <label>
-              Tipe halaman
-              <select name="type" value={form.type} onChange={updateField}>
-                {typeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Judul
-              <input name="title" value={form.title} onChange={updateField} placeholder="Contoh: Syarat & Ketentuan" />
-            </label>
-
-            <label>
-              Isi konten
-              <textarea name="content" value={form.content} onChange={updateField} rows="8" placeholder="Tulis isi halaman. Untuk FAQ, gunakan format Q: ... dan A: ..." />
-            </label>
-
-            <div className="content-editor-options">
-              <label>
-                Urutan tampilan
-                <input name="sortOrder" value={form.sortOrder} onChange={updateField} type="number" min="0" />
-              </label>
-              <label className="content-publish-field">
-                <input name="isPublished" type="checkbox" checked={form.isPublished} onChange={updateField} />
-                <span className="content-publish-copy">
-                  <strong>Tampilkan ke publik</strong>
-                  <small>{form.isPublished ? 'Konten terlihat di website.' : 'Konten tersimpan sebagai draft.'}</small>
-                </span>
-                <span className={`content-publish-badge${form.isPublished ? ' is-published' : ' is-draft'}`}>{form.isPublished ? 'Publik' : 'Draft'}</span>
-              </label>
-            </div>
-
-            <button className="btn btn-primary full content-submit-button" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah konten'}</button>
-          </form>
-
           <section className="crud-table-panel admin-content-list">
             <div className="content-list-heading">
               <div><h2>Daftar konten</h2><p>Kelola informasi yang digunakan di halaman website.</p></div>
@@ -263,6 +234,58 @@ export default function AdminContentPage() {
             </div>
           </section>
         </section>
+
+        <ModalForm
+          isOpen={formOpen}
+          onClose={resetForm}
+          title={editingId ? 'Perbarui halaman publik' : 'Tambah halaman publik'}
+          subtitle={editingId ? 'Perbarui informasi yang ditampilkan di website.' : 'Buat halaman publik baru untuk website Glosir.'}
+          kicker={editingId ? 'EDIT KONTEN' : 'KONTEN BARU'}
+          maxWidth="720px"
+          cardClassName="content-editor-modal-card"
+        >
+          <form className="crud-form-panel admin-content-editor content-editor-modal-form" onSubmit={submitForm}>
+            {formError && <div className="crud-notice content-form-error" role="alert">{formError}</div>}
+            <label>
+              Tipe halaman
+              <select name="type" value={form.type} onChange={updateField}>
+                {typeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Judul
+              <input name="title" value={form.title} onChange={updateField} placeholder="Contoh: Syarat & Ketentuan" />
+            </label>
+
+            <label>
+              Isi konten
+              <textarea name="content" value={form.content} onChange={updateField} rows="8" placeholder="Tulis isi halaman. Untuk FAQ, gunakan format Q: ... dan A: ..." />
+            </label>
+
+            <div className="content-editor-options">
+              <label>
+                Urutan tampilan
+                <input name="sortOrder" value={form.sortOrder} onChange={updateField} type="number" min="0" />
+              </label>
+              <label className="content-publish-field">
+                <input name="isPublished" type="checkbox" checked={form.isPublished} onChange={updateField} />
+                <span className="content-publish-copy">
+                  <strong>Tampilkan ke publik</strong>
+                  <small>{form.isPublished ? 'Konten terlihat di website.' : 'Konten tersimpan sebagai draft.'}</small>
+                </span>
+                <span className={`content-publish-badge${form.isPublished ? ' is-published' : ' is-draft'}`}>{form.isPublished ? 'Publik' : 'Draft'}</span>
+              </label>
+            </div>
+
+            <div className="content-editor-modal-actions">
+              <button className="btn btn-secondary" type="button" onClick={resetForm} disabled={saving}>Batal</button>
+              <button className="btn btn-primary content-submit-button" type="submit" disabled={saving}>{saving ? 'Menyimpan...' : editingId ? 'Simpan perubahan' : 'Tambah konten'}</button>
+            </div>
+          </form>
+        </ModalForm>
       </AdminShell>
   );
 }

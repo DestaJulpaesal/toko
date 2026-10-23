@@ -8,6 +8,7 @@ import compression from 'compression';
 
 import { apiLimiter, whatsappWebhookLimiter } from './middleware/security.js';
 import authRoutes from './routes/authRoutes.js';
+import accountRoutes from './routes/accountRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import productUnitRoutes from './routes/productUnitRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
@@ -116,6 +117,7 @@ app.get('/api/health/deep', async (req, res) => {
 
 app.get('/api/homepage', createHomepageHandler(prisma));
 app.use('/api/auth', authRoutes);
+app.use('/api/accounts', accountRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/products', productUnitRoutes);
 app.use('/api/orders', orderRoutes);

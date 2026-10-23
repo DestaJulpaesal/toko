@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, ArrowUpRight, CircleDollarSign, Package, ShoppingCart, TriangleAlert, WalletCards } from 'lucide-react';
+import {
+  Archive,
+  ArrowRight,
+  ArrowUpRight,
+  CircleDollarSign,
+  Clock3,
+  Package,
+  ShoppingCart,
+  Sparkles,
+  TriangleAlert,
+  WalletCards,
+} from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import { apiFetch } from '../services/api';
 
@@ -32,7 +43,7 @@ export default function AdminSimpleDashboard() {
         });
         setLastUpdated(new Date());
       } catch {
-        setError('Gagal memuat data ringkasan. Coba refresh halaman.');
+        if (active) setError('Gagal memuat data ringkasan. Coba refresh halaman.');
       } finally {
         loadingRequest = false;
         if (active && initial) setLoading(false);
@@ -47,18 +58,114 @@ export default function AdminSimpleDashboard() {
   }, []);
 
   const cards = [
-    { label: 'Omzet Hari Ini', value: money(summary.income), hint: 'Pemasukan tercatat hari ini', icon: CircleDollarSign, className: 'simple-card-green', to: '/admin/finance' },
-    { label: 'Stok Menipis', value: `${summary.lowStock} barang`, hint: 'Perlu segera diperiksa', icon: TriangleAlert, className: summary.lowStock ? 'simple-card-alert' : 'simple-card-yellow', to: '/admin/products' },
-    { label: 'Piutang Jatuh Tempo', value: `${summary.dueDebts} orang`, hint: 'Jatuh tempo dalam 7 hari', icon: TriangleAlert, className: summary.dueDebts ? 'simple-card-alert' : 'simple-card-yellow', to: '/admin/debts' },
-    { label: 'Pendapatan 7 Hari', value: money(summary.weekIncome), hint: 'Ringkasan transaksi selesai', icon: ShoppingCart, className: 'simple-card-blue', to: '/admin/finance' },
+    {
+      label: 'Pemasukan hari ini',
+      value: money(summary.income),
+      hint: 'Uang masuk yang tercatat hari ini',
+      icon: CircleDollarSign,
+      className: 'simple-card-green',
+      to: '/admin/finance',
+    },
+    {
+      label: 'Stok menipis',
+      value: `${summary.lowStock} barang`,
+      hint: summary.lowStock ? 'Periksa sebelum kehabisan' : 'Tidak ada stok yang perlu dicek',
+      icon: TriangleAlert,
+      className: summary.lowStock ? 'simple-card-alert' : 'simple-card-blue',
+      to: '/admin/products',
+    },
+    {
+      label: 'Piutang jatuh tempo',
+      value: `${summary.dueDebts} orang`,
+      hint: summary.dueDebts ? 'Perlu ditindaklanjuti' : 'Tidak ada piutang jatuh tempo',
+      icon: WalletCards,
+      className: summary.dueDebts ? 'simple-card-alert' : 'simple-card-violet',
+      to: '/admin/debts',
+    },
+    {
+      label: 'Pemasukan 7 hari',
+      value: money(summary.weekIncome),
+      hint: 'Total pemasukan minggu ini',
+      icon: ShoppingCart,
+      className: 'simple-card-blue',
+      to: '/admin/finance',
+    },
   ];
 
   const quickActions = [
-    { label: 'Buka Kasir', hint: 'Scan barang dan terima pembayaran', to: '/kasir', icon: ShoppingCart, className: 'quick-action-green' },
-    { label: 'Catat Uang Keluar', hint: 'Belanja, listrik, atau biaya toko', to: '/admin/finance', icon: WalletCards, className: 'quick-action-yellow' },
-    { label: 'Cek Stok Barang', hint: 'Lihat barang yang hampir habis', to: '/admin/products', icon: Package, className: 'quick-action-blue' },
-    { label: 'Kelola Parsel', hint: 'Atur paket, harga, dan isi barang', to: '/admin/parcels', icon: Archive, className: 'quick-action-orange' },
+    { label: 'Buka kasir', hint: 'Mulai transaksi penjualan', to: '/kasir', icon: ShoppingCart, className: 'quick-action-green' },
+    { label: 'Catat uang keluar', hint: 'Belanja barang atau biaya toko', to: '/admin/finance', icon: WalletCards, className: 'quick-action-blue' },
+    { label: 'Periksa stok', hint: 'Cari barang yang perlu ditambah', to: '/admin/products', icon: Package, className: 'quick-action-yellow' },
+    { label: 'Kelola parsel', hint: 'Atur paket dan penagihan', to: '/admin/parcels', icon: Archive, className: 'quick-action-violet' },
   ];
 
-  return <AdminShell active="Dashboard" className="admin-simple-shell" mainClassName="simple-dashboard-main"><header className="simple-dashboard-header"><div><span className="eyebrow light">Ringkasan mudah</span><h1>Halo, cek toko hari ini</h1><p>Lihat kondisi toko dan pilih pekerjaan yang ingin dilakukan.</p><small className="simple-dashboard-updated">{loading ? 'Mengambil data terbaru...' : `Terakhir diperbarui ${lastUpdated?.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`}</small></div></header>{error && <div className="crud-notice" role="alert">{error}</div>}<section className="simple-dashboard-grid">{cards.map(({ label, value, hint, icon: Icon, className, to }) => <Link key={label} to={to} className={`simple-dashboard-card ${className}`}><div className="simple-card-top"><span>{label}</span><span className="simple-card-icon"><Icon size={19} /></span></div><strong>{loading ? '...' : value}</strong><div className="simple-card-bottom"><small>{hint}</small><b aria-hidden="true"><ArrowUpRight size={17} /></b></div></Link>)}</section><section className="simple-quick-actions" aria-labelledby="quick-actions-title"><div className="simple-section-heading"><div><span className="eyebrow light">Pekerjaan utama</span><h2 id="quick-actions-title">Mau melakukan apa?</h2></div><span className="simple-section-note">Pilih satu tombol besar</span></div><div className="simple-quick-actions-grid">{quickActions.map(({ label, hint, to, icon: Icon, className }) => <Link key={label} to={to} className={`simple-quick-action ${className}`}><span className="simple-quick-action-icon"><Icon size={27} strokeWidth={2} aria-hidden="true" /></span><span><strong>{label}</strong><small>{hint}</small></span><b aria-hidden="true">→</b></Link>)}</div></section><div className="simple-dashboard-help"><strong>Butuh bantuan?</strong><span>Data otomatis disinkronkan setiap 60 detik.</span><Link to="/admin/detail">Buka laporan lengkap →</Link></div></AdminShell>;
+  return (
+    <AdminShell active="Dashboard" className="admin-simple-shell" mainClassName="simple-dashboard-main">
+      <div className="simple-dashboard">
+        <header className="simple-dashboard-hero">
+          <div className="simple-dashboard-hero-copy">
+            <span className="simple-dashboard-kicker"><Sparkles size={14} aria-hidden="true" /> Dashboard toko</span>
+            <h1>Semua yang penting,<br />langsung terlihat.</h1>
+            <p>Pantau uang masuk, stok, dan piutang. Lanjutkan pekerjaan toko dari satu tempat.</p>
+            <div className="simple-dashboard-sync">
+              <span className={`simple-sync-dot ${!error && lastUpdated ? 'is-ready' : ''}`} />
+              <span>{loading ? 'Mengambil data terbaru...' : error ? 'Data perlu diperbarui' : `Data diperbarui ${lastUpdated?.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`}</span>
+            </div>
+          </div>
+          <Link to="/kasir" className="simple-dashboard-primary-action">
+            <span className="simple-primary-icon"><ShoppingCart size={19} aria-hidden="true" /></span>
+            <span><small>Mulai jualan</small><strong>Buka kasir</strong></span>
+            <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+          <div className="simple-hero-decoration" aria-hidden="true" />
+        </header>
+
+        {error && <div className="simple-dashboard-error" role="alert"><TriangleAlert size={17} />{error}</div>}
+
+        <section className="simple-dashboard-section" aria-labelledby="simple-summary-title">
+          <div className="simple-section-heading">
+            <div>
+              <span className="simple-section-kicker">Ringkasan hari ini</span>
+              <h2 id="simple-summary-title">Kondisi toko</h2>
+            </div>
+            <span className="simple-section-note"><Clock3 size={14} aria-hidden="true" /> Diperbarui otomatis</span>
+          </div>
+          <div className="simple-dashboard-grid">
+            {cards.map(({ label, value, hint, icon: Icon, className, to }) => (
+              <Link key={label} to={to} className={`simple-dashboard-card ${className}`}>
+                <div className="simple-card-top">
+                  <span>{label}</span>
+                  <span className="simple-card-icon"><Icon size={19} aria-hidden="true" /></span>
+                </div>
+                <strong>{loading ? '...' : value}</strong>
+                <div className="simple-card-bottom">
+                  <small>{hint}</small>
+                  <b aria-hidden="true"><ArrowUpRight size={16} /></b>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="simple-quick-actions" aria-labelledby="quick-actions-title">
+          <div className="simple-section-heading">
+            <div>
+              <span className="simple-section-kicker">Akses cepat</span>
+              <h2 id="quick-actions-title">Mau melakukan apa?</h2>
+            </div>
+            <span className="simple-section-note">Pilih pekerjaan untuk dilanjutkan</span>
+          </div>
+          <div className="simple-quick-actions-grid">
+            {quickActions.map(({ label, hint, to, icon: Icon, className }) => (
+              <Link key={label} to={to} className={`simple-quick-action ${className}`}>
+                <span className="simple-quick-action-icon"><Icon size={21} strokeWidth={1.9} aria-hidden="true" /></span>
+                <span><strong>{label}</strong><small>{hint}</small></span>
+                <ArrowRight size={17} aria-hidden="true" />
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
+    </AdminShell>
+  );
 }

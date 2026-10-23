@@ -103,6 +103,14 @@ export const inviteUserSchema = z.object({
   email: emailSchema,
   role: z.enum(['ADMIN', 'CASHIER', 'PARCEL_MANAGER']),
   phone: z.string().trim().optional().nullable(),
+  regionId: z.string().trim().optional().nullable(),
+}).superRefine((value, context) => {
+  if (value.role === 'PARCEL_MANAGER' && !value.regionId) {
+    context.addIssue({ code: 'custom', path: ['regionId'], message: 'Wilayah wajib dipilih untuk manager parsel.' });
+  }
+  if (value.role !== 'PARCEL_MANAGER' && value.regionId) {
+    context.addIssue({ code: 'custom', path: ['regionId'], message: 'Wilayah hanya dapat diberikan kepada manager parsel.' });
+  }
 });
 
 export const notificationPreferencesSchema = z.object({
@@ -328,19 +336,29 @@ export const parcelCollectionVerifySchema = z.object({
 // ---- Akun manager/kasir ----
 export const managerCreateSchema = z.object({
   name: z.string().trim().min(1, 'Nama wajib diisi'),
-  email: z.string().trim().min(1, 'Email wajib diisi'),
+  email: emailSchema,
   password: z.string().min(6, 'Password minimal 6 karakter'),
   phone: z.string().trim().optional().nullable(),
-  regionId: z.string().optional().nullable(),
+  regionId: z.string().trim().min(1, 'Wilayah wajib dipilih'),
 });
 export const managerUpdateSchema = z.object({
   name: z.string().trim().optional(),
-  email: z.string().trim().optional(),
+  email: emailSchema.optional(),
   password: z.string().min(6, 'Password minimal 6 karakter').optional().or(z.literal('')),
   phone: z.string().trim().optional().nullable(),
-  regionId: z.string().optional().nullable(),
+  regionId: z.string().trim().min(1, 'Wilayah wajib dipilih').optional(),
   isActive: z.coerce.boolean().optional(),
 });
+
+export const accountUpdateSchema = z.object({
+  name: z.string().trim().min(1, 'Nama wajib diisi').max(100).optional(),
+  email: emailSchema.optional(),
+  phone: z.string().trim().max(40).optional().nullable(),
+  role: z.enum(['ADMIN', 'CASHIER', 'PARCEL_MANAGER']).optional(),
+  regionId: z.string().trim().optional().nullable(),
+  isActive: z.boolean().optional(),
+  password: strongPasswordSchema.optional().or(z.literal('')),
+}).strict();
 
 // ---- Peserta parsel ----
 export const parcelParticipantCreateSchema = z.object({
@@ -462,7 +480,8 @@ export const siteContentUpdateSchema = siteContentCreateSchema.partial();
 
 export const contactMessageSchema = z.object({
   name: z.string().trim().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
-  phone: z.string().trim().min(8, 'Nomor WhatsApp minimal 8 karakter').max(30, 'Nomor WhatsApp maksimal 30 karakter'),
+  phone: z.string().trim().max(30, 'Nomor WhatsApp maksimal 30 karakter').optional().default('')
+    .refine((value) => !value || value.length >= 8, 'Nomor WhatsApp minimal 8 karakter'),
   message: z.string().trim().min(3, 'Pesan minimal 3 karakter').max(2000, 'Pesan maksimal 2000 karakter'),
 });
 

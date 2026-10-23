@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../services/api';
-import { clearStaffCaches } from '../utils/catalogStorage';
+import { logoutSession } from '../utils/authSession';
 import ReminderBell from './ReminderBell';
-import { Archive, CalendarRange, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, MapPinned, Package, PackagePlus, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
+import { Archive, CalendarRange, ClipboardCheck, FileText, Globe2, History, LayoutDashboard, LogOut, Mail, MapPinned, Package, PackagePlus, Percent, Settings, ShoppingCart, Tags, Users, WalletCards } from 'lucide-react';
 
 const ownerPrimaryGroups = [
-  { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Penagihan Wilayah', '/admin/parcel-collections'], ['06', 'Keuangan', '/admin/finance']] },
+  { label: 'Menu Utama', links: [['01', 'Dashboard', '/admin'], ['02', 'Kasir', '/kasir'], ['03', 'Riwayat Transaksi', '/kasir/riwayat'], ['04', 'Produk', '/admin/products'], ['05', 'Penagihan Wilayah', '/admin/parcel-collections'], ['06', 'Keuangan', '/admin/finance'], ['07', 'Akun & Akses', '/admin/accounts'], ['08', 'Pesan Masuk', '/admin/messages']] },
 ];
 
 const ownerSecondaryGroups = [
@@ -89,10 +89,7 @@ export default function AdminSidebar({ active = '' }) {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('glosir_token');
-    localStorage.removeItem('glosir_user');
-    clearStaffCaches();
-    navigate('/login');
+    logoutSession(navigate);
   };
 
   const toggleSidebar = () => {
@@ -253,6 +250,8 @@ function getSidebarIcon(label, fallback) {
     'Approval Keuangan': ClipboardCheck,
     'Audit Keuangan': History,
     'Konten Publik': Globe2,
+    'Akun & Akses': Users,
+    'Pesan Masuk': Mail,
     Profil: Settings,
     'Stok Opname': ClipboardCheck,
     Restock: PackagePlus,

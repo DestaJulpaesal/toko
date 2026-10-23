@@ -145,6 +145,7 @@ Create a public Supabase Storage bucket named `catalog-images`. The backend requ
 - Finance and debt deletion uses soft-delete (`deletedAt`).
 - Stock opname, price/stock audit logs, and event package APIs are available to authenticated staff/admin users.
 - Admin routes: `/admin/stock-opname` and `/admin/event-packages`; public catalog: `/paket-acara`.
+- Owner mengelola akun Owner, Admin, Kasir, dan Manager Parsel di `/admin/accounts`. Undangan karyawan dan reset password akun tim tersedia di halaman tersebut; profil toko tetap dikelola di `/admin/profile`. Kasir tidak ditampilkan sebagai manager parsel.
 - Optional nightly WhatsApp recap uses Fonnte when `ENABLE_NIGHTLY_RECAP=true`, `FONNTE_API_KEY`, and `OWNER_WHATSAPP_NUMBER` are configured.
 - WhatsApp owner commands are available at `POST /api/whatsapp/webhook`; configure the owner whitelist and optional `WHATSAPP_WEBHOOK_SECRET` before connecting a provider.
 - Customer WhatsApp commands: `cek pesanan`, `status`, and `lacak [nomor order]`. Status notifications are sent after admin updates an order through `PATCH /api/orders/:id/status`.

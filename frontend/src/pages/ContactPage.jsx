@@ -180,7 +180,7 @@ export default function ContactPage() {
               </div>
               <div className="contact-response-note">
                 <MessageCircle size={17} />
-                <span>Isi formulir dan tim kami akan menghubungimu lewat WhatsApp.</span>
+                <span>Isi nomor WhatsApp jika ingin dihubungi kembali lewat WhatsApp.</span>
               </div>
             </div>
             {contactCopy.length > 1 && (
@@ -194,7 +194,7 @@ export default function ContactPage() {
             <div className="contact-form-heading">
               <span className="contact-section-eyebrow">Kirim pesan</span>
               <h2>Ada yang bisa kami bantu?</h2>
-              <p>Tulis nama, nomor WhatsApp, dan pesanmu. Tim kami akan segera menghubungi.</p>
+              <p>Tulis nama dan pesanmu. Nomor WhatsApp boleh dikosongkan.</p>
             </div>
 
             <form className="contact-form" onSubmit={handleSubmit}>
@@ -204,8 +204,8 @@ export default function ContactPage() {
                   <input name="name" value={form.name} onChange={handleChange} autoComplete="name" required minLength={2} maxLength={100} placeholder="Nama lengkap" />
                 </label>
                 <label>
-                  Nomor WhatsApp <span aria-hidden="true">*</span>
-                  <input name="phone" value={form.phone} onChange={handleChange} autoComplete="tel" required minLength={8} maxLength={30} placeholder="08xx xxxx xxxx" />
+                  Nomor WhatsApp <span className="contact-optional-label">(opsional)</span>
+                  <input name="phone" value={form.phone} onChange={handleChange} autoComplete="tel" maxLength={30} placeholder="08xx xxxx xxxx" />
                 </label>
                 <label className="contact-message-field">
                   Pesan <span aria-hidden="true">*</span>

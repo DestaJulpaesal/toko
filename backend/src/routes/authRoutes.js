@@ -208,7 +208,30 @@ router.post('/invite', authenticateToken, requireRole('OWNER'), emailActionLimit
   try {
     const existing = await prisma.user.findUnique({ where: { email: req.body.email } });
     if (existing) return res.status(409).json({ success: false, message: 'Email tersebut sudah terdaftar.' });
-    const user = await prisma.user.create({ data: { name: req.body.name, email: req.body.email, phone: req.body.phone || null, role: req.body.role, passwordHash: 'disabled' } });
+    const user = await prisma.$transaction(async (tx) => {
+      const invitedUser = await tx.user.create({
+        data: {
+          name: req.body.name,
+          email: req.body.email,
+          phone: req.body.phone || null,
+          role: req.body.role,
+          regionId: req.body.regionId || null,
+          passwordHash: 'disabled',
+        },
+      });
+      if (req.body.regionId) {
+        const assigned = await tx.parcelRegion.updateMany({
+          where: { id: req.body.regionId, isActive: true, managerId: null },
+          data: { managerId: invitedUser.id },
+        });
+        if (!assigned.count) {
+          const error = new Error('Wilayah parsel tidak ditemukan, nonaktif, atau sudah memiliki manager.');
+          error.code = 'REGION_UNAVAILABLE';
+          throw error;
+        }
+      }
+      return invitedUser;
+    });
     const token = await createPasswordResetToken(user.id, 48);
     const actionUrl = appUrl('reset-password', token);
     await sendEmail({
@@ -222,6 +245,12 @@ router.post('/invite', authenticateToken, requireRole('OWNER'), emailActionLimit
     await prisma.auditLog.create({ data: { entityType: 'User', entityId: user.id, field: 'invitation', newValue: req.body.role, changedById: req.user.id } });
     return res.status(201).json({ success: true, message: 'Undangan sudah dikirim ke email karyawan.' });
   } catch (error) {
+    if (error.code === 'REGION_UNAVAILABLE') {
+      return res.status(409).json({ success: false, message: error.message });
+    }
+    if (error.code === 'P2002') {
+      return res.status(409).json({ success: false, message: 'Email tersebut sudah terdaftar.' });
+    }
     console.error('User invitation failed:', error.message);
     return res.status(503).json({ success: false, message: 'Undangan belum bisa dikirim. Coba lagi.' });
   }
