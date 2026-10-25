@@ -7,7 +7,7 @@
 /* ---------- A. JEMBATAN UNTUK CLASS LAMA ---------- */
 
 /* Area konten admin + posisi terhadap sidebar (SATU definisi, menggantikan 3 versi lama).
-   Desktop >=1025px: sidebar fixed 232px (76px kalau collapsed), konten digeser margin-kiri.
+   Desktop >=1025px: sidebar fixed 280px (76px kalau collapsed), konten digeser margin-kiri.
    Tablet/HP <=1024px: sidebar jadi bar atas (sticky), konten penuh. */
 .g-shell { --g-sidebar-w: 280px; background: var(--g-bg); color: var(--g-text); font-family: var(--g-font); }
 .g-shell:has(.sidebar-collapsed) { --g-sidebar-w: 76px; }
@@ -35,11 +35,9 @@
 .g-main .admin-subtitle { margin: var(--g-space-1) 0 0; color: var(--g-muted); font-size: var(--g-text-sm); }
 
 /* ---------- Dashboard SaaS ---------- */
+.admin-shell.g-shell:has(.dashboard-shell-main) { background: #f5f4f1; }
 .dashboard-shell-main {
-  background:
-    radial-gradient(ellipse at 88% 0%, rgba(48, 132, 225, 0.075), transparent 34%),
-    radial-gradient(ellipse at 6% 10%, rgba(19, 148, 99, 0.065), transparent 31%),
-    #f5f8f7 !important;
+  background: #f5f4f1 !important;
 }
 .dashboard-saas {
   --dashboard-line: #e2eae6;
@@ -74,15 +72,21 @@
 .dashboard-topbar-brand { display: none !important; }
 .dashboard-brand-mark {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   place-items: center;
-  border-radius: 11px;
-  background: linear-gradient(145deg, #15966b, #287ac7);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.35), transparent 36%),
+    linear-gradient(145deg, #15966b, #287ac7);
   color: white;
   font-size: 18px;
   font-weight: 700;
+  box-shadow: 0 5px 12px rgba(25, 124, 91, 0.2);
 }
+.dashboard-topbar-brand p { margin: 0; }
+.dashboard-topbar-brand > div { gap: 4px; }
 .dashboard-search {
   width: min(100%, 500px);
   flex: 1 1 360px;
@@ -93,6 +97,56 @@
   padding: 0 11px;
   color: var(--dashboard-muted);
   background: #f8fbf9;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.dashboard-search:focus-within {
+  border-color: rgba(18, 129, 93, 0.5);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(18, 129, 93, 0.09);
+}
+.dashboard-search input {
+  font-size: 12px;
+}
+.dashboard-topbar-actions {
+  gap: 9px !important;
+}
+.dashboard-topbar .dashboard-cashier-button {
+  gap: 8px;
+  border: 0 !important;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #11845e, #176f91) !important;
+  color: #fff !important;
+  box-shadow: 0 5px 13px rgba(17, 132, 94, 0.19);
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+.dashboard-topbar .dashboard-cashier-button:hover {
+  filter: brightness(1.04);
+  box-shadow: 0 8px 17px rgba(17, 132, 94, 0.24);
+  transform: translateY(-1px);
+}
+.dashboard-topbar .dashboard-health-button {
+  gap: 9px;
+  border: 1px solid #deebe4 !important;
+  border-radius: 10px;
+  background: #f7faf8;
+  color: #42685b;
+  font-size: 11px;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.dashboard-topbar .dashboard-health-button:hover {
+  border-color: #c9e0d4 !important;
+  background: #eff7f2;
+}
+.dashboard-topbar .dashboard-profile {
+  border: 1px solid #e4ebe7 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  color: #284a3e !important;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.dashboard-topbar .dashboard-profile:hover {
+  border-color: #cbded4 !important;
+  background: #f8fbf9 !important;
 }
 .dashboard-search > span {
   white-space: nowrap;
@@ -1309,6 +1363,7 @@ body .product-performance-shell .product-performance-results .g-panel { padding:
 .g-main .product-editor-form > .catalog-image-field,
 .g-main .product-editor-form > .product-packages-panel,
 .g-main .product-editor-form > .quick-access-toggle,
+.g-main .product-editor-form > .product-homepage-options,
 .g-main .product-editor-form > .product-form-actions { grid-column: 1 / -1; }
 .g-main .product-editor-form > label { margin-bottom: 16px; }
 .g-main .product-editor-form > .form-two-columns { gap: 0 18px; }
@@ -1316,6 +1371,15 @@ body .product-performance-shell .product-performance-results .g-panel { padding:
 .g-main .product-editor-form > .catalog-image-field { margin: 0 0 16px; }
 .g-main .product-editor-form > .product-packages-panel { margin-top: 4px; }
 .g-main .product-editor-form > .quick-access-toggle { align-self: start; }
+.g-main .product-homepage-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+@media (max-width: 760px) {
+  .g-main .product-homepage-options { grid-template-columns: 1fr; }
+}
 .g-main .product-form-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 8px; }
 .g-main .product-form-actions .btn { min-width: 140px; }
 .g-main .product-table-heading {

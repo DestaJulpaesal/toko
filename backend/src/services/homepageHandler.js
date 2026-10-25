@@ -28,13 +28,21 @@ function formatPromo(promo) {
 }
 
 function formatHomepageProduct(product) {
+  const variant = product.variants?.[0];
+  const price = Number(variant?.sellPrice || 0);
+  const originalPrice = product.originalPrice == null ? null : Number(product.originalPrice);
+  const hasDiscount = originalPrice !== null && originalPrice > price;
+
   return {
     id: product.id,
+    variantId: variant?.id,
     name: product.name,
     category: product.category?.name || 'Tanpa kategori',
     imageUrl: product.imageUrl || null,
-    price: Number(product.variants[0]?.sellPrice || 0),
-    originalPrice: null,
+    price,
+    originalPrice: hasDiscount ? originalPrice : null,
+    discountPercent: hasDiscount ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0,
+    stock: Number(variant?.stockQty || 0),
   };
 }
 
@@ -52,7 +60,9 @@ function getHomepageCache(db) {
 
 async function loadHomepageData(db) {
   const now = new Date();
-  const [categories, promos, products] = await Promise.all([
+  const salesSince = new Date(now);
+  salesSince.setDate(salesSince.getDate() - 90);
+  const [categories, promos, products, completedOrderItems] = await Promise.all([
     db.category.findMany({
       include: { _count: { select: { products: true } } },
       orderBy: { name: 'asc' },
@@ -81,41 +91,77 @@ async function loadHomepageData(db) {
       },
     }),
     db.product.findMany({
-      where: {
-        status: 'ACTIVE',
-        OR: [{ isFlashSale: true }, { isBestseller: true }, { isRecommended: true }],
-      },
+      where: { status: 'ACTIVE' },
       select: {
         id: true,
         name: true,
         imageUrl: true,
         createdAt: true,
+        originalPrice: true,
         isFlashSale: true,
         isBestseller: true,
         isRecommended: true,
+        isFeatured: true,
         category: { select: { name: true } },
         variants: {
           where: { isActive: true, isDefault: true },
           take: 1,
-          select: { sellPrice: true },
+          select: { id: true, sellPrice: true, stockQty: true },
         },
       },
       orderBy: { createdAt: 'desc' },
     }),
+    db.orderItem.findMany({
+      where: {
+        productId: { not: null },
+        order: { status: 'COMPLETED', createdAt: { gte: salesSince } },
+      },
+      select: { productId: true, quantity: true },
+    }),
   ]);
 
-  const selectProducts = (flag) => products
-    .filter((product) => product[flag])
-    .slice(0, 10)
-    .map(formatHomepageProduct);
+  const availableProducts = products.filter((product) => (
+    product.variants?.[0] && Number(product.variants[0].stockQty || 0) > 0
+  ));
+  const selectProducts = (matches) => matches.map(formatHomepageProduct);
+  const flashSaleProducts = selectProducts(availableProducts.filter((product) => (
+    product.isFlashSale
+    && product.originalPrice != null
+    && Number(product.originalPrice) > Number(product.variants[0].sellPrice || 0)
+  )));
+
+  const soldQuantities = new Map();
+  for (const item of completedOrderItems) {
+    if (!item.productId) continue;
+    soldQuantities.set(
+      item.productId,
+      (soldQuantities.get(item.productId) || 0) + Number(item.quantity || 0),
+    );
+  }
+  const productsById = new Map(availableProducts.map((product) => [product.id, product]));
+  const salesRankedProducts = [...soldQuantities.entries()]
+    .sort((first, second) => second[1] - first[1])
+    .map(([productId]) => productsById.get(productId))
+    .filter(Boolean);
+  const bestsellerProducts = salesRankedProducts.length > 0
+    ? selectProducts(salesRankedProducts)
+    : selectProducts(availableProducts.filter((product) => product.isBestseller));
+
+  const markedRecommendations = availableProducts.filter((product) => product.isRecommended);
+  const recommendations = markedRecommendations.length > 0
+    ? markedRecommendations
+    : [...availableProducts].sort((first, second) => (
+      Number(second.isFeatured) - Number(first.isFeatured)
+      || new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
+    ));
 
   return {
     success: true,
     categories: categories.map(formatCategory),
     promos: promos.map(formatPromo),
-    flashSaleProducts: selectProducts('isFlashSale'),
-    bestsellerProducts: selectProducts('isBestseller'),
-    recommendedProducts: selectProducts('isRecommended'),
+    flashSaleProducts,
+    bestsellerProducts,
+    recommendedProducts: selectProducts(recommendations),
   };
 }
 

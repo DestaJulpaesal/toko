@@ -47,6 +47,7 @@ import analyticsRoutes from './routes/analyticsRoutes.js';
 import operationalNotificationRoutes from './routes/operationalNotificationRoutes.js';
 import stockMovementRoutes from './routes/stockMovementRoutes.js';
 import settingRoutes from './routes/settingRoutes.js';
+import globotRoutes from './routes/globotRoutes.js';
 import adminDashboardRoutes from './routes/adminDashboardRoutes.js';
 import prisma from './config/db.js';
 import { createHomepageHandler } from './services/homepageHandler.js';
@@ -155,6 +156,7 @@ app.use('/api/backup', backupRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/notifications/operational', operationalNotificationRoutes);
 app.use('/api/settings', settingRoutes);
+app.use('/api/globot', globotRoutes);
 app.use('/api/admin/dashboard', adminDashboardRoutes);
 
 app.use((req, res) => {

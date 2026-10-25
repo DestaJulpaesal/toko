@@ -36,15 +36,15 @@ export default function DashboardTopbar({ search, onSearch, healthy, loading, la
         />
       </label>
 
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <Button asChild size="sm" className="h-9 px-3">
+      <div className="dashboard-topbar-actions flex shrink-0 items-center gap-2 sm:gap-3">
+        <Button asChild size="sm" className="dashboard-cashier-button h-9 px-3">
           <Link to="/kasir"><ShoppingCart aria-hidden="true" /> <span className="hidden sm:inline">Buka kasir</span><span className="sm:hidden">Kasir</span></Link>
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-9 gap-2 px-3"
+          className="dashboard-health-button h-9 gap-2 px-3"
           onClick={onOpenStatus}
           aria-label="Lihat status sistem dan backup"
         >

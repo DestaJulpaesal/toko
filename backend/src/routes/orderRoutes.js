@@ -13,6 +13,8 @@ import { recordPromoUse, validatePromoCode } from '../services/promoService.js';
 import { getAppSettings } from '../services/appSettingService.js';
 import { parsePagination } from '../utils/pagination.js';
 import { isValidIndonesianPhone, normalizeIndonesianPhone } from '../utils/phoneUtils.js';
+import { createOnlineOrderNumber } from '../utils/orderNumber.js';
+import { formatOnlineOrderWhatsappMessage } from '../utils/orderWhatsappMessage.js';
 
 const router = express.Router();
 const staffOnly = requireRole('OWNER', 'ADMIN', 'CASHIER');
@@ -324,37 +326,24 @@ router.post('/online', checkoutLimiter, validateBody(onlineOrderSchema), async (
     const promoResult = promoCode ? await validatePromoCode(prisma, promoCode, subtotal, lines) : null;
     const promoDiscount = promoResult?.discountAmount || 0;
     const total = Math.max(subtotal - promoDiscount + Number(shippingCost || 0), 0);
-    const orderNumber = createOrderNumber('WEB');
+    const orderNumber = createOnlineOrderNumber();
     const normalizedPhone = normalizeIndonesianPhone(customerPhone);
     const storeNumber = String(process.env.STORE_WHATSAPP_NUMBER || process.env.OWNER_WHATSAPP_NUMBER || '').replace(/\D/g, '');
     if (!storeNumber) return res.status(503).json({ success: false, message: 'Nomor WhatsApp toko belum dikonfigurasi' });
-    const fulfillmentLabel = fulfillmentMethod === 'DELIVERY' ? 'Antar ke alamat' : 'Ambil langsung di toko';
-    const distanceLabel = fulfillmentMethod === 'DELIVERY' ? `\nJarak perkiraan : ${Number(distanceKm).toLocaleString('id-ID')} km` : '';
-    const itemLines = lines
-      .map((line, index) => `${index + 1}. ${line.name}\n   ${line.quantity} x Rp ${line.unitPrice.toLocaleString('id-ID')} = Rp ${line.total.toLocaleString('id-ID')}`)
-      .join('\n');
-    const noteLine = note?.trim() ? `\nCatatan          : ${note.trim()}` : '';
-    const whatsappText = [
-      '*KONFIRMASI PESANAN GLOSIR*',
-      '━━━━━━━━━━━━━━━━━━━━',
-      `No. Pesanan      : ${orderNumber}`,
-      `Nama             : ${customerName}`,
-      `WhatsApp         : ${normalizedPhone}`,
-      `Pengambilan      : ${fulfillmentLabel}${distanceLabel}`,
-      noteLine,
-      '',
-      '*DAFTAR BELANJA*',
-      itemLines,
-      '',
-      '━━━━━━━━━━━━━━━━━━━━',
-      `Subtotal         : Rp ${subtotal.toLocaleString('id-ID')}`,
-      `Diskon           : Rp ${promoDiscount.toLocaleString('id-ID')}`,
-      `Ongkir           : Rp ${shippingCost.toLocaleString('id-ID')}`,
-      `*TOTAL           : Rp ${total.toLocaleString('id-ID')}*`,
-      `Promo            : ${promoCode || '-'}`,
-      '',
-      'Mohon konfirmasi pesanan saya. Terima kasih.',
-    ].join('\n').replace(/\n\n\n+/g, '\n\n');
+    const whatsappText = formatOnlineOrderWhatsappMessage({
+      orderNumber,
+      customerName,
+      customerPhone: normalizedPhone,
+      fulfillmentMethod,
+      distanceKm,
+      note,
+      items: lines,
+      subtotal,
+      discount: promoDiscount,
+      shippingCost,
+      total,
+      promoCode,
+    });
     const whatsappLink = `https://wa.me/${storeNumber}?text=${encodeURIComponent(whatsappText)}`;
     const { order } = await prisma.$transaction(async (transaction) => {
       let linkedCustomer = await transaction.customer.findFirst({ where: { phone: normalizedPhone } });

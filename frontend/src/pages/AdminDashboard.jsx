@@ -7,9 +7,13 @@ import {
   Banknote,
   Boxes,
   CircleHelp,
+  History,
   PackageSearch,
+  PackagePlus,
   SearchX,
+  ShoppingCart,
   Wallet,
+  WalletCards,
 } from "lucide-react";
 import {
   Bar,
@@ -268,35 +272,77 @@ export default function AdminDashboard() {
             </div>
           </section>
 
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ringkasan keuangan">
-            <DashboardMetricCard
-              icon={Wallet}
-              label="Total pemasukan"
-              value={loading ? "Memuat..." : formatCurrency(periodIncome)}
-              caption={`${period} · pemasukan tercatat`}
-              tone="income"
-            />
-            <DashboardMetricCard
-              icon={ArrowDownRight}
-              label="Pengeluaran"
-              value={loading ? "Memuat..." : formatCurrency(periodExpense)}
-              caption="Terhubung ke catatan keuangan"
-              tone="expense"
-            />
-            <DashboardMetricCard
-              icon={periodNet >= 0 ? ArrowUpRight : ArrowDownRight}
-              label="Laba bersih"
-              value={loading ? "Memuat..." : formatCurrency(periodNet)}
-              caption={periodNet >= 0 ? "Pemasukan lebih besar dari pengeluaran" : "Pengeluaran lebih besar dari pemasukan"}
-              tone={periodNet >= 0 ? "positive" : "negative"}
-            />
-            <DashboardMetricCard
-              icon={Boxes}
-              label="Stok perlu diperiksa"
-              value={loading ? "Memuat..." : `${lowStockCount} produk`}
-              caption="Produk yang disarankan untuk restok"
-              tone={lowStockCount ? "warning" : "default"}
-            />
+          <section className="dashboard-overview-section" aria-label="Ringkasan keuangan">
+            <div className="dashboard-section-heading">
+              <div>
+                <span className="dashboard-section-eyebrow">Performa toko</span>
+                <h2>Angka penting, sekilas pandang</h2>
+                <p>Ringkasan keuangan dan stok untuk periode {period.toLocaleLowerCase("id-ID")}.</p>
+              </div>
+              <span className="dashboard-live-indicator"><i /> Ringkasan aktif</span>
+            </div>
+            <div className="dashboard-metrics-grid">
+              <DashboardMetricCard
+                icon={Wallet}
+                label="Total pemasukan"
+                value={loading ? "Memuat..." : formatCurrency(periodIncome)}
+                caption={`${period} · pemasukan tercatat`}
+                tone="income"
+              />
+              <DashboardMetricCard
+                icon={ArrowDownRight}
+                label="Pengeluaran"
+                value={loading ? "Memuat..." : formatCurrency(periodExpense)}
+                caption="Terhubung ke catatan keuangan"
+                tone="expense"
+              />
+              <DashboardMetricCard
+                icon={periodNet >= 0 ? ArrowUpRight : ArrowDownRight}
+                label="Laba bersih"
+                value={loading ? "Memuat..." : formatCurrency(periodNet)}
+                caption={periodNet >= 0 ? "Pemasukan lebih besar dari pengeluaran" : "Pengeluaran lebih besar dari pemasukan"}
+                tone={periodNet >= 0 ? "positive" : "negative"}
+              />
+              <DashboardMetricCard
+                icon={Boxes}
+                label="Stok perlu diperiksa"
+                value={loading ? "Memuat..." : `${lowStockCount} produk`}
+                caption="Produk yang disarankan untuk restok"
+                tone={lowStockCount ? "warning" : "default"}
+              />
+            </div>
+          </section>
+
+          <section className="dashboard-shortcuts-section" aria-label="Akses cepat">
+            <div className="dashboard-shortcuts-heading">
+              <div>
+                <span className="dashboard-section-eyebrow">Lanjutkan pekerjaan</span>
+                <h2>Akses cepat</h2>
+              </div>
+              <span>Pintasan ke aktivitas utama toko</span>
+            </div>
+            <div className="dashboard-shortcuts-grid">
+              <Link className="dashboard-shortcut dashboard-shortcut-pos" to="/kasir">
+                <span className="dashboard-shortcut-icon"><ShoppingCart size={19} /></span>
+                <span className="dashboard-shortcut-copy"><strong>Buka kasir</strong><small>Mulai transaksi penjualan</small></span>
+                <ArrowUpRight className="dashboard-shortcut-arrow" size={17} />
+              </Link>
+              <Link className="dashboard-shortcut dashboard-shortcut-products" to="/admin/products">
+                <span className="dashboard-shortcut-icon"><PackagePlus size={19} /></span>
+                <span className="dashboard-shortcut-copy"><strong>Kelola produk</strong><small>Atur katalog dan stok</small></span>
+                <ArrowUpRight className="dashboard-shortcut-arrow" size={17} />
+              </Link>
+              <Link className="dashboard-shortcut dashboard-shortcut-finance" to="/admin/finance">
+                <span className="dashboard-shortcut-icon"><WalletCards size={19} /></span>
+                <span className="dashboard-shortcut-copy"><strong>Buku kas</strong><small>Pantau arus keuangan</small></span>
+                <ArrowUpRight className="dashboard-shortcut-arrow" size={17} />
+              </Link>
+              <Link className="dashboard-shortcut dashboard-shortcut-history" to="/kasir/riwayat">
+                <span className="dashboard-shortcut-icon"><History size={19} /></span>
+                <span className="dashboard-shortcut-copy"><strong>Riwayat transaksi</strong><small>Lihat aktivitas penjualan</small></span>
+                <ArrowUpRight className="dashboard-shortcut-arrow" size={17} />
+              </Link>
+            </div>
           </section>
 
           <>
@@ -327,8 +373,8 @@ export default function AdminDashboard() {
                               tickFormatter={(value) => value === 0 ? "0" : `${new Intl.NumberFormat("id-ID", { notation: "compact", maximumFractionDigits: 0 }).format(value)}`}
                             />
                             <Tooltip content={<CashflowTooltip />} cursor={{ stroke: "#c6d8ce", strokeDasharray: "4 4" }} />
-                            <Bar dataKey="income" name="Pemasukan" fill="#13845f" radius={[5, 5, 0, 0]} maxBarSize={17} isAnimationActive={false} />
-                            <Bar dataKey="expense" name="Pengeluaran" fill="#4389d6" radius={[5, 5, 0, 0]} maxBarSize={17} isAnimationActive={false} />
+                            <Bar dataKey="income" name="Pemasukan" fill="#13845f" radius={[5, 5, 0, 0]} maxBarSize={17} animationDuration={750} animationEasing="ease-out" />
+                            <Bar dataKey="expense" name="Pengeluaran" fill="#4389d6" radius={[5, 5, 0, 0]} maxBarSize={17} animationDuration={850} animationEasing="ease-out" />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>

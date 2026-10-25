@@ -1,5 +1,7 @@
+import { useLocation } from 'react-router-dom';
+
 export default function SupportButton() {
-  const path = window.location.pathname;
+  const { pathname: path } = useLocation();
   if (!path.startsWith('/admin') && !path.startsWith('/kasir') && !path.startsWith('/parcel-manager')) return null;
   const number = import.meta.env.VITE_SUPPORT_WHATSAPP_NUMBER || '6282118996827';
   const message = encodeURIComponent(`Halo, saya perlu bantuan memakai sistem Glosir di halaman ${path}.`);

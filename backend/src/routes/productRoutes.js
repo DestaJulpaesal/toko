@@ -20,16 +20,20 @@ async function findCategory(name) {
   return prisma.category.findFirst({ where: { name: 'Warung' } });
 }
 
+function formatPublicSectionProduct(product) {
+  return formatProduct(product, AUDIENCE.PUBLIC);
+}
+
 // Publik, tetapi isinya menyesuaikan siapa yang membuka (lihat services/catalogSerializers.js).
 router.get('/', softAuth, catalog.listProducts);
 router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(productCreateSchema), async (req, res) => {
   try {
-    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, stockWarning = 5, status = 'Aktif', isQuickAccess = false, imageUrl } = req.body || {};
+    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, stockWarning = 5, status = 'Aktif', isQuickAccess = false, isFlashSale = false, isBestseller = false, isRecommended = false, imageUrl } = req.body || {};
 
     const categoryRecord = await findCategory(category);
     if (!categoryRecord) return res.status(400).json({ success: false, message: `Kategori ${category} belum tersedia` });
 
-    const calculatedBase = purchasePrice !== undefined ? Number(purchasePrice) : (originalPrice ? Number(originalPrice) : Number(price));
+    const calculatedBase = purchasePrice == null ? Number(price) : Number(purchasePrice);
     const internalSku = String(sku || `GLS-${Date.now()}`).trim();
     const product = await prisma.product.create({
       data: {
@@ -38,8 +42,12 @@ router.post('/', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(
         slug: `${String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
         categoryId: categoryRecord.id,
         status: statusToDb[status] || 'ACTIVE',
+        originalPrice: originalPrice ? Number(originalPrice) : null,
         stockWarning: Number(stockWarning),
         isQuickAccess: Boolean(isQuickAccess),
+        isFlashSale: Boolean(isFlashSale),
+        isBestseller: Boolean(isBestseller),
+        isRecommended: Boolean(isRecommended),
         imageUrl: imageUrl ? String(imageUrl).trim() : null,
         variants: { create: { name: 'Kemasan utama', sku: `${internalSku}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null, basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), unit: 'unit', isDefault: true } },
       },
@@ -79,11 +87,15 @@ router.post('/bulk', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
             categoryId: categoryRecord.id,
             status: statusToDb[item.status] || 'ACTIVE',
             stockWarning: 5,
+            originalPrice: item.originalPrice ? Number(item.originalPrice) : null,
+            isFlashSale: Boolean(item.isFlashSale),
+            isBestseller: Boolean(item.isBestseller),
+            isRecommended: Boolean(item.isRecommended),
             variants: { create: {
               name: String(item.unit || 'Kemasan utama'),
               sku: `${internalSku}-DEFAULT`,
               barcode: item.barcode ? String(item.barcode).trim() : null,
-              basePrice: item.purchasePrice !== undefined ? Number(item.purchasePrice) : (item.originalPrice ? Number(item.originalPrice) : Number(item.price)),
+              basePrice: item.purchasePrice == null ? Number(item.price) : Number(item.purchasePrice),
               sellPrice: Number(item.price),
               wholesalePrice: item.wholesalePrice ? Number(item.wholesalePrice) : null,
               stockQty: Number(item.stock),
@@ -193,7 +205,7 @@ router.patch('/:id/variants/:variantId', authenticateToken, requireRole('OWNER',
 
 router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateBody(productUpdateSchema), async (req, res) => {
   try {
-    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, stockWarning, status = 'Aktif', isQuickAccess = false, imageUrl } = req.body || {};
+    const { name, sku, barcode, category, price, wholesalePrice, purchasePrice, originalPrice, stock, stockWarning, status = 'Aktif', isQuickAccess = false, isFlashSale = false, isBestseller = false, isRecommended = false, imageUrl } = req.body || {};
     const [categoryRecord, existing] = await Promise.all([
       findCategory(category),
       prisma.product.findUnique({ where: { id: req.params.id }, include: { category: true, variants: { where: { isDefault: true }, take: 1 } } }),
@@ -201,7 +213,7 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
     if (!categoryRecord) return res.status(400).json({ success: false, message: `Kategori ${category} belum tersedia` });
     if (!existing) return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
     const variant = existing.variants[0];
-    const calculatedBase = purchasePrice !== undefined ? Number(purchasePrice) : (originalPrice ? Number(originalPrice) : (variant ? Number(variant.basePrice) : Number(price)));
+    const calculatedBase = purchasePrice == null ? (variant ? Number(variant.basePrice) : Number(price)) : Number(purchasePrice);
     const changes = variant ? [
       ['sellPrice', Number(variant.sellPrice), Number(price)],
       ['wholesalePrice', variant.wholesalePrice == null ? null : Number(variant.wholesalePrice), wholesalePrice ? Number(wholesalePrice) : null],
@@ -211,6 +223,10 @@ router.patch('/:id', authenticateToken, requireRole('OWNER', 'ADMIN'), validateB
       where: { id: req.params.id },
       data: {
         name: String(name).trim(), sku: String(sku).trim(), categoryId: categoryRecord.id, status: statusToDb[status] || 'ACTIVE', stockWarning: stockWarning === undefined ? existing.stockWarning : Number(stockWarning), isQuickAccess: Boolean(isQuickAccess), imageUrl: imageUrl ? String(imageUrl).trim() : null,
+        originalPrice: originalPrice ? Number(originalPrice) : null,
+        isFlashSale: Boolean(isFlashSale),
+        isBestseller: Boolean(isBestseller),
+        isRecommended: Boolean(isRecommended),
         variants: variant ? { update: { where: { id: variant.id }, data: { basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), sku: `${String(sku).trim()}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null } } } : { create: { name: 'Kemasan utama', sku: `${String(sku).trim()}-DEFAULT`, barcode: barcode ? String(barcode).trim() : null, basePrice: calculatedBase, sellPrice: Number(price), wholesalePrice: wholesalePrice ? Number(wholesalePrice) : null, stockQty: Number(stock), unit: 'unit', isDefault: true } },
       },
       include: { category: true, variants: { where: { isDefault: true }, take: 1 } },
@@ -270,20 +286,13 @@ router.get('/public/flash-sale', async (req, res) => {
           take: 1,
         }
       },
-      take: 10,
       orderBy: { createdAt: 'desc' }
     });
-    return res.json({ 
-      success: true, 
-      products: products.map(p => ({
-        id: p.id,
-        name: p.name,
-        category: p.category.name,
-        imageUrl: p.imageUrl,
-        price: p.variants[0]?.sellPrice || 0,
-        originalPrice: p.variants[0]?.basePrice || 0,
-      }))
-    });
+    const discountedProducts = products
+      .map(formatPublicSectionProduct)
+      .filter((product) => product.stock > 0 && product.originalPrice > product.price)
+      .slice(0, 10);
+    return res.json({ success: true, products: discountedProducts });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Flash sale produk gagal dimuat' });
   }
@@ -306,17 +315,7 @@ router.get('/public/bestseller', async (req, res) => {
       take: 10,
       orderBy: { createdAt: 'desc' }
     });
-    return res.json({ 
-      success: true, 
-      products: products.map(p => ({
-        id: p.id,
-        name: p.name,
-        category: p.category.name,
-        imageUrl: p.imageUrl,
-        price: p.variants[0]?.sellPrice || 0,
-        originalPrice: p.variants[0]?.basePrice || 0,
-      }))
-    });
+    return res.json({ success: true, products: products.map(formatPublicSectionProduct) });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Produk terlaris gagal dimuat' });
   }
@@ -339,17 +338,7 @@ router.get('/public/recommended', async (req, res) => {
       take: 10,
       orderBy: { createdAt: 'desc' }
     });
-    return res.json({ 
-      success: true, 
-      products: products.map(p => ({
-        id: p.id,
-        name: p.name,
-        category: p.category.name,
-        imageUrl: p.imageUrl,
-        price: p.variants[0]?.sellPrice || 0,
-        originalPrice: p.variants[0]?.basePrice || 0,
-      }))
-    });
+    return res.json({ success: true, products: products.map(formatPublicSectionProduct) });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Produk rekomendasi gagal dimuat' });
   }

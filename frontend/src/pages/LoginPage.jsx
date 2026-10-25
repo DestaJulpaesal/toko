@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { apiFetch, monitorSessionExpiry } from '../services/api';
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '', rememberMe: false });
+  const [showPassword, setShowPassword] = useState(false);
   const [forcePasswordChange, setForcePasswordChange] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [resetRequested, setResetRequested] = useState(false);
   const [verificationRequired, setVerificationRequired] = useState(false);
   const googleButtonRef = useRef(null);
@@ -225,16 +229,28 @@ export default function LoginPage() {
                 placeholder="nama@glosir.com"
               />
             </label>
-            <label>
+            <label className="login-password-label">
               Password
-              <input
-                name="password"
-                type="password"
-                required
-                value={form.password}
-                onChange={handleChange}
-                placeholder="Masukkan password"
-              />
+              <span className="login-password-field">
+                <input
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={form.password}
+                  onChange={handleChange}
+                  placeholder="Masukkan password"
+                />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                </button>
+              </span>
             </label>
             <label className="login-remember"><input name="rememberMe" type="checkbox" checked={form.rememberMe} onChange={(event) => setForm((current) => ({ ...current, rememberMe: event.target.checked }))} /> Ingat saya di perangkat ini</label>
             <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
@@ -248,13 +264,35 @@ export default function LoginPage() {
 
           {forcePasswordChange && (
             <form onSubmit={handleChangePassword} className="login-form">
-              <label>
+              <label className="login-password-label">
                 Password baru
-                <input name="newPassword" type="password" minLength="8" required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Minimal 8 karakter" />
+                <span className="login-password-field">
+                  <input name="newPassword" type={showNewPassword ? 'text' : 'password'} autoComplete="new-password" minLength="8" required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Minimal 8 karakter" />
+                  <button
+                    type="button"
+                    className="login-password-toggle"
+                    aria-label={showNewPassword ? 'Sembunyikan password baru' : 'Tampilkan password baru'}
+                    aria-pressed={showNewPassword}
+                    onClick={() => setShowNewPassword((visible) => !visible)}
+                  >
+                    {showNewPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                  </button>
+                </span>
               </label>
-              <label>
+              <label className="login-password-label">
                 Ulangi password baru
-                <input name="passwordConfirmation" type="password" minLength="8" required value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} placeholder="Ketik ulang password baru" />
+                <span className="login-password-field">
+                  <input name="passwordConfirmation" type={showPasswordConfirmation ? 'text' : 'password'} autoComplete="new-password" minLength="8" required value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} placeholder="Ketik ulang password baru" />
+                  <button
+                    type="button"
+                    className="login-password-toggle"
+                    aria-label={showPasswordConfirmation ? 'Sembunyikan ulangi password' : 'Tampilkan ulangi password'}
+                    aria-pressed={showPasswordConfirmation}
+                    onClick={() => setShowPasswordConfirmation((visible) => !visible)}
+                  >
+                    {showPasswordConfirmation ? <EyeOff size={19} /> : <Eye size={19} />}
+                  </button>
+                </span>
               </label>
               <button type="submit" className="btn btn-primary login-submit" disabled={loading}>
                 {loading ? 'Menyimpan password...' : 'Simpan password baru'}

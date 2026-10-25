@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Store, ShieldCheck, Sparkles } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
@@ -43,7 +44,42 @@ export default function ProfilePage() {
         </section>
 
         <section className="profile-story">
-          <div className="profile-portrait">{profile.photoUrl ? <img src={profile.photoUrl} alt={profile.name} /> : profile.name.toUpperCase()}<br /><small>Glosir Family Store</small></div>
+          <div className="profile-owner-card">
+            <div className="profile-owner-badge-wrap">
+              <span className="profile-owner-badge">
+                <Store size={14} /> Pemilik &amp; Pengelola
+              </span>
+            </div>
+
+            <div className="profile-owner-frame">
+              {profile.photoUrl ? (
+                <img
+                  src={profile.photoUrl}
+                  alt={profile.name}
+                  className="profile-owner-photo"
+                />
+              ) : (
+                <div className="profile-owner-placeholder">
+                  <span className="profile-placeholder-icon">🏪</span>
+                  <strong>{profile.name}</strong>
+                </div>
+              )}
+            </div>
+
+            <div className="profile-owner-info">
+              <h3 className="profile-owner-name">{profile.name}</h3>
+              <p className="profile-owner-store">Glosir Family Store</p>
+              <div className="profile-owner-chips">
+                <span className="profile-owner-chip">
+                  <Sparkles size={12} /> Ramah &amp; Terpercaya
+                </span>
+                <span className="profile-owner-chip">
+                  <ShieldCheck size={12} /> Amanah &amp; Dekat
+                </span>
+              </div>
+            </div>
+          </div>
+
           <div className="profile-story-copy">
             <span className="eyebrow dark">Cerita kami</span>
             <h2>Berawal dari melayani sekitar, lalu dipercaya lebih banyak orang.</h2>

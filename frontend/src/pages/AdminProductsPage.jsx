@@ -31,6 +31,9 @@ const emptyForm = {
   status: 'Aktif',
   imageUrl: '',
   isQuickAccess: false,
+  isFlashSale: false,
+  isBestseller: false,
+  isRecommended: false,
   packages: [],
 };
 
@@ -389,6 +392,9 @@ export default function AdminProductsPage() {
         stock: Number(form.stock),
         stockWarning: Number(form.stockWarning ?? 0),
         isQuickAccess: Boolean(form.isQuickAccess),
+        isFlashSale: Boolean(form.isFlashSale),
+        isBestseller: Boolean(form.isBestseller),
+        isRecommended: Boolean(form.isRecommended),
       };
       const discountPercent = payload.originalPrice && payload.originalPrice > payload.price
         ? Math.round(((payload.originalPrice - payload.price) / payload.originalPrice) * 100)
@@ -719,6 +725,20 @@ export default function AdminProductsPage() {
             </section>
 
             <label className="quick-access-toggle"><input type="checkbox" checked={Boolean(form.isQuickAccess)} onChange={(event) => setForm((current) => ({ ...current, isQuickAccess: event.target.checked }))} /><span><strong>Tampilkan sebagai tombol cepat di Kasir</strong><small>Untuk barang yang sering dijual tanpa perlu mencari.</small></span></label>
+            <div className="product-homepage-options">
+              <label className="quick-access-toggle">
+                <input type="checkbox" checked={Boolean(form.isFlashSale)} onChange={(event) => setForm((current) => ({ ...current, isFlashSale: event.target.checked }))} />
+                <span><strong>Tampilkan di Flash Sale</strong><small>Isi harga normal lebih tinggi dari harga jual agar diskonnya tampil.</small></span>
+              </label>
+              <label className="quick-access-toggle">
+                <input type="checkbox" checked={Boolean(form.isBestseller)} onChange={(event) => setForm((current) => ({ ...current, isBestseller: event.target.checked }))} />
+                <span><strong>Tandai sebagai produk terlaris</strong><small>Dipakai sebagai pilihan cadangan jika belum ada riwayat penjualan selesai.</small></span>
+              </label>
+              <label className="quick-access-toggle">
+                <input type="checkbox" checked={Boolean(form.isRecommended)} onChange={(event) => setForm((current) => ({ ...current, isRecommended: event.target.checked }))} />
+                <span><strong>Tampilkan di rekomendasi</strong><small>Pilih produk yang ingin diutamakan di beranda.</small></span>
+              </label>
+            </div>
 
               <div className="product-form-actions">
                 <button className="btn btn-secondary" type="button" onClick={closeProductModal} disabled={saving}>Batal</button>

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { apiFetch } from '../services/api';
 
 const money = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 
 export default function QuickAddFab() {
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState('EXPENSE');
   const [amount, setAmount] = useState('');
@@ -53,7 +55,7 @@ export default function QuickAddFab() {
   };
 
   const undo = async () => { if (!lastId) return; const response = await apiFetch(`/finance/${lastId}`, { method: 'DELETE' }); setNotice(response.ok ? 'Transaksi diurungkan.' : 'Transaksi tidak dapat diurungkan.'); setLastId(null); };
-  if (!localStorage.getItem('glosir_token') || !window.location.pathname.startsWith('/admin')) return null;
+  if (!localStorage.getItem('glosir_token') || !pathname.startsWith('/admin')) return null;
   return <div className="quick-add-fab-wrap">
     {open && <section className="quick-add-sheet" aria-label="Tambah transaksi cepat">
       <div className="quick-add-sheet-head"><div><span className="panel-kicker">Input cepat</span><h2>Catat transaksi</h2></div><button type="button" className="text-button" onClick={() => setOpen(false)}>Tutup</button></div>

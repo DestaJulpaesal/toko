@@ -19,7 +19,7 @@ if (SHOW_PARSEL_LEBARAN) {
   mainNavigation.splice(2, 0, { label: 'Parsel Lebaran', to: '/parsel' });
 }
 
-export default function PublicHeader() {
+export default function PublicHeader({ onHomeClick }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,7 +70,15 @@ export default function PublicHeader() {
         <div className="header-inner">
           <div className="header-brand-wrap">
             <span className="brand-mark" aria-hidden="true"><Store size={21} strokeWidth={2.5} /></span>
-            <Link to="/" className="brand-title">
+            <Link
+              to="/"
+              className="brand-title"
+              onClick={(event) => {
+                if (!onHomeClick) return;
+                event.preventDefault();
+                onHomeClick();
+              }}
+            >
               {storeName}
             </Link>
             <span className="brand-sub">Sembako & Grosir</span>
@@ -101,7 +109,16 @@ export default function PublicHeader() {
             onClick={() => setMenuOpen(false)}
           >
             {mainNavigation.map((item) => (
-              <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? 'active-link' : '')}>
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={(event) => {
+                  if (item.to !== '/' || !onHomeClick) return;
+                  event.preventDefault();
+                  onHomeClick();
+                }}
+                className={({ isActive }) => (isActive ? 'active-link' : '')}
+              >
                 {item.label}
               </NavLink>
             ))}

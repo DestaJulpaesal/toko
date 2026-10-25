@@ -43,6 +43,14 @@ export const checkoutLimiter = rateLimit({
   message: { success: false, message: 'Terlalu banyak permintaan checkout. Coba lagi sebentar.' },
 });
 
+export const globotLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, message: 'Globot menerima terlalu banyak pertanyaan dari perangkat ini. Coba lagi beberapa menit.' },
+});
+
 // Webhook WhatsApp: dibatasi lebih ketat daripada apiLimiter umum, karena satu nomor toko
 // biasanya cuma perlu mengirim beberapa perintah per menit. Batas ini juga membuat percobaan
 // menebak secret webhook (lihat webhookSecurity.js) menjadi lambat dan gampang ketahuan di log.
@@ -423,6 +431,9 @@ export const productCreateSchema = z.object({
   originalPrice: z.coerce.number().optional().nullable(),
   stock: z.coerce.number('Stok wajib diisi'),
   stockWarning: z.coerce.number().int().nonnegative().optional(),
+  isFlashSale: z.coerce.boolean().optional(),
+  isBestseller: z.coerce.boolean().optional(),
+  isRecommended: z.coerce.boolean().optional(),
   status: z.string().optional().default('Aktif'),
 }).passthrough();
 export const productUpdateSchema = productCreateSchema;
@@ -437,6 +448,9 @@ export const productBulkSchema = z.object({
     purchasePrice: z.coerce.number().optional().nullable(),
     originalPrice: z.coerce.number().optional().nullable(),
     stock: z.coerce.number(),
+    isFlashSale: z.coerce.boolean().optional(),
+    isBestseller: z.coerce.boolean().optional(),
+    isRecommended: z.coerce.boolean().optional(),
     unit: z.string().trim().optional(),
     status: z.string().optional(),
   }).passthrough()).min(1, 'Minimal satu produk wajib dikirim'),

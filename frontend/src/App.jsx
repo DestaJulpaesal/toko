@@ -59,6 +59,7 @@ import NoticeToast from './components/NoticeToast';
 import FirstTimeGuide from './components/FirstTimeGuide';
 import SupportButton from './components/SupportButton';
 import QuickAddFab from './components/QuickAddFab';
+import GlobotWidget from './components/GlobotWidget';
 
 // Route Guard: Proteksi menu khusus Owner/Admin agar Karyawan/Kasir dialihkan ke /kasir
 function getStoredUser() {
@@ -99,6 +100,7 @@ export default function App() {
           <NoticeToast />
           <FirstTimeGuide />
           <SupportButton />
+          <GlobotWidget />
           <QuickAddFab />
           <PublicScrollReveal />
           <Suspense fallback={<div className="page-loading">Memuat halaman...</div>}>

@@ -5,7 +5,7 @@ import PublicFooter from '../components/PublicFooter';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '../services/api';
 import { isValidIndonesianPhone, normalizeIndonesianPhone } from '../utils/phoneUtils';
-import { MessageCircle, Store, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, MessageCircle, Store, AlertTriangle, ShieldCheck, ShoppingBag } from 'lucide-react';
 
 // Konfigurasi pencegahan pesanan iseng (mudah diubah)
 const ORDER_LIMIT_CONFIG = {
@@ -22,6 +22,19 @@ export default function CheckoutPage() {
   const [formError, setFormError] = useState('');
   const [loading, setLoading] = useState(false);
   const total = Math.max(0, totalPrice - discount);
+  const checkoutNavigation = (
+    <nav className="checkout-back-navigation" aria-label="Navigasi belanja">
+      <Link to="/cart" className="checkout-back-link">
+        <ArrowLeft size={17} aria-hidden="true" />
+        <ShoppingBag size={17} aria-hidden="true" />
+        Kembali ke keranjang
+      </Link>
+      <Link to="/products" className="checkout-continue-link">
+        Lanjut belanja
+        <ArrowRight size={17} aria-hidden="true" />
+      </Link>
+    </nav>
+  );
 
   // Ambil data nama & nomor HP dari localStorage agar terisi otomatis
   useEffect(() => {
@@ -92,7 +105,6 @@ export default function CheckoutPage() {
           customerPhone: normalizedPhone,
           address: '',
           fulfillmentMethod: 'PICKUP',
-          note: 'Metode: Ambil di Toko',
           promoCode: promo || '',
           items: items.map((item) => ({
             variantId: item.variantId || undefined,
@@ -164,6 +176,7 @@ export default function CheckoutPage() {
       <div className="glosir-public-page">
         <PublicHeader />
         <main style={{ maxWidth: '600px', margin: '40px auto', textAlign: 'center', padding: '32px 16px', background: '#ffffff', borderRadius: '20px', border: '1px solid #e5e7eb' }}>
+          {checkoutNavigation}
           <Store size={48} style={{ color: '#1f7a4a', marginBottom: '16px' }} />
           <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 10px' }}>Keranjang Belanja Masih Kosong</h1>
           <p style={{ color: '#6b7280', margin: '0 0 24px' }}>Tambahkan produk terlebih dahulu sebelum melakukan pemesanan.</p>
@@ -184,6 +197,7 @@ export default function CheckoutPage() {
           <span style={{ fontSize: '0.85rem', color: '#1f7a4a', fontWeight: 800, textTransform: 'uppercase' }}>Pemesanan Cepat (Tanpa Login)</span>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 900, color: '#111827', margin: '4px 0 0' }}>Ambil & Bayar di Toko</h1>
         </div>
+        {checkoutNavigation}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
           {/* Form Pembeli */}

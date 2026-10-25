@@ -37,7 +37,10 @@ export function formatProduct(product, audience = AUDIENCE.PUBLIC) {
   const price = Number(variant?.sellPrice || 0);
   // Harga coret HANYA dari nilai yang diisi owner. Dulu ada cadangan yang mengambil harga modal
   // ketika modal > harga jual, sehingga angka modal bisa tampil sebagai "harga coret" ke pelanggan.
-  const originalPrice = product.originalPrice ? Number(product.originalPrice) : null;
+  const configuredOriginalPrice = product.originalPrice == null ? null : Number(product.originalPrice);
+  const originalPrice = configuredOriginalPrice !== null && configuredOriginalPrice > price
+    ? configuredOriginalPrice
+    : audience === AUDIENCE.PUBLIC ? null : configuredOriginalPrice;
   const discountPercent = originalPrice && originalPrice > price
     ? Math.round(((originalPrice - price) / originalPrice) * 100)
     : 0;
@@ -92,6 +95,9 @@ export function formatProduct(product, audience = AUDIENCE.PUBLIC) {
     stockWarning: Number(product.stockWarning || 0),
     wholesalePrice: toNumberOrNull(variant?.wholesalePrice),
     isQuickAccess: Boolean(product.isQuickAccess),
+    isFlashSale: Boolean(product.isFlashSale),
+    isBestseller: Boolean(product.isBestseller),
+    isRecommended: Boolean(product.isRecommended),
     ...(Array.isArray(product.units) ? {
       units: product.units.map((unit) => ({
         id: unit.id,

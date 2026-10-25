@@ -9,7 +9,9 @@ import { usePublicSettings } from '../context/PublicSettingsContext';
 import { normalizeIndonesianPhone } from '../utils/phoneUtils';
 import { showSuccess } from '../utils/noticeService';
 import { readJsonStorage } from '../utils/catalogStorage';
-import { publicCategoriesOrDefault, sortPublicCategories } from '../utils/publicContentDefaults';
+import { sortPublicCategories } from '../utils/publicContentDefaults';
+import { useFavorites } from '../context/FavoritesContext';
+import HomeProductSectionPage from './HomeProductSectionPage';
 
 const CATEGORY_META = {
   'Glosir': { icon: '🛒' },
@@ -32,7 +34,7 @@ const CATEGORY_META = {
   'Paket Acara': { icon: '📦' },
 };
 
-const PUBLIC_HOMEPAGE_CACHE_KEY = 'glosir_public_homepage_v1';
+const PUBLIC_HOMEPAGE_CACHE_KEY = 'glosir_public_homepage_v3';
 let homepageRequestPromise;
 
 function readHomepageCache() {
@@ -122,34 +124,58 @@ function HomePromoBanner({ promo, variant }) {
 }
 
 export default function HomePage() {
+  const [activeProductSection, setActiveProductSection] = useState(null);
+  const [homepageScrollPosition, setHomepageScrollPosition] = useState(0);
   const [initialHomepage] = useState(readHomepageCache);
   const [flashSaleProducts, setFlashSaleProducts] = useState(() => initialHomepage?.flashSaleProducts || []);
   const [bestsellerProducts, setBestsellerProducts] = useState(() => initialHomepage?.bestsellerProducts || []);
   const [recommendedProducts, setRecommendedProducts] = useState(() => initialHomepage?.recommendedProducts || []);
-  const [categories, setCategories] = useState(() => publicCategoriesOrDefault(initialHomepage?.categories || []));
+  const [categories, setCategories] = useState(() => initialHomepage?.categories || []);
   const [activePromos, setActivePromos] = useState(() => (initialHomepage?.promos || []).filter((promo) => promoIsActive(promo)));
   const [loading, setLoading] = useState(() => !initialHomepage);
+  const [homepageError, setHomepageError] = useState('');
   const findHomePromo = (name) => activePromos.find((promo) => promo.name?.trim().toLowerCase() === name);
   
-  const flashSaleScrollRef = useRef(null);
-  const recommendedScrollRef = useRef(null);
+  const categoryScrollRef = useRef(null);
   
   const [showLeftArrow, setShowLeftArrow] = useState({
-    flashSale: false,
-    recommended: false,
+    categories: false,
   });
   const [showRightArrow, setShowRightArrow] = useState({
-    flashSale: true,
-    recommended: true,
+    categories: true,
   });
   
   const { addItem } = useCart();
+  const { toggleFavorite, isFavorite } = useFavorites();
   const { storeProfile } = usePublicSettings();
   const storeWaNumber = normalizeIndonesianPhone(storeProfile.phone || import.meta.env.VITE_STORE_WHATSAPP_NUMBER || '');
   const promoDemo8 = findHomePromo('promo demo 8');
   const promoDemo9 = findHomePromo('promo demo 9');
   const promoDemo10 = findHomePromo('promo demo 10');
-  const visibleCategories = sortPublicCategories(publicCategoriesOrDefault(categories));
+  const visibleCategories = sortPublicCategories(categories);
+  const activeSectionProducts = activeProductSection === 'flash-sale'
+    ? flashSaleProducts
+    : activeProductSection === 'recommended'
+      ? recommendedProducts
+      : bestsellerProducts;
+
+  const openProductSection = (section) => {
+    setHomepageScrollPosition(window.scrollY);
+    setActiveProductSection(section);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const closeProductSection = () => {
+    setActiveProductSection(null);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: homepageScrollPosition, behavior: 'smooth' });
+    });
+  };
+
+  const returnToHomeStart = () => {
+    setActiveProductSection(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -159,7 +185,7 @@ export default function HomePage() {
         if (cancelled) return;
 
         const homepage = {
-          categories: publicCategoriesOrDefault(Array.isArray(data?.categories) ? data.categories : []),
+          categories: Array.isArray(data?.categories) ? data.categories : [],
           promos: Array.isArray(data?.promos) ? data.promos : [],
           flashSaleProducts: Array.isArray(data?.flashSaleProducts) ? data.flashSaleProducts : [],
           bestsellerProducts: Array.isArray(data?.bestsellerProducts) ? data.bestsellerProducts : [],
@@ -171,6 +197,7 @@ export default function HomePage() {
         setFlashSaleProducts(homepage.flashSaleProducts);
         setBestsellerProducts(homepage.bestsellerProducts);
         setRecommendedProducts(homepage.recommendedProducts);
+        setHomepageError('');
         setLoading(false);
 
         try {
@@ -182,6 +209,7 @@ export default function HomePage() {
       .catch((error) => {
         console.error('Homepage data failed:', error);
         if (cancelled) return;
+        setHomepageError(error.message || 'Data homepage gagal dimuat.');
         setLoading(false);
       });
 
@@ -191,7 +219,8 @@ export default function HomePage() {
   }, []);
 
   const handleAddToCart = (product, e) => {
-    e.preventDefault();
+    e?.preventDefault();
+    e?.stopPropagation();
     addItem(product);
     showSuccess(`"${product.name}" ditambahkan ke keranjang`);
   };
@@ -202,7 +231,7 @@ export default function HomePage() {
     
     setShowLeftArrow((prev) => ({
       ...prev,
-      [section]: scrollLeft > 0,
+      [section]: scrollLeft > 6,
     }));
     
     setShowRightArrow((prev) => ({
@@ -213,26 +242,46 @@ export default function HomePage() {
 
   const handleScroll = (ref, section, direction) => {
     if (!ref.current) return;
-    const scrollAmount = 300;
+    const scrollAmount = section === 'categories' ? 240 : 300;
     ref.current.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth',
     });
     
-    setTimeout(() => checkArrowVisibility(ref, section), 100);
+    setTimeout(() => checkArrowVisibility(ref, section), 320);
   };
 
   // Check arrow visibility on mount and when data changes
   useEffect(() => {
-    checkArrowVisibility(flashSaleScrollRef, 'flashSale');
-    checkArrowVisibility(recommendedScrollRef, 'recommended');
-  }, [flashSaleProducts, bestsellerProducts, recommendedProducts]);
+    checkArrowVisibility(categoryScrollRef, 'categories');
+  }, [categories]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      checkArrowVisibility(categoryScrollRef, 'categories');
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <div className="glosir-public-page">
-      <PublicHeader />
+      <PublicHeader onHomeClick={returnToHomeStart} />
 
       <main className="glosir-home-content">
+        {activeProductSection ? (
+          <HomeProductSectionPage
+            section={activeProductSection}
+            products={activeSectionProducts}
+            loading={loading}
+            error={homepageError}
+            isFavorite={isFavorite}
+            onToggleFavorite={toggleFavorite}
+            onAddToCart={handleAddToCart}
+            onBack={closeProductSection}
+          />
+        ) : (
+          <>
         {/* 1. Banner toko */}
         <section className="home-hero" aria-labelledby="home-hero-title">
           <div className="home-hero-copy">
@@ -267,39 +316,80 @@ export default function HomePage() {
             <h2>Kategori Belanja</h2>
             <Link to="/products" className="view-all-link">Lihat Semua <ChevronRight size={16} /></Link>
           </div>
-          <div className="category-browse-grid homepage-category-grid">
-            {visibleCategories.map((cat) => {
-              const meta = CATEGORY_META[cat.name] || { icon: '🛍️' };
-              const categoryImage = cat.imageUrl;
-              return (
-                <Link
-                  key={cat.id}
-                  to={`/products?category=${encodeURIComponent(cat.name)}`}
-                  className="category-big-card"
-                  aria-label={`Lihat kategori ${cat.name}`}
-                >
-                  <span className="category-icon-big">
-                    {categoryImage ? (
-                      <img
-                        src={categoryImage}
-                        alt=""
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          if (e.currentTarget.nextElementSibling) {
-                            e.currentTarget.nextElementSibling.style.display = 'inline';
-                          }
-                        }}
-                      />
-                    ) : null}
-                    <span className={categoryImage ? 'category-icon-fallback is-hidden' : 'category-icon-fallback'}>
-                      {meta.icon}
+
+          <div className="home-category-slider-wrap">
+            {showLeftArrow.categories && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleScroll(categoryScrollRef, 'categories', 'left');
+                }}
+                className="scroll-arrow scroll-arrow-left home-category-arrow"
+                aria-label="Lihat kategori sebelumnya"
+              >
+                <ChevronLeft size={20} />
+              </button>
+            )}
+
+            <div
+              className="category-browse-grid homepage-category-track"
+              ref={categoryScrollRef}
+              onScroll={() => checkArrowVisibility(categoryScrollRef, 'categories')}
+            >
+              {loading ? (
+                <div className="products-loading">Memuat kategori...</div>
+              ) : visibleCategories.length === 0 ? (
+                <div className="products-empty">Belum ada kategori di database.</div>
+              ) : visibleCategories.map((cat) => {
+                const meta = CATEGORY_META[cat.name] || { icon: '🛍️' };
+                const categoryImage = cat.imageUrl;
+                return (
+                  <Link
+                    key={cat.id}
+                    to={`/products?category=${encodeURIComponent(cat.name)}`}
+                    className="category-big-card home-category-slide-item"
+                    aria-label={`Lihat kategori ${cat.name}`}
+                  >
+                    <span className="category-icon-big">
+                      {categoryImage ? (
+                        <img
+                          src={categoryImage}
+                          alt=""
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextElementSibling) {
+                              e.currentTarget.nextElementSibling.style.display = 'inline';
+                            }
+                          }}
+                        />
+                      ) : null}
+                      <span className={categoryImage ? 'category-icon-fallback is-hidden' : 'category-icon-fallback'}>
+                        {meta.icon}
+                      </span>
                     </span>
-                  </span>
-                  <span className="category-card-name">{cat.name}</span>
-                </Link>
-              );
-            })}
+                    <span className="category-card-name">{cat.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {showRightArrow.categories && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleScroll(categoryScrollRef, 'categories', 'right');
+                }}
+                className="scroll-arrow scroll-arrow-right home-category-arrow"
+                aria-label="Lihat kategori berikutnya"
+              >
+                <ChevronRight size={20} />
+              </button>
+            )}
           </div>
         </section>
 
@@ -311,32 +401,20 @@ export default function HomePage() {
             <div className="home-flash-sale-title">
               <span className="home-flash-sale-icon"><Flame size={21} fill="currentColor" /></span>
               <div>
-                <span className="home-flash-sale-eyebrow">Harga spesial, waktu terbatas</span>
+                <span className="home-flash-sale-eyebrow">Harga promo untuk produk pilihan</span>
                 <h2>Flash Sale</h2>
                 <p>Kesempatan hemat untuk produk pilihan.</p>
               </div>
             </div>
-            <Link to="/products" className="home-flash-sale-link">
-              Jelajahi Katalog <ChevronRight size={17} />
-            </Link>
+            <button type="button" onClick={() => openProductSection('flash-sale')} className="home-flash-sale-link">
+              Lihat Semua <ChevronRight size={17} />
+            </button>
           </div>
 
           <div className="home-flash-sale-content">
-            <div className="home-flash-sale-track-wrap">
-              {showLeftArrow.flashSale && (
-                <button
-                  onClick={() => handleScroll(flashSaleScrollRef, 'flashSale', 'left')}
-                  className="scroll-arrow scroll-arrow-left"
-                  aria-label="Scroll ke kiri"
-                >
-                  <ChevronLeft size={24} />
-                </button>
-              )}
-
+            <div className="home-flash-sale-grid-wrap">
               <div
                 className="products-scroll-container home-flash-sale-list"
-                ref={flashSaleScrollRef}
-                onScroll={() => checkArrowVisibility(flashSaleScrollRef, 'flashSale')}
               >
                 {loading ? (
                   <div className="home-flash-sale-empty" role="status">
@@ -353,32 +431,38 @@ export default function HomePage() {
                     <Link to="/products">Lihat produk <ChevronRight size={15} /></Link>
                   </div>
                 ) : (
-                  flashSaleProducts.map((product) => (
+                  flashSaleProducts.slice(0, 12).map((product) => (
                     <article key={product.id} className="fresh-product-card home-flash-sale-card">
                       <span className="home-flash-sale-badge">
                         {product.originalPrice > product.price
                           ? `-${Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%`
                           : 'Flash Sale'}
                       </span>
-                      <div className="product-photo-box home-flash-sale-photo">
-                        {product.imageUrl ? (
-                          <img src={product.imageUrl} alt={product.name} className="product-real-img" loading="lazy" />
-                        ) : (
-                          <span className="product-placeholder-icon">🛍️</span>
-                        )}
-                      </div>
-                      <div className="product-details">
-                        <span className="product-category-label">{product.category}</span>
-                        <h3 className="product-card-title">{product.name}</h3>
-                        {product.originalPrice > product.price && (
-                          <del className="home-flash-sale-original-price">
-                            Rp {product.originalPrice.toLocaleString('id-ID')}
-                          </del>
-                        )}
-                        <div className="product-price-fresh">
-                          Rp {product.price.toLocaleString('id-ID')}
+                      <Link
+                        to={`/products/${product.id}`}
+                        className="home-product-detail-link"
+                        aria-label={`Lihat detail ${product.name}`}
+                      >
+                        <div className="product-photo-box home-flash-sale-photo">
+                          {product.imageUrl ? (
+                            <img src={product.imageUrl} alt={product.name} className="product-real-img" loading="lazy" />
+                          ) : (
+                            <span className="product-placeholder-icon">🛍️</span>
+                          )}
                         </div>
-                      </div>
+                        <div className="product-details">
+                          <span className="product-category-label">{product.category}</span>
+                          <h3 className="product-card-title">{product.name}</h3>
+                          {product.originalPrice > product.price && (
+                            <del className="home-flash-sale-original-price">
+                              Rp {product.originalPrice.toLocaleString('id-ID')}
+                            </del>
+                          )}
+                          <div className="product-price-fresh">
+                            Rp {product.price.toLocaleString('id-ID')}
+                          </div>
+                        </div>
+                      </Link>
                       <button
                         className="btn-add-cart-fresh"
                         onClick={(e) => handleAddToCart(product, e)}
@@ -390,16 +474,6 @@ export default function HomePage() {
                   ))
                 )}
               </div>
-
-              {showRightArrow.flashSale && (
-                <button
-                  onClick={() => handleScroll(flashSaleScrollRef, 'flashSale', 'right')}
-                  className="scroll-arrow scroll-arrow-right"
-                  aria-label="Scroll ke kanan"
-                >
-                  <ChevronRight size={24} />
-                </button>
-              )}
             </div>
           </div>
         </section>
@@ -415,46 +489,39 @@ export default function HomePage() {
                 <h2>Rekomendasi untuk Anda</h2>
                 <p>Temukan kebutuhan pilihan dengan mudah.</p>
               </div>
-              <Link to="/products" className="home-discovery-view-all">Lihat Semua <ChevronRight size={16} /></Link>
+              <button type="button" onClick={() => openProductSection('recommended')} className="home-discovery-view-all">Lihat Semua <ChevronRight size={16} /></button>
             </div>
             <div className="home-recommendations-wrap">
-              {showLeftArrow.recommended && (
-                <button
-                  onClick={() => handleScroll(recommendedScrollRef, 'recommended', 'left')}
-                  className="scroll-arrow scroll-arrow-left"
-                  aria-label="Rekomendasi sebelumnya"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-              )}
-              <div
-                className="products-scroll-container home-recommendations-list"
-                ref={recommendedScrollRef}
-                onScroll={() => checkArrowVisibility(recommendedScrollRef, 'recommended')}
-              >
+              <div className="home-recommendations-list">
                 {loading ? (
                   <div className="products-loading">Memuat rekomendasi...</div>
                 ) : recommendedProducts.length === 0 ? (
                   <div className="products-empty">Belum ada rekomendasi.</div>
                 ) : (
-                  recommendedProducts.map((product) => (
+                  recommendedProducts.slice(0, 12).map((product) => (
                     <article key={product.id} className="fresh-product-card home-recommendation-card">
                       {product.badge && <span className="product-badge-fresh">{product.badge}</span>}
-                      <div className="product-photo-box">
-                        {product.imageUrl ? (
-                          <img src={product.imageUrl} alt={product.name} className="product-real-img" loading="lazy" />
-                        ) : (
-                          <span className="product-placeholder-icon">🛍️</span>
-                        )}
-                      </div>
-                      <div className="product-details">
-                        <span className="product-category-label">{product.category}</span>
-                        <h3 className="product-card-title">{product.name}</h3>
-                        <div className="product-price-fresh">Rp {product.price.toLocaleString('id-ID')}</div>
-                        {product.originalPrice > product.price && (
-                          <del className="home-product-original-price">Rp {product.originalPrice.toLocaleString('id-ID')}</del>
-                        )}
-                      </div>
+                      <Link
+                        to={`/products/${product.id}`}
+                        className="home-product-detail-link"
+                        aria-label={`Lihat detail ${product.name}`}
+                      >
+                        <div className="product-photo-box">
+                          {product.imageUrl ? (
+                            <img src={product.imageUrl} alt={product.name} className="product-real-img" loading="lazy" />
+                          ) : (
+                            <span className="product-placeholder-icon">🛍️</span>
+                          )}
+                        </div>
+                        <div className="product-details">
+                          <span className="product-category-label">{product.category}</span>
+                          <h3 className="product-card-title">{product.name}</h3>
+                          <div className="product-price-fresh">Rp {product.price.toLocaleString('id-ID')}</div>
+                          {product.originalPrice > product.price && (
+                            <del className="home-product-original-price">Rp {product.originalPrice.toLocaleString('id-ID')}</del>
+                          )}
+                        </div>
+                      </Link>
                       <button
                         className="btn-add-cart-fresh"
                         onClick={(event) => handleAddToCart(product, event)}
@@ -466,15 +533,6 @@ export default function HomePage() {
                   ))
                 )}
               </div>
-              {showRightArrow.recommended && (
-                <button
-                  onClick={() => handleScroll(recommendedScrollRef, 'recommended', 'right')}
-                  className="scroll-arrow scroll-arrow-right"
-                  aria-label="Rekomendasi berikutnya"
-                >
-                  <ChevronRight size={20} />
-                </button>
-              )}
             </div>
           </div>
 
@@ -483,11 +541,11 @@ export default function HomePage() {
               <div>
                 <span className="home-discovery-eyebrow">Favorit pelanggan</span>
                 <h2>Produk Terlaris</h2>
-                <p>Barang yang paling sering dibeli pelanggan.</p>
+                <p>Urutan dari transaksi selesai 90 hari; jika belum ada, gunakan pilihan toko.</p>
               </div>
-              <Link to="/products" className="home-discovery-view-all" aria-label="Lihat semua produk">
+              <button type="button" onClick={() => openProductSection('bestsellers')} className="home-discovery-view-all" aria-label="Lihat semua produk terlaris">
                 Lihat semua <ChevronRight size={16} />
-              </Link>
+              </button>
             </div>
             <div className="home-bestsellers-list">
               {loading ? (
@@ -495,7 +553,7 @@ export default function HomePage() {
               ) : bestsellerProducts.length === 0 ? (
                 <div className="products-empty">Belum ada produk terlaris.</div>
               ) : (
-                bestsellerProducts.slice(0, 6).map((product, index) => (
+                bestsellerProducts.slice(0, 3).map((product, index) => (
                   <article key={product.id} className="home-bestseller-row">
                     <span
                       className={`home-bestseller-rank${index < 3 ? ` is-top-rank is-top-rank-${index + 1}` : ''}`}
@@ -503,18 +561,24 @@ export default function HomePage() {
                     >
                       {index + 1}
                     </span>
-                    <div className="home-bestseller-image">
-                      {product.imageUrl ? (
-                        <img src={product.imageUrl} alt="" loading="lazy" />
-                      ) : (
-                        <span aria-hidden="true">🛍️</span>
-                      )}
-                    </div>
-                    <div className="home-bestseller-copy">
-                      <span>{product.category}</span>
-                      <h3>{product.name}</h3>
-                      <strong>Rp {product.price.toLocaleString('id-ID')}</strong>
-                    </div>
+                    <Link
+                      to={`/products/${product.id}`}
+                      className="home-bestseller-link"
+                      aria-label={`Lihat detail ${product.name}`}
+                    >
+                      <div className="home-bestseller-image">
+                        {product.imageUrl ? (
+                          <img src={product.imageUrl} alt="" loading="lazy" />
+                        ) : (
+                          <span aria-hidden="true">🛍️</span>
+                        )}
+                      </div>
+                      <div className="home-bestseller-copy">
+                        <span>{product.category}</span>
+                        <h3>{product.name}</h3>
+                        <strong>Rp {product.price.toLocaleString('id-ID')}</strong>
+                      </div>
+                    </Link>
                     <button
                       className="home-bestseller-add"
                       onClick={(event) => handleAddToCart(product, event)}
@@ -622,6 +686,8 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+          </>
+        )}
       </main>
 
       <PublicFooter />

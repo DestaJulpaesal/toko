@@ -121,18 +121,48 @@ app.get('/homepage', createHomepageHandler({
   product: {
     async findMany(options) {
       homepageQueryCount += 1;
-      assert.equal(options.select.originalPrice, undefined);
+      assert.equal(options.where.status, 'ACTIVE');
+      assert.equal(options.select.originalPrice, true);
       assert.equal(options.select.variants.select.basePrice, undefined);
-      return [{
-        id: 'p-home',
-        name: 'Beras',
-        imageUrl: null,
-        isFlashSale: true,
-        isBestseller: true,
-        isRecommended: false,
-        category: { name: 'Sembako' },
-        variants: [{ sellPrice: '12000' }],
-      }];
+      return [
+        {
+          id: 'p-home',
+          name: 'Beras',
+          imageUrl: null,
+          createdAt: new Date('2026-01-02'),
+          originalPrice: '15000',
+          isFlashSale: true,
+          isBestseller: true,
+          isRecommended: false,
+          isFeatured: false,
+          category: { name: 'Sembako' },
+          variants: [{ id: 'v-home', sellPrice: '12000', stockQty: '12' }],
+        },
+        {
+          id: 'p-home-2',
+          name: 'Minyak',
+          imageUrl: null,
+          createdAt: new Date('2026-01-01'),
+          originalPrice: null,
+          isFlashSale: false,
+          isBestseller: false,
+          isRecommended: false,
+          isFeatured: false,
+          category: { name: 'Sembako' },
+          variants: [{ id: 'v-home-2', sellPrice: '20000', stockQty: '5' }],
+        },
+      ];
+    },
+  },
+  orderItem: {
+    async findMany(options) {
+      homepageQueryCount += 1;
+      assert.equal(options.where.order.status, 'COMPLETED');
+      assert.equal(options.select.productId, true);
+      return [
+        { productId: 'p-home', quantity: '2' },
+        { productId: 'p-home-2', quantity: '9' },
+      ];
     },
   },
 }));
@@ -195,15 +225,17 @@ test('homepage: satu respons berisi semua data publik tanpa membocorkan harga mo
   assert.equal(body.categories[0].imageUrl, 'https://example.test/sembako.webp');
   assert.equal(body.promos[0].name, 'Promo Hemat');
   assert.equal(body.flashSaleProducts[0].price, 12000);
-  assert.equal(body.flashSaleProducts[0].originalPrice, null);
-  assert.equal(body.bestsellerProducts[0].id, 'p-home');
-  assert.deepEqual(body.recommendedProducts, []);
+  assert.equal(body.flashSaleProducts[0].originalPrice, 15000);
+  assert.equal(body.flashSaleProducts[0].variantId, 'v-home');
+  assert.equal(body.bestsellerProducts[0].id, 'p-home-2');
+  assert.ok(body.recommendedProducts.some((product) => product.id === 'p-home'));
+  assert.ok(body.recommendedProducts.some((product) => product.id === 'p-home-2'));
   assert.deepEqual(findForbiddenKeys(body), []);
 
   const cached = await get('/homepage');
   assert.equal(cached.status, 200);
   assert.deepEqual(cached.body, body);
-  assert.equal(homepageQueryCount - queryCountBefore, 3);
+  assert.equal(homepageQueryCount - queryCountBefore, 4);
 });
 
 test('token kedaluwarsa atau ngawur: tetap 200 sebagai pengunjung, bukan 403', async () => {
@@ -266,6 +298,11 @@ test('OWNER dan ADMIN: menerima harga modal dan bisa memakai ?all=true', async (
 test('serializer: audiens default adalah publik (aman bila lupa diisi)', () => {
   assert.deepEqual(findForbiddenKeys(formatProduct(products[0])), []);
   assert.deepEqual(findForbiddenKeys(formatProduct(products[0], AUDIENCE.PUBLIC)), []);
+  const saleProduct = formatProduct(makeProduct({ originalPrice: '8000' }), AUDIENCE.PUBLIC);
+  assert.equal(saleProduct.originalPrice, 8000);
+  assert.equal(saleProduct.discountPercent, 25);
+  const nonDiscounted = formatProduct(makeProduct({ originalPrice: '5000' }), AUDIENCE.PUBLIC);
+  assert.equal(nonDiscounted.originalPrice, null);
   assert.equal(getAudience(undefined), AUDIENCE.PUBLIC);
   assert.equal(getAudience({ role: 'OWNER' }), AUDIENCE.OWNER);
   assert.equal(getAudience({ role: 'CASHIER' }), AUDIENCE.STAFF);
@@ -290,6 +327,8 @@ test('route: endpoint publik terpasang ke handler yang aman', () => {
   assert.match(productRoutes, /router\.get\('\/', softAuth, catalog\.listProducts\)/);
   assert.match(productRoutes, /router\.get\('\/:id', softAuth, catalog\.getProduct\)/);
   assert.doesNotMatch(productRoutes, /function formatProduct/);
+  assert.doesNotMatch(productRoutes, /originalPrice:\s*p\.variants\[0\]\?\.basePrice/);
+  assert.match(productRoutes, /filter\(\(product\) => product\.stock > 0 && product\.originalPrice > product\.price\)/);
   const eventRoutes = read('eventPackageRoutes.js');
   assert.match(eventRoutes, /router\.get\('\/', catalog\.listEventPackages\)/);
   assert.match(eventRoutes, /router\.get\('\/:id', catalog\.getEventPackage\)/);
