@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bot, ExternalLink, MessageCircle, Send, ShoppingBag, X } from 'lucide-react';
+import { Bot, MessageCircle, PackageSearch, Send, ShoppingBag, Sparkles, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { usePublicSettings } from '../context/PublicSettingsContext';
 import { API_BASE_URL } from '../services/api';
@@ -31,10 +31,74 @@ function createPageContext(pathname, items) {
   };
 }
 
-function getDefaultHelpMessage(pathname) {
-  if (pathname.startsWith('/products/')) return 'Halo kak! Ada produk yang sedang dilihat? Tanyakan harga atau stoknya, atau sebutkan produk yang ingin dicari.';
-  if (pathname === '/cart' || pathname === '/checkout') return 'Halo kak! Aku bisa bantu memahami langkah pemesanan. Untuk menyelesaikan transaksi, gunakan alur checkout resmi di halaman ini.';
-  return 'Halo kak! Aku Globot, siap bantu cari produk atau menjelaskan cara berbelanja di Glosir.';
+function getWelcomeContent(pathname, totalItems) {
+  if (pathname.startsWith('/products/')) {
+    return {
+      title: 'Lagi cari info produk?',
+      description: 'Tanya stok atau harga produk yang sedang Kakak lihat.',
+      suggestions: [
+        { label: 'Cek stok', question: 'Apakah produk yang sedang saya lihat tersedia?' },
+        { label: 'Tanya harga', question: 'Berapa harga produk yang sedang saya lihat?' },
+      ],
+    };
+  }
+  if (pathname === '/cart') {
+    return totalItems
+      ? {
+        title: 'Keranjang siap diperiksa',
+        description: `Ada ${totalItems} barang di keranjang. Tinjau jumlahnya, lalu lanjut checkout jika sudah sesuai.`,
+        suggestions: [{ label: 'Cara pesan', action: 'guide' }],
+      }
+      : {
+        title: 'Keranjang masih kosong',
+        description: 'Cari barang yang dibutuhkan, lalu tambahkan ke keranjang untuk mulai memesan.',
+        suggestions: [{ label: 'Cari produk', to: '/products' }],
+      };
+  }
+  if (pathname === '/checkout') {
+    return {
+      title: 'Bantu selesaikan pesanan',
+      description: 'Isi nama dan nomor WhatsApp aktif pada form checkout. Setelah pesanan dicatat, lanjutkan konfirmasi melalui WhatsApp toko.',
+      suggestions: [
+        { label: 'Kembali ke keranjang', to: '/cart' },
+        { label: 'Cara pesan', action: 'guide' },
+      ],
+    };
+  }
+  if (pathname === '/pesanan') {
+    return {
+      title: 'Mau cek status pesanan?',
+      description: 'Gunakan form di halaman ini dengan nomor pesanan dan 4 digit terakhir nomor WhatsApp saat memesan. Jangan kirim data itu di chat.',
+      suggestions: [{ label: 'Buka cek pesanan', to: '/pesanan' }],
+    };
+  }
+  if (pathname === '/products') {
+    return {
+      title: 'Mau cari kebutuhan apa?',
+      description: 'Pilih kategori untuk melihat barang yang tersedia di katalog.',
+      suggestions: [
+        { label: 'Beras', to: '/products?search=beras' },
+        { label: 'Minyak', to: '/products?search=minyak' },
+        { label: 'Lihat promo', to: '/promo' },
+      ],
+    };
+  }
+  if (pathname === '/promo') {
+    return {
+      title: 'Sedang lihat promo',
+      description: 'Tanya Globot tentang produk atau promo yang sedang Kakak lihat.',
+      suggestions: [{ label: 'Cari produk', to: '/products' }],
+    };
+  }
+  return {
+    title: 'Halo, Kak! Ada yang dicari?',
+    description: 'Aku bisa bantu cari produk, jelaskan cara pesan, atau arahkan Kakak ke status pesanan.',
+    suggestions: [
+      { label: 'Cari beras', to: '/products?search=beras' },
+      { label: 'Cari minyak', to: '/products?search=minyak' },
+      { label: 'Cek promo', to: '/promo' },
+    ],
+  };
 }
 
 export default function GlobotWidget() {
@@ -56,6 +120,11 @@ export default function GlobotWidget() {
   const supportUrl = supportNumber
     ? `https://wa.me/${supportNumber}?text=${encodeURIComponent('Halo, saya perlu bantuan berbelanja di Glosir.')}`
     : '/contact-us';
+  const fallbackActions = [
+    { label: 'Cari produk', to: '/products' },
+    { label: 'Cek pesanan', to: '/pesanan' },
+    ...(totalItems > 0 ? [{ label: 'Buka keranjang', to: '/cart' }] : []),
+  ];
 
   useEffect(() => {
     if (!available) setIsOpen(false);
@@ -71,9 +140,9 @@ export default function GlobotWidget() {
 
   if (!available) return null;
 
-  const sendMessage = async (event) => {
+  const sendMessage = async (event, messageText = input) => {
     event?.preventDefault();
-    const content = input.trim();
+    const content = messageText.trim();
     if (!content || loading) return;
 
     const nextMessages = [...messages, { role: 'user', content }];
@@ -100,10 +169,7 @@ export default function GlobotWidget() {
           setMessages((current) => [...current, {
             role: 'assistant',
             content: 'Maaf kak, chat AI belum tersambung di server saat ini. Menu pencarian, keranjang, checkout, dan cek pesanan di atas tetap bisa dipakai ya.',
-            actions: [
-              { label: 'Buka katalog', to: '/products' },
-              { label: 'Ke keranjang', to: '/cart' },
-            ],
+            actions: fallbackActions,
           }]);
           return;
         }
@@ -111,10 +177,7 @@ export default function GlobotWidget() {
           setMessages((current) => [...current, {
             role: 'assistant',
             content: 'Fitur chat AI sedang disiapkan, kak. Sambil menunggu, kakak tetap bisa mencari produk atau melanjutkan pesanan lewat menu di atas.',
-            actions: [
-              { label: 'Buka katalog', to: '/products' },
-              { label: 'Ke keranjang', to: '/cart' },
-            ],
+            actions: fallbackActions,
           }]);
           return;
         }
@@ -135,32 +198,28 @@ export default function GlobotWidget() {
   const showOrderingGuide = () => {
     setMessages((current) => [...current, {
       role: 'assistant',
-      content: 'Cara pesan: pilih produk dari katalog, tambahkan ke keranjang, lalu lanjut ke halaman checkout. Isi nama dan nomor WhatsApp untuk membuat pesanan dan meneruskan konfirmasi melalui WhatsApp.',
+      content: 'Cara pesan:\n1. Pilih produk dan tambahkan ke keranjang.\n2. Periksa keranjang, lalu lanjut ke checkout.\n3. Isi nama dan nomor WhatsApp aktif, lalu tekan “Pesan & Lanjut ke WhatsApp”.\n4. Konfirmasi pesanan dengan toko. Pesanan diambil dan dibayar di toko.',
       actions: [
-        { label: 'Lihat katalog', to: '/products' },
-        { label: 'Buka keranjang', to: '/cart' },
-        { label: 'Lanjut checkout', to: '/checkout' },
+        { label: 'Cari produk', to: '/products' },
+        ...(totalItems > 0 ? [{ label: 'Lanjut checkout', to: '/checkout' }] : []),
       ],
     }]);
   };
 
+  const welcome = getWelcomeContent(location.pathname, totalItems);
   const cartSummary = items.length
     ? items.slice(0, 5).map((item) => `${item.name} × ${item.qty}`).join(', ')
     : 'Keranjang masih kosong.';
-  const conversation = messages.length ? messages : [
-    { role: 'assistant', content: getDefaultHelpMessage(location.pathname) },
-  ];
-
   return (
     <div className={`globot-widget ${isOpen ? 'is-open' : ''}`}>
       {isOpen && (
         <section className="globot-panel" role="dialog" aria-modal="false" aria-labelledby="globot-title">
           <header className="globot-header">
             <div className="globot-header-identity">
-              <span className="globot-avatar"><Bot size={21} aria-hidden="true" /></span>
+              <span className="globot-avatar"><Bot size={23} aria-hidden="true" /></span>
               <div>
                 <h2 id="globot-title">Globot</h2>
-                <p>Asisten Glosir</p>
+                <p>Asisten belanja Glosir</p>
               </div>
             </div>
             <button className="globot-close" type="button" aria-label="Tutup Globot" onClick={() => setIsOpen(false)}>
@@ -169,15 +228,32 @@ export default function GlobotWidget() {
           </header>
 
           <nav className="globot-quick-links" aria-label="Navigasi belanja">
-            <Link to="/products" onClick={() => setIsOpen(false)}>Cari produk</Link>
-            <button type="button" onClick={showOrderingGuide}>Cara pesan</button>
-            <Link to="/cart" onClick={() => setIsOpen(false)}>Keranjang <span>{totalItems}</span></Link>
-            <Link to="/checkout" onClick={() => setIsOpen(false)}>Checkout</Link>
+            <Link to="/products" onClick={() => setIsOpen(false)}><PackageSearch size={16} /> Produk</Link>
             <Link to="/pesanan" onClick={() => setIsOpen(false)}>Cek pesanan</Link>
+            <button type="button" onClick={showOrderingGuide}>Cara pesan</button>
           </nav>
 
           <div className="globot-messages" aria-live="polite" aria-relevant="additions text">
-            {conversation.map((message, index) => (
+            {messages.length === 0 && (
+              <section className="globot-welcome-card" aria-label="Bantuan Globot">
+                <span className="globot-welcome-icon"><Sparkles size={18} aria-hidden="true" /></span>
+                <p className="globot-welcome-eyebrow">ASISTEN BELANJA</p>
+                <h3>{welcome.title}</h3>
+                <p className="globot-welcome-copy">{welcome.description}</p>
+                <div className="globot-suggestions" aria-label="Saran pencarian">
+                  {welcome.suggestions.map((suggestion) => {
+                    if (suggestion.to) {
+                      return <Link key={suggestion.label} to={suggestion.to} onClick={() => setIsOpen(false)}>{suggestion.label}</Link>;
+                    }
+                    if (suggestion.action === 'guide') {
+                      return <button key={suggestion.label} type="button" onClick={showOrderingGuide}>{suggestion.label}</button>;
+                    }
+                    return <button key={suggestion.label} type="button" disabled={loading} onClick={() => sendMessage(undefined, suggestion.question)}>{suggestion.label}</button>;
+                  })}
+                </div>
+              </section>
+            )}
+            {messages.map((message, index) => (
               <div className={`globot-message globot-message--${message.role}`} key={`${message.role}-${index}`}>
                 <div className="globot-message-bubble">{message.content}</div>
                 {message.products?.length > 0 && (
@@ -220,7 +296,8 @@ export default function GlobotWidget() {
             <div className="globot-cart-shortcut">
               <ShoppingBag size={16} aria-hidden="true" />
               <span title={cartSummary}>{totalItems} barang · {formatMoney(totalPrice)}</span>
-              <Link to="/cart" onClick={() => setIsOpen(false)}>Lihat keranjang</Link>
+              <Link to="/cart" onClick={() => setIsOpen(false)}>Keranjang</Link>
+              <Link to="/checkout" onClick={() => setIsOpen(false)}>Checkout</Link>
             </div>
           )}
 
@@ -245,9 +322,6 @@ export default function GlobotWidget() {
           </form>
           <footer className="globot-footer">
             <span>Jangan kirim nomor pesanan atau data pribadi di chat.</span>
-            <Link to="/checkout" onClick={() => setIsOpen(false)} aria-label="Buka halaman checkout">
-              <ExternalLink size={13} />
-            </Link>
           </footer>
         </section>
       )}

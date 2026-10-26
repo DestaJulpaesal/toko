@@ -16,28 +16,54 @@ export default function LoginPage() {
   const googleButtonRef = useRef(null);
   const googleClientId = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const showMessage = (text, type = 'error') => {
+    setMessage(text);
+    setMessageType(type);
+  };
+
+  const clearMessage = () => {
+    setMessage('');
+    setMessageType('');
+  };
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    if (messageType === 'error') clearMessage();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const email = form.email.trim();
+    if (!email) {
+      showMessage('Email wajib diisi.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showMessage('Format email belum benar. Contoh: nama@email.com.');
+      return;
+    }
+    if (!form.password) {
+      showMessage('Password wajib diisi.');
+      return;
+    }
+
     setLoading(true);
-    setMessage('');
+    clearMessage();
 
     try {
       const response = await apiFetch('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, email }),
       });
 
       const data = await response.json();
 
-      if (!data.success) {
-        setMessage(data.message || 'Login gagal');
+      if (!response.ok || !data.success) {
+        showMessage(data.message || 'Login gagal. Periksa kembali email dan password.');
         setLoading(false);
         return;
       }
@@ -48,20 +74,20 @@ export default function LoginPage() {
 
       if (data.mustChangePassword) {
         setForcePasswordChange(true);
-        setMessage('Demi keamanan, buat password baru sebelum melanjutkan.');
+        showMessage('Demi keamanan, buat password baru sebelum melanjutkan.', 'info');
         setLoading(false);
         return;
       }
 
       if (data.emailVerificationRequired) {
         setVerificationRequired(true);
-        setMessage('Verifikasi email dulu. Tautan verifikasi akan dikirim ke email akun.');
+        showMessage('Verifikasi email dulu. Tautan verifikasi akan dikirim ke email akun.', 'info');
         setLoading(false);
         return;
       }
 
       const roleLabel = data.user.role === 'OWNER' ? 'Owner / Admin' : 'Karyawan / Kasir';
-      setMessage(`Login berhasil sebagai ${roleLabel}. Mengalihkan...`);
+      showMessage(`Login berhasil sebagai ${roleLabel}. Mengalihkan...`, 'success');
 
       setTimeout(() => {
         if (data.user.role === 'OWNER') {
@@ -72,15 +98,15 @@ export default function LoginPage() {
           window.location.href = '/kasir';
         }
       }, 500);
-    } catch (error) {
-      setMessage('Backend belum berjalan. Jalankan server backend di port 5000 lalu coba lagi.');
+    } catch {
+      showMessage('Tidak dapat terhubung ke server. Periksa koneksi atau coba lagi sebentar.');
       setLoading(false);
     }
   };
 
   const handleGoogleCredential = async (response) => {
     setLoading(true);
-    setMessage('Memeriksa akun Google...');
+    showMessage('Memeriksa akun Google...', 'info');
     try {
       const result = await apiFetch('/auth/google', {
         method: 'POST',
@@ -90,17 +116,17 @@ export default function LoginPage() {
       });
       const data = await result.json();
       if (!result.ok || !data.success) {
-        setMessage(data.message || 'Login Google belum berhasil.');
+        showMessage(data.message || 'Login Google belum berhasil. Silakan coba lagi.');
         setLoading(false);
         return;
       }
       localStorage.setItem('glosir_token', data.token);
       localStorage.setItem('glosir_user', JSON.stringify(data.user));
       monitorSessionExpiry();
-      setMessage('Login Google berhasil. Mengalihkan...');
+      showMessage('Login Google berhasil. Mengalihkan...', 'success');
       window.location.href = data.user.role === 'OWNER' || data.user.role === 'ADMIN' ? '/admin' : data.user.role === 'PARCEL_MANAGER' ? '/parcel-manager' : '/kasir';
     } catch {
-      setMessage('Login Google belum berhasil. Periksa koneksi internet lalu coba lagi.');
+      showMessage('Login Google belum berhasil. Periksa koneksi internet lalu coba lagi.');
       setLoading(false);
     }
   };
@@ -128,9 +154,9 @@ export default function LoginPage() {
     try {
       const response = await apiFetch('/auth/request-verification', { method: 'POST', silentNotify: true });
       const data = await response.json();
-      setMessage(data.message || 'Tautan verifikasi sudah dikirim.');
+      showMessage(data.message || 'Tautan verifikasi sudah dikirim.', response.ok && data.success !== false ? 'success' : 'error');
     } catch {
-      setMessage('Tautan verifikasi belum bisa dikirim. Coba lagi sebentar.');
+      showMessage('Tautan verifikasi belum bisa dikirim. Coba lagi sebentar.');
     } finally {
       setLoading(false);
     }
@@ -139,11 +165,11 @@ export default function LoginPage() {
   const handleChangePassword = async (event) => {
     event.preventDefault();
     if (newPassword !== passwordConfirmation) {
-      setMessage('Password baru dan ulangi password harus sama.');
+      showMessage('Password baru dan ulangi password harus sama.');
       return;
     }
     setLoading(true);
-    setMessage('');
+    clearMessage();
     try {
       const response = await apiFetch('/auth/change-password', {
         method: 'POST',
@@ -152,7 +178,7 @@ export default function LoginPage() {
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
-        setMessage(data.message || 'Password belum berhasil diganti.');
+        showMessage(data.message || 'Password belum berhasil diganti.');
         setLoading(false);
         return;
       }
@@ -162,18 +188,22 @@ export default function LoginPage() {
         monitorSessionExpiry();
       }
       setForcePasswordChange(false);
-      setMessage('Password berhasil diganti. Mengalihkan...');
+      showMessage('Password berhasil diganti. Mengalihkan...', 'success');
       const user = JSON.parse(localStorage.getItem('glosir_user') || '{}');
       window.location.href = user.role === 'OWNER' || user.role === 'ADMIN' ? '/admin' : '/kasir';
     } catch {
-      setMessage('Password belum berhasil diganti. Periksa koneksi internet lalu coba lagi.');
+      showMessage('Password belum berhasil diganti. Periksa koneksi internet lalu coba lagi.');
       setLoading(false);
     }
   };
 
   const handleForgotPassword = async () => {
     if (!form.email) {
-      setMessage('Isi email terlebih dahulu, lalu pilih lupa password.');
+      showMessage('Isi email terlebih dahulu, lalu pilih lupa password.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      showMessage('Format email belum benar. Periksa kembali email yang dimasukkan.');
       return;
     }
     setLoading(true);
@@ -181,14 +211,15 @@ export default function LoginPage() {
       const response = await apiFetch('/auth/request-password-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email }),
+        body: JSON.stringify({ email: form.email.trim() }),
         silentNotify: true,
       });
       const data = await response.json();
-      setMessage(data.message || 'Jika email terdaftar, tautan reset password sudah dikirim.');
-      setResetRequested(true);
+      const succeeded = response.ok && data.success !== false;
+      showMessage(data.message || 'Jika email terdaftar, tautan reset password sudah dikirim.', succeeded ? 'success' : 'error');
+      setResetRequested(succeeded);
     } catch {
-      setMessage('Permintaan reset belum bisa diproses. Coba lagi sebentar.');
+      showMessage('Permintaan reset belum bisa diproses. Coba lagi sebentar.');
     } finally {
       setLoading(false);
     }
@@ -217,7 +248,7 @@ export default function LoginPage() {
             <p>Gunakan akun Karyawan / Kasir atau Owner untuk melanjutkan.</p>
           </div>
 
-          {!forcePasswordChange && <form onSubmit={handleSubmit} className="login-form">
+          {!forcePasswordChange && <form onSubmit={handleSubmit} className="login-form" noValidate>
             <label>
               Email
               <input
@@ -301,7 +332,7 @@ export default function LoginPage() {
           )}
 
           {message && (
-            <p className={`login-message ${message.startsWith('Login berhasil') ? 'success' : 'error'}`}>
+            <p className={`login-message ${messageType}`} role={messageType === 'error' ? 'alert' : 'status'} aria-live="polite">
               {message}
             </p>
           )}

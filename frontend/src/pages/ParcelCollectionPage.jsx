@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, CheckCircle2, CircleDollarSign, Clock3, Eye, Plus, Search, Users } from 'lucide-react';
+import { CalendarDays, CheckCircle2, CircleDollarSign, Clock3, Eye, Phone, Plus, Search, Users, WalletCards } from 'lucide-react';
 import AdminSidebar from '../components/AdminSidebar';
 import CurrencyInput from '../components/CurrencyInput';
 import ModalForm from '../components/ModalForm';
 import { confirmAction } from '../utils/confirmService';
 import { apiFetch } from '../services/api';
+import '../styles/parcel-collection.css';
 
 const money = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 const localDateValue = () => {
@@ -19,6 +20,7 @@ const differenceLabel = (value) => {
   if (!difference) return 'Sesuai';
   return `${difference > 0 ? 'Lebih' : 'Kurang'} ${money(Math.abs(difference))}`;
 };
+const frequencyLabel = (frequency) => frequency === 'WEEKLY' ? 'Setoran mingguan' : 'Setoran harian';
 
 export default function ParcelCollectionPage() {
   const [participants, setParticipants] = useState([]);
@@ -88,6 +90,8 @@ export default function ParcelCollectionPage() {
   });
   const expectedAmount = regionParticipants.reduce((sum, participant) => sum + Number(amounts[participant.id] || 0), 0);
   const enteredCount = regionParticipants.filter((participant) => Number(amounts[participant.id]) > 0).length;
+  const outstandingAmount = regionParticipants.reduce((sum, participant) => sum + Number(participant.remainingAmount || 0), 0);
+  const overdueCount = regionParticipants.filter((participant) => participant.collectionStatus === 'OVERDUE').length;
   const pendingSessions = sessions.filter((session) => session.status !== 'VERIFIED');
   const verifiedSessions = sessions.filter((session) => session.status === 'VERIFIED');
   const totalCollected = sessions.reduce((sum, session) => sum + Number(session.expectedAmount || 0), 0);
@@ -206,20 +210,61 @@ export default function ParcelCollectionPage() {
         </section>
       </main>
 
-      <ModalForm isOpen={formOpen} onClose={() => setFormOpen(false)} title="Catat setoran" subtitle="Isi nominal yang dibayarkan setiap peserta di wilayah ini." kicker="Kunjungan penagihan" maxWidth="680px" cardClassName="collection-modal">
+      <ModalForm isOpen={formOpen} onClose={() => setFormOpen(false)} title="Catat setoran" subtitle="Pilih wilayah, periksa tagihan peserta, lalu masukkan uang yang diterima." kicker="Kunjungan penagihan" maxWidth="940px" cardClassName="collection-modal collection-entry-modal">
         <form className="collection-modal-form" onSubmit={submit}>
-          {!isManager && <label>Wilayah<select required value={regionId} onChange={(event) => setRegionId(event.target.value)}><option value="">Pilih wilayah</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} ({region.code})</option>)}</select></label>}
-          <label className="collection-date-label"><span><CalendarDays size={14} /> Tanggal penagihan</span><input type="date" value={collectionDate} onChange={(event) => setCollectionDate(event.target.value)} /></label>
-          <div className="collection-region-heading"><span><strong>{regionName}</strong><small>{enteredCount} dari {regionParticipants.length} peserta diisi</small></span><b>{money(expectedAmount)}</b></div>
+          <div className="collection-entry-details-grid">
+            {!isManager && <label>Wilayah<select required value={regionId} onChange={(event) => setRegionId(event.target.value)}><option value="">Pilih wilayah</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name} ({region.code})</option>)}</select></label>}
+            <label className="collection-date-label"><span><CalendarDays size={14} /> Tanggal penagihan</span><input type="date" value={collectionDate} onChange={(event) => setCollectionDate(event.target.value)} /></label>
+          </div>
+          <div className="collection-entry-summary">
+            <div className="collection-entry-summary-heading">
+              <span className="collection-entry-region-mark"><Users size={17} /></span>
+              <span><small>Wilayah penagihan</small><strong>{regionName}</strong></span>
+            </div>
+            <div className="collection-entry-summary-stats">
+              <div><span>Peserta</span><strong>{regionParticipants.length}</strong></div>
+              <div><span>Sisa tagihan</span><strong>{money(outstandingAmount)}</strong></div>
+              <div><span>Sudah diisi</span><strong>{enteredCount} / {regionParticipants.length}</strong></div>
+            </div>
+          </div>
+          <div className="collection-participant-heading">
+            <span><strong>Rincian setoran peserta</strong><small>Masukkan uang yang diterima untuk masing-masing peserta.</small></span>
+            {overdueCount > 0 && <span className="collection-overdue-count">{overdueCount} menunggak</span>}
+          </div>
           <label className="collection-search"><Search size={16} /><input type="search" value={participantSearch} onChange={(event) => setParticipantSearch(event.target.value)} placeholder="Cari nama atau nomor HP" aria-label="Cari peserta berdasarkan nama atau nomor HP" /></label>
           <div className="collection-participant-list">
-            {visibleParticipants.map((participant) => <label className={`collection-participant-row${Number(amounts[participant.id]) > 0 ? ' has-amount' : ''}`} key={participant.id}><span><strong>{participant.name}</strong><small>Sisa tagihan {money(participant.remainingAmount)}{(participant.customerPhone || participant.participantPhone) ? ` · ${participant.customerPhone || participant.participantPhone}` : ''}</small></span><CurrencyInput value={amounts[participant.id] || ''} onValueChange={(value) => setAmounts((current) => ({ ...current, [participant.id]: value }))} placeholder="Rp 0" aria-label={`Setoran ${participant.name}`} /></label>)}
+            {visibleParticipants.map((participant) => <label className={`collection-participant-row${Number(amounts[participant.id]) > 0 ? ' has-amount' : ''}`} key={participant.id}>
+              <span className="collection-participant-info">
+                <span className="collection-participant-identity">
+                  <i aria-hidden="true">{(participant.name || '?').trim().charAt(0).toUpperCase()}</i>
+                  <span><strong>{participant.name}</strong><small><Phone size={12} />{(participant.customerPhone || participant.participantPhone) || 'Nomor HP belum tersedia'}</small></span>
+                </span>
+                <span className="collection-participant-meta">
+                  <span><small>Total target</small><b>{money(participant.targetAmount)}</b></span>
+                  <span><small>Sudah dibayar</small><b>{money(participant.paidAmount)}</b></span>
+                  <span><small>Sisa tagihan</small><b>{money(participant.remainingAmount)}</b></span>
+                  <span><small>Jadwal</small><b>{money(participant.contributionAmount)} · {frequencyLabel(participant.frequency)}</b></span>
+                </span>
+                <span className="collection-participant-progress">
+                  <span><small>Progres pembayaran</small><b>{participant.progress || 0}%</b></span>
+                  <i><i style={{ width: `${Math.max(0, Math.min(Number(participant.progress || 0), 100))}%` }} /></i>
+                </span>
+              </span>
+              <span className="collection-participant-input">
+                <small>Setoran hari ini</small>
+                <CurrencyInput value={amounts[participant.id] || ''} onValueChange={(value) => setAmounts((current) => ({ ...current, [participant.id]: value }))} placeholder="Rp 0" aria-label={`Setoran ${participant.name}`} />
+                {Number(amounts[participant.id]) > 0 && <small className="collection-entered-amount"><WalletCards size={12} /> {money(amounts[participant.id])} diterima</small>}
+              </span>
+            </label>)}
             {!loading && !regionParticipants.length && <div className="collection-empty-state"><Users size={22} /><strong>{regionId ? 'Belum ada peserta di wilayah ini' : 'Pilih wilayah terlebih dahulu'}</strong><span>{regionId ? 'Peserta yang terdaftar di wilayah ini akan muncul di sini.' : 'Pilih wilayah untuk melihat daftar peserta dan mencatat setoran.'}</span></div>}
             {!loading && regionParticipants.length > 0 && !visibleParticipants.length && <div className="collection-empty-state"><Search size={22} /><strong>Peserta tidak ditemukan</strong><span>Coba gunakan nama atau nomor HP yang berbeda.</span></div>}
             {loading && <div className="collection-empty-state" role="status">Memuat daftar peserta...</div>}
           </div>
-          <label>Catatan wilayah<textarea rows="2" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Contoh: penagihan keliling hari Senin" /></label>
-          <div className="collection-submit-row">{enteredCount > 0 && <button className="collection-clear-button" type="button" onClick={() => setAmounts({})}>Kosongkan nominal</button>}<button className="btn btn-primary full" type="submit" disabled={saving || loading || enteredCount === 0}>{saving ? 'Menyimpan rekap...' : `Simpan rekap · ${money(expectedAmount)}`}</button></div>
+          <label className="collection-entry-note">Catatan kunjungan <small>Opsional, misalnya peserta tidak di rumah atau jadwal penagihan berikutnya.</small><textarea rows="2" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Tulis catatan untuk rekap wilayah ini..." /></label>
+          <div className="collection-submit-row">
+            <span className="collection-submit-total"><small>Total uang yang dicatat</small><strong>{money(expectedAmount)}</strong></span>
+            <div>{enteredCount > 0 && <button className="collection-clear-button" type="button" onClick={() => setAmounts({})}>Kosongkan nominal</button>}<button className="btn btn-primary" type="submit" disabled={saving || loading || enteredCount === 0}>{saving ? 'Menyimpan rekap...' : `Simpan rekap · ${enteredCount} peserta`}</button></div>
+          </div>
         </form>
       </ModalForm>
 

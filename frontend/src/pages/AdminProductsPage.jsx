@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, PackagePlus, Pencil, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react';
+import { Barcode, Eye, Image as ImageIcon, PackagePlus, Pencil, Plus, Search, ShoppingBag, Trash2 } from 'lucide-react';
 import AdminShell from '../layouts/AdminShell';
 import BulkTableActions, { BulkRowCheckbox } from '../components/BulkTableActions';
 import ModalForm from '../components/ModalForm';
@@ -11,6 +11,8 @@ import StockReceiptImportModal from '../components/StockReceiptImportModal';
 import { generateAutoBarcode, playBeep } from '../utils/barcodeUtils';
 import CurrencyInput from '../components/CurrencyInput';
 import CatalogImageField from '../components/CatalogImageField';
+import CatalogImage from '../components/CatalogImage';
+import '../styles/admin-products.css';
 import { confirmAction } from '../utils/confirmService';
 import { showNotice } from '../utils/noticeService';
 import { apiFetch } from '../services/api';
@@ -599,7 +601,7 @@ export default function AdminProductsPage() {
             title={editingId ? 'Edit produk' : 'Tambah produk'}
             subtitle="Lengkapi informasi produk, harga, stok, dan barcode."
             kicker={editingId ? 'Perbarui katalog' : 'Produk baru'}
-            maxWidth="1080px"
+            maxWidth="1180px"
             cardClassName="product-editor-modal"
           >
             {notice && (
@@ -609,136 +611,177 @@ export default function AdminProductsPage() {
               </div>
             )}
             <form className="crud-form-panel product-editor-form" onSubmit={submitForm}>
-
-            <label>
-              Nama produk
-              <input name="name" value={form.name || ''} onChange={updateField} placeholder="Contoh: Kopi Bubuk Premium" />
-            </label>
-
-            <label>
-              SKU / Barcode
-              <div className="sku-input-wrapper">
-                <input
-                  ref={barcodeInputRef}
-                  name="barcode"
-                  value={form.barcode || ''}
-                  onChange={updateField}
-                  onKeyDown={handleBarcodeInputKeyDown}
-                  autoComplete="off"
-                  placeholder="Opsional: scan barcode pabrik"
-                />
-                <input
-                  name="sku"
-                  value={form.sku || ''}
-                  onChange={updateField}
-                  placeholder="SKU internal (opsional, otomatis)"
-                />
-                <button
-                  type="button"
-                  className="btn-auto-barcode"
-                  onClick={handleAutoGenerateBarcode}
-                  title="Buat barcode internal untuk dicetak pada label toko"
-                >
-                  ⚡ Buat Label
-                </button>
-                <button
-                  type="button"
-                  className="btn-scan-barcode"
-                  onClick={() => setScannerOpen(true)}
-                  title="Buka kamera untuk scan barcode kemasan barang"
-                >
-                  📷 Scan
-                </button>
-              </div>
-                <small style={{ color: '#6b7280', fontSize: '0.74rem', marginTop: '4px', display: 'block' }}>
-                Barcode pabrik opsional. Produk tanpa barcode tetap bisa dicari lewat nama atau SKU internal.
-              </small>
-            </label>
-
-            <div className="form-two-columns">
-              <label>
-                Kategori
-                <select name="category" value={form.category || ''} onChange={updateField}>
-                  <option value="">Pilih kategori produk</option>
-                  {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
-                </select>
-              </label>
-              <label>
-                Status
-                <select name="status" value={form.status || 'Aktif'} onChange={updateField}>
-                  <option>Aktif</option>
-                  <option>Stok menipis</option>
-                  <option>Draft</option>
-                </select>
-              </label>
-            </div>
-
-            <CatalogImageField value={form.imageUrl || ''} onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))} group="products" label="Foto produk" />
-
-            <div className="form-two-columns product-price-fields">
-              <label>
-                Harga Jual (Promo)
-                <CurrencyInput name="price" value={form.price} onValueChange={(value) => setForm((current) => ({ ...current, price: value }))} placeholder="Rp 48.000" />
-              </label>
-              <label>
-                Harga warung / grosir
-                <CurrencyInput name="wholesalePrice" value={form.wholesalePrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, wholesalePrice: value }))} placeholder="Opsional, mis. Rp 45.000" />
-              </label>
-              <label>
-                Harga beli / modal
-                <CurrencyInput name="purchasePrice" value={form.purchasePrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, purchasePrice: value }))} placeholder="Rp 40.000" />
-              </label>
-              <label>
-                Harga Normal / Coret (Opsional)
-                <CurrencyInput name="originalPrice" value={form.originalPrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, originalPrice: value }))} placeholder="Rp 60.000" />
-              </label>
-            </div>
-
-            <label>
-              Stok
-              <input name="stock" value={form.stock ?? ''} onChange={updateField} type="number" min="0" placeholder="25" />
-            </label>
-            <label>
-              Stok minimum (batas restock)
-              <input name="stockWarning" value={form.stockWarning ?? 0} onChange={updateField} type="number" min="0" step="1" placeholder="5" />
-              <small className="field-help">Peringatan muncul saat stok sama atau di bawah angka ini.</small>
-            </label>
-
-            <section className="product-packages-panel">
-              <div className="panel-heading">
-                <div><span className="panel-kicker">Kemasan tambahan</span><h3>Atur ukuran jual selain eceran</h3><p className="product-package-help">Contoh: 1 dus berisi beberapa unit. Setiap kemasan dapat memiliki harga, barcode, dan stok sendiri.</p></div>
-                <button type="button" className="text-button" onClick={() => setForm((current) => ({ ...current, packages: [...(current.packages || []), { name: 'Dus', sku: '', barcode: '', price: '', wholesalePrice: '', purchasePrice: '', stock: '' }] }))}>+ Tambah kemasan</button>
-              </div>
-              <small className="tool-empty">Isi nama model kemasan, lalu bedakan harga jual, harga warung/grosir, modal beli, barcode, SKU, dan stoknya.</small>
-              {(form.packages || []).map((packageForm, index) => (
-                <div className="product-package-row" key={packageForm.id || index}>
-                  <label><span>Model kemasan</span><input type="text" placeholder="Dus / Pak / Slop" value={packageForm.name ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item) }))} /></label>
-                  <label><span>SKU kemasan</span><input type="text" placeholder="Kode SKU khusus kemasan" value={packageForm.sku ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, sku: event.target.value } : item) }))} /></label>
-                  <label><span>Barcode kemasan</span><input type="text" placeholder="Barcode pada dus/pak" value={packageForm.barcode ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, barcode: event.target.value } : item) }))} /></label>
-                  <label><span>Harga jual pelanggan</span><CurrencyInput value={packageForm.price ?? ''} placeholder="Rp 0" onValueChange={(value) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, price: value } : item) }))} /></label>
-                  <label><span>Harga warung / grosir</span><CurrencyInput value={packageForm.wholesalePrice ?? ''} placeholder="Rp 0" onValueChange={(value) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, wholesalePrice: value } : item) }))} /></label>
-                  <label><span>Harga beli / modal</span><CurrencyInput value={packageForm.purchasePrice ?? ''} placeholder="Rp 0" onValueChange={(value) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, purchasePrice: value } : item) }))} /></label>
-                  <label><span>Stok kemasan</span><input type="number" min="0" placeholder="0" value={packageForm.stock ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, stock: event.target.value } : item) }))} /></label>
-                  <button type="button" className="text-button" onClick={() => setForm((current) => ({ ...current, packages: current.packages.filter((_, itemIndex) => itemIndex !== index) }))}>Hapus</button>
+              <section className="product-form-section">
+                <div className="product-form-section-heading">
+                  <span className="product-form-step">01</span>
+                  <div><h3>Informasi produk</h3><p>Nama, kategori, barcode, dan foto yang akan tampil di katalog.</p></div>
                 </div>
-              ))}
-            </section>
+                <div className="product-information-grid">
+                  <div className="product-information-fields">
+                    <label>
+                      Nama produk
+                      <input name="name" value={form.name || ''} onChange={updateField} placeholder="Contoh: Kopi Bubuk Premium" />
+                    </label>
 
-            <label className="quick-access-toggle"><input type="checkbox" checked={Boolean(form.isQuickAccess)} onChange={(event) => setForm((current) => ({ ...current, isQuickAccess: event.target.checked }))} /><span><strong>Tampilkan sebagai tombol cepat di Kasir</strong><small>Untuk barang yang sering dijual tanpa perlu mencari.</small></span></label>
-            <div className="product-homepage-options">
-              <label className="quick-access-toggle">
-                <input type="checkbox" checked={Boolean(form.isFlashSale)} onChange={(event) => setForm((current) => ({ ...current, isFlashSale: event.target.checked }))} />
-                <span><strong>Tampilkan di Flash Sale</strong><small>Isi harga normal lebih tinggi dari harga jual agar diskonnya tampil.</small></span>
-              </label>
-              <label className="quick-access-toggle">
-                <input type="checkbox" checked={Boolean(form.isBestseller)} onChange={(event) => setForm((current) => ({ ...current, isBestseller: event.target.checked }))} />
-                <span><strong>Tandai sebagai produk terlaris</strong><small>Dipakai sebagai pilihan cadangan jika belum ada riwayat penjualan selesai.</small></span>
-              </label>
-              <label className="quick-access-toggle">
-                <input type="checkbox" checked={Boolean(form.isRecommended)} onChange={(event) => setForm((current) => ({ ...current, isRecommended: event.target.checked }))} />
-                <span><strong>Tampilkan di rekomendasi</strong><small>Pilih produk yang ingin diutamakan di beranda.</small></span>
-              </label>
-            </div>
+                    <label>
+                      SKU &amp; barcode
+                      <div className="sku-input-wrapper">
+                        <input
+                          ref={barcodeInputRef}
+                          name="barcode"
+                          value={form.barcode || ''}
+                          onChange={updateField}
+                          onKeyDown={handleBarcodeInputKeyDown}
+                          autoComplete="off"
+                          placeholder="Barcode pabrik (opsional)"
+                          aria-label="Barcode produk"
+                        />
+                        <input
+                          name="sku"
+                          value={form.sku || ''}
+                          onChange={updateField}
+                          placeholder="SKU internal (opsional, otomatis)"
+                          aria-label="SKU internal"
+                        />
+                        <button
+                          type="button"
+                          className="btn-auto-barcode"
+                          onClick={handleAutoGenerateBarcode}
+                          title="Buat barcode internal untuk dicetak pada label toko"
+                        >
+                          ⚡ Buat Label
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-scan-barcode"
+                          onClick={() => setScannerOpen(true)}
+                          title="Buka kamera untuk scan barcode kemasan barang"
+                        >
+                          📷 Scan
+                        </button>
+                      </div>
+                      <small className="field-help">Barcode pabrik opsional. Produk tanpa barcode tetap bisa dicari lewat nama atau SKU internal.</small>
+                    </label>
+
+                    <div className="form-two-columns">
+                      <label>
+                        Kategori
+                        <select name="category" value={form.category || ''} onChange={updateField}>
+                          <option value="">Pilih kategori produk</option>
+                          {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
+                        </select>
+                      </label>
+                      <label>
+                        Status
+                        <select name="status" value={form.status || 'Aktif'} onChange={updateField}>
+                          <option>Aktif</option>
+                          <option>Stok menipis</option>
+                          <option>Draft</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="product-image-editor">
+                    <CatalogImageField value={form.imageUrl || ''} onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))} group="products" label="Foto produk" />
+                  </div>
+                </div>
+              </section>
+
+              <div className="product-form-data-grid">
+                <section className="product-form-section">
+                  <div className="product-form-section-heading">
+                    <span className="product-form-step">02</span>
+                    <div><h3>Harga produk</h3><p>Atur harga jual, grosir, modal, dan harga normal untuk promo.</p></div>
+                  </div>
+                  <div className="form-two-columns product-price-fields">
+                    <label>
+                      Harga jual pelanggan
+                      <CurrencyInput name="price" value={form.price} onValueChange={(value) => setForm((current) => ({ ...current, price: value }))} placeholder="Rp 48.000" />
+                    </label>
+                    <label>
+                      Harga warung / grosir
+                      <CurrencyInput name="wholesalePrice" value={form.wholesalePrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, wholesalePrice: value }))} placeholder="Opsional, mis. Rp 45.000" />
+                    </label>
+                    <label>
+                      Harga beli / modal
+                      <CurrencyInput name="purchasePrice" value={form.purchasePrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, purchasePrice: value }))} placeholder="Rp 40.000" />
+                    </label>
+                    <label>
+                      Harga normal / coret (opsional)
+                      <CurrencyInput name="originalPrice" value={form.originalPrice || ''} onValueChange={(value) => setForm((current) => ({ ...current, originalPrice: value }))} placeholder="Rp 60.000" />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="product-form-section product-stock-section">
+                  <div className="product-form-section-heading">
+                    <span className="product-form-step">03</span>
+                    <div><h3>Stok &amp; kemasan</h3><p>Atur persediaan dan batas pengingat restock.</p></div>
+                  </div>
+                  <div className="product-stock-fields">
+                    <label>
+                      Stok tersedia
+                      <input name="stock" value={form.stock ?? ''} onChange={updateField} type="number" min="0" placeholder="25" />
+                    </label>
+                    <label>
+                      Stok minimum (batas restock)
+                      <input name="stockWarning" value={form.stockWarning ?? 0} onChange={updateField} type="number" min="0" step="1" placeholder="5" />
+                      <small className="field-help">Peringatan muncul saat stok sama atau di bawah angka ini.</small>
+                    </label>
+                  </div>
+                </section>
+              </div>
+
+            <details className="product-optional-panel product-packages-panel">
+              <summary>
+                <span className="product-optional-icon">+</span>
+                <span className="product-optional-copy"><strong>Kemasan tambahan</strong><small>Atur ukuran jual seperti dus, pak, atau slop.</small></span>
+                <span className="product-optional-count">{form.packages?.length ? `${form.packages.length} kemasan` : 'Opsional'}</span>
+              </summary>
+              <div className="product-optional-content">
+                <button type="button" className="product-add-package" onClick={() => setForm((current) => ({ ...current, packages: [...(current.packages || []), { name: 'Dus', sku: '', barcode: '', price: '', wholesalePrice: '', purchasePrice: '', stock: '' }] }))}>+ Tambah kemasan</button>
+                {form.packages?.length > 0 && <small className="tool-empty">Setiap kemasan dapat memiliki harga, barcode, SKU, dan stok sendiri.</small>}
+                {(form.packages || []).map((packageForm, index) => (
+                  <div className="product-package-row" key={packageForm.id || index}>
+                    <label><span>Model kemasan</span><input type="text" placeholder="Dus / Pak / Slop" value={packageForm.name ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item) }))} /></label>
+                    <label><span>SKU kemasan</span><input type="text" placeholder="Kode SKU khusus kemasan" value={packageForm.sku ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, sku: event.target.value } : item) }))} /></label>
+                    <label><span>Barcode kemasan</span><input type="text" placeholder="Barcode pada dus/pak" value={packageForm.barcode ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, barcode: event.target.value } : item) }))} /></label>
+                    <label><span>Harga jual pelanggan</span><CurrencyInput value={packageForm.price ?? ''} placeholder="Rp 0" onValueChange={(value) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, price: value } : item) }))} /></label>
+                    <label><span>Harga warung / grosir</span><CurrencyInput value={packageForm.wholesalePrice ?? ''} placeholder="Rp 0" onValueChange={(value) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, wholesalePrice: value } : item) }))} /></label>
+                    <label><span>Harga beli / modal</span><CurrencyInput value={packageForm.purchasePrice ?? ''} placeholder="Rp 0" onValueChange={(value) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, purchasePrice: value } : item) }))} /></label>
+                    <label><span>Stok kemasan</span><input type="number" min="0" placeholder="0" value={packageForm.stock ?? ''} onChange={(event) => setForm((current) => ({ ...current, packages: current.packages.map((item, itemIndex) => itemIndex === index ? { ...item, stock: event.target.value } : item) }))} /></label>
+                    <button type="button" className="text-button" onClick={() => setForm((current) => ({ ...current, packages: current.packages.filter((_, itemIndex) => itemIndex !== index) }))}>Hapus kemasan</button>
+                  </div>
+                ))}
+              </div>
+            </details>
+
+            <details className="product-optional-panel product-visibility-section">
+              <summary>
+                <span className="product-optional-icon">+</span>
+                <span className="product-optional-copy"><strong>Pengaturan tampilan</strong><small>Pilihan tambahan untuk kasir, flash sale, dan rekomendasi.</small></span>
+                <span className="product-optional-count">
+                  {[form.isQuickAccess, form.isFlashSale, form.isBestseller, form.isRecommended].filter(Boolean).length
+                    ? `${[form.isQuickAccess, form.isFlashSale, form.isBestseller, form.isRecommended].filter(Boolean).length} aktif`
+                    : 'Opsional'}
+                </span>
+              </summary>
+              <div className="product-optional-content product-homepage-options">
+                <label className="quick-access-toggle"><input type="checkbox" checked={Boolean(form.isQuickAccess)} onChange={(event) => setForm((current) => ({ ...current, isQuickAccess: event.target.checked }))} /><span><strong>Tampilkan sebagai tombol cepat di Kasir</strong><small>Untuk barang yang sering dijual tanpa perlu mencari.</small></span></label>
+                <label className="quick-access-toggle">
+                  <input type="checkbox" checked={Boolean(form.isFlashSale)} onChange={(event) => setForm((current) => ({ ...current, isFlashSale: event.target.checked }))} />
+                  <span><strong>Tampilkan di Flash Sale</strong><small>Isi harga normal lebih tinggi dari harga jual agar diskonnya tampil.</small></span>
+                </label>
+                <label className="quick-access-toggle">
+                  <input type="checkbox" checked={Boolean(form.isBestseller)} onChange={(event) => setForm((current) => ({ ...current, isBestseller: event.target.checked }))} />
+                  <span><strong>Tandai sebagai produk terlaris</strong><small>Dipakai sebagai pilihan cadangan jika belum ada riwayat penjualan selesai.</small></span>
+                </label>
+                <label className="quick-access-toggle">
+                  <input type="checkbox" checked={Boolean(form.isRecommended)} onChange={(event) => setForm((current) => ({ ...current, isRecommended: event.target.checked }))} />
+                  <span><strong>Tampilkan di rekomendasi</strong><small>Pilih produk yang ingin diutamakan di beranda.</small></span>
+                </label>
+              </div>
+            </details>
 
               <div className="product-form-actions">
                 <button className="btn btn-secondary" type="button" onClick={closeProductModal} disabled={saving}>Batal</button>
@@ -795,7 +838,9 @@ export default function AdminProductsPage() {
                   <tr>
                     <th className="bulk-check-column">Pilih</th><th>Produk & Barcode</th>
                     <th>Kategori</th>
-                    <th>Harga</th>
+                    <th>Harga jual</th>
+                    <th>Harga grosir</th>
+                    <th>Harga modal</th>
                     <th>Stok</th>
                     <th>Status</th>
                     <th>Aksi</th>
@@ -805,15 +850,21 @@ export default function AdminProductsPage() {
                   {visibleProducts.map((product) => (
                     <tr key={product.id}>
                       <td className="bulk-check-column"><BulkRowCheckbox checked={selectedProductIds.includes(product.id)} onChange={(checked) => toggleProductSelection(product.id, checked)} label={`Pilih ${product.name}`} /></td>
-                      <td>
-                        <strong>{product.name}</strong>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                          <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', background: '#f3f4f6', padding: '2px 6px', borderRadius: '4px', color: '#1f2937', fontWeight: 600 }}>
-                            🏷️ {product.sku}
-                          </span>
+                      <td className="product-table-identity">
+                        <div className="product-table-photo">
+                          <CatalogImage src={product.imageUrl} alt={product.name} width={96} height={96}>
+                            <ImageIcon size={20} aria-hidden="true" />
+                          </CatalogImage>
+                        </div>
+                        <div className="product-table-copy">
+                          <strong>{product.name}</strong>
+                          <div className="product-table-codes">
+                            {product.sku && <span><Barcode size={13} /> SKU: {product.sku}</span>}
+                            {product.barcode && product.barcode !== product.sku && <span><Barcode size={13} /> Barcode: {product.barcode}</span>}
+                          </div>
                           <button
                             type="button"
-                            style={{ background: 'none', border: 'none', color: '#1f7a4a', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                            className="product-print-label"
                             onClick={() => setPrintModalProduct(product)}
                             title="Cetak stiker barcode untuk barang ini"
                           >
@@ -833,7 +884,9 @@ export default function AdminProductsPage() {
                           </div>
                         )}
                       </td>
-                      <td>{product.stock}</td>
+                      <td>{product.wholesalePrice !== null && product.wholesalePrice !== undefined && product.wholesalePrice !== '' ? <strong>Rp {Number(product.wholesalePrice).toLocaleString('id-ID')}</strong> : <span className="product-table-muted">—</span>}</td>
+                      <td>{product.purchasePrice !== null && product.purchasePrice !== undefined && product.purchasePrice !== '' ? <strong>Rp {Number(product.purchasePrice).toLocaleString('id-ID')}</strong> : <span className="product-table-muted">—</span>}</td>
+                      <td><strong>{product.stock ?? 0}</strong><small>Min. {product.stockWarning ?? 0}</small></td>
                       <td>
                         <span className={`status-chip ${product.status === 'Aktif' ? 'good' : product.status === 'Stok menipis' ? 'warning' : ''}`}>
                           {product.status}

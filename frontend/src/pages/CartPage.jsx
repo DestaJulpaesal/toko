@@ -97,26 +97,30 @@ export default function CartPage() {
               </div>
             ) : (
               items.map((item) => (
-                <div key={item.id} className="cart-item" style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ width: '60px', height: '60px', background: '#f3f4f6', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', flexShrink: 0 }}>
-                    🛍️
+                <div key={item.id} className="cart-item">
+                  <div className="cart-item-thumbnail">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} width="80" height="80" loading="lazy" decoding="async" />
+                    ) : (
+                      <span aria-hidden="true">🛍️</span>
+                    )}
                   </div>
-                  <div className="cart-info" style={{ flex: 1 }}>
-                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 6px', color: '#111827' }}>{item.name}</h3>
-                    <div style={{ fontSize: '0.88rem', color: '#6b7280', marginBottom: '8px' }}>
+                  <div className="cart-info">
+                    <h3>{item.name}</h3>
+                    <div className="cart-item-unit-price">
                       Rp {Number(item.price).toLocaleString('id-ID')} / {item.unit || 'Pcs'}
                     </div>
-                    <div className="qty-control" style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '10px', overflow: 'hidden' }}>
-                      <button onClick={() => updateQty(item.id, item.qty - 1)} style={{ width: '44px', height: '40px', background: '#f9fafb', border: 'none', fontSize: '1.2rem', fontWeight: 800, cursor: 'pointer' }}>-</button>
-                      <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}>{item.qty}</span>
-                      <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ width: '44px', height: '40px', background: '#f9fafb', border: 'none', fontSize: '1.2rem', fontWeight: 800, cursor: 'pointer' }}>+</button>
+                    <div className="qty-control">
+                      <button type="button" onClick={() => updateQty(item.id, item.qty - 1)} aria-label={`Kurangi jumlah ${item.name}`}>-</button>
+                      <span>{item.qty}</span>
+                      <button type="button" onClick={() => updateQty(item.id, item.qty + 1)} aria-label={`Tambah jumlah ${item.name}`}>+</button>
                     </div>
                   </div>
-                  <div className="cart-actions" style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                    <strong style={{ fontSize: '1.15rem', color: '#1f7a4a', fontWeight: 900 }}>
+                  <div className="cart-actions">
+                    <strong>
                       Rp {(item.qty * item.price).toLocaleString('id-ID')}
                     </strong>
-                    <button className="remove-btn" onClick={() => confirmRemoveItem(item)} style={{ background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', fontWeight: 700 }}>
+                    <button type="button" className="remove-btn" onClick={() => confirmRemoveItem(item)}>
                       <Trash2 size={16} /> Hapus
                     </button>
                   </div>

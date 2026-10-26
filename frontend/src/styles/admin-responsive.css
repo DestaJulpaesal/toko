@@ -1023,3 +1023,195 @@
     white-space: nowrap;
   }
 }
+
+@media (max-width: 1024px) {
+  .admin-sidebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 40px 40px auto;
+    grid-template-rows: 48px;
+    align-items: center;
+    column-gap: 10px;
+    min-height: 68px;
+    padding: 10px 16px;
+  }
+
+  .admin-sidebar .admin-brand {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .admin-sidebar .admin-brand-copy {
+    min-width: 0;
+  }
+
+  .admin-sidebar .admin-brand-copy strong {
+    overflow: hidden;
+    font-size: .98rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-sidebar .admin-mobile-menu-button {
+    position: static;
+    grid-column: 2;
+    grid-row: 1;
+    width: 40px;
+    height: 40px;
+    justify-self: center;
+    border: 1px solid #dfe8e1;
+    border-radius: 11px;
+    background: #f5f9f6;
+  }
+
+  .admin-sidebar .reminder-bell {
+    position: static;
+    grid-column: 3;
+    grid-row: 1;
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+  }
+
+  .admin-sidebar .reminder-bell > button {
+    display: grid;
+    position: relative;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid #dfe8e1;
+    border-radius: 11px;
+    color: #28734c;
+    background: #f5f9f6;
+  }
+
+  .admin-sidebar .reminder-bell > button span {
+    top: -5px;
+    right: -5px;
+    min-width: 17px;
+    box-sizing: border-box;
+    padding: 2px 4px;
+    border: 2px solid #fff;
+    font-size: 9px;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  .admin-sidebar .sidebar-profile {
+    grid-column: 4;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-self: end;
+    gap: 9px;
+    min-width: 0;
+    min-height: 40px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .admin-sidebar .sidebar-profile .avatar {
+    display: grid;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+  }
+
+  .admin-sidebar .sidebar-profile-copy {
+    display: grid;
+    width: clamp(82px, 14vw, 132px);
+    min-width: 0;
+    gap: 3px;
+    overflow: hidden;
+  }
+
+  .admin-sidebar .sidebar-profile-copy strong,
+  .admin-sidebar .sidebar-profile-copy small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-sidebar .sidebar-profile-copy strong {
+    color: #29362e;
+    font-size: .75rem;
+  }
+
+  .admin-sidebar .sidebar-profile-copy small {
+    color: #7a8a80;
+    font-size: .66rem;
+  }
+
+  .admin-sidebar .sidebar-profile .sidebar-logout-btn {
+    display: grid;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid #dfe8e1;
+    border-radius: 11px;
+    color: #647269;
+    background: #f5f9f6;
+  }
+
+  .admin-sidebar .sidebar-profile .sidebar-logout-label,
+  .admin-sidebar .sidebar-profile .sidebar-text-size {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-sidebar {
+    grid-template-columns: minmax(0, 1fr) 38px 38px auto;
+    column-gap: 7px;
+    min-height: 62px;
+    padding: 8px 10px;
+  }
+
+  .admin-sidebar .admin-brand-copy small {
+    display: none;
+  }
+
+  .admin-sidebar .admin-mobile-menu-button,
+  .admin-sidebar .reminder-bell,
+  .admin-sidebar .reminder-bell > button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .admin-sidebar .sidebar-profile {
+    gap: 7px;
+  }
+
+  .admin-sidebar .sidebar-profile-copy {
+    display: none;
+  }
+
+  .admin-sidebar .sidebar-profile .avatar {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .admin-sidebar .sidebar-profile .sidebar-logout-btn {
+    flex-basis: 38px;
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+  }
+}
+
+@media (max-width: 360px) {
+  .admin-sidebar {
+    column-gap: 5px;
+    padding-inline: 8px;
+  }
+}

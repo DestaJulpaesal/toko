@@ -2,38 +2,39 @@ import { Link } from 'react-router-dom';
 import { Heart, Plus } from 'lucide-react';
 import CatalogImage from './CatalogImage';
 
+/**
+ * Kartu produk katalog (dipakai di /products, detail produk "terkait", dan seksi beranda).
+ * Semua ukuran diatur lewat kelas CSS di styles/product-cards.css (tidak ada inline style),
+ * supaya bisa diubah per breakpoint dan semua kartu selalu seragam:
+ *   gambar (rasio tetap) -> meta 1 baris -> nama 2 baris -> harga (slot harga coret tetap) -> tombol.
+ */
 export default function ProductCard({ product, isFavorited = false, onToggleFavorite, onAddToCart }) {
   const hasDiscount = (product.originalPrice && product.originalPrice > product.price) || (product.discountPercent > 0);
   const discountPct = product.discountPercent || (product.originalPrice ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0);
+  const detailPath = product.detailPath || `/products/${product.id}`;
+  const metaText = [product.category, product.unit ? `/${product.unit}` : ''].filter(Boolean).join(' \u2022 ');
 
   return (
-    <article
-      className="product-card catalog-product-card bg-white border border-gray-200 rounded-[18px] p-3 flex flex-col relative shadow-sm hover:shadow-md transition-shadow"
-      style={{
-        background: '#ffffff',
-        border: '1px solid #e5e7eb',
-        borderRadius: '18px',
-        padding: '12px',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-      }}
-    >
-      {/* Kontainer Foto Produk & Tombol Wishlist */}
-      <div
-        className="catalog-product-image relative w-full aspect-square rounded-[14px] overflow-hidden bg-slate-50 mb-2.5 block"
-        style={{
-          position: 'relative',
-          width: '100%',
-          aspectRatio: '1/1',
-          borderRadius: '14px',
-          overflow: 'hidden',
-          background: '#f8fafc',
-          marginBottom: '10px',
-        }}
-      >
-        {/* Tombol Wishlist / Favorit Interaktif */}
+    <article className="catalog-product-card">
+      {/* Foto produk: rasio tetap, tidak pernah menentukan tinggi kartu */}
+      <div className="catalog-product-image">
+        <Link
+          to={detailPath}
+          className="catalog-product-image-link"
+          aria-label={`Lihat ${product.name}`}
+          tabIndex={-1}
+        >
+          <CatalogImage src={product.imageUrl} alt={`Foto ${product.name}`}>
+            <div className="catalog-product-placeholder" role="img" aria-label={`Foto ${product.name} belum tersedia`}>
+              <span aria-hidden="true">{'\u{1F6CD}\uFE0F'}</span>
+            </div>
+          </CatalogImage>
+        </Link>
+
+        {hasDiscount && discountPct > 0 && (
+          <span className="catalog-product-badge">Hemat {discountPct}%</span>
+        )}
+
         <button
           type="button"
           onClick={(e) => {
@@ -43,173 +44,39 @@ export default function ProductCard({ product, isFavorited = false, onToggleFavo
           }}
           aria-label={isFavorited ? `Hapus ${product.name} dari favorit` : `Tambahkan ${product.name} ke favorit`}
           aria-pressed={isFavorited}
-          className="absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-sm flex items-center justify-center transition-all cursor-pointer border-none"
-          style={{
-            position: 'absolute',
-            top: '9px',
-            right: '9px',
-            zIndex: 10,
-            background: isFavorited ? '#fff1f2' : 'rgba(255, 255, 255, 0.96)',
-            border: `1px solid ${isFavorited ? '#fecdd3' : 'rgba(229, 231, 235, 0.9)'}`,
-            borderRadius: '50%',
-            width: '36px',
-            minWidth: '36px',
-            height: '36px',
-            minHeight: '36px',
-            padding: 0,
-            display: 'flex',
-            flex: '0 0 36px',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            color: isFavorited ? '#e11d48' : '#64748b',
-            boxShadow: '0 2px 8px rgba(15, 23, 42, 0.16)',
-            transition: 'transform 0.15s ease, background 0.15s ease, color 0.15s ease',
-          }}
+          className={`catalog-product-fav${isFavorited ? ' is-active' : ''}`}
         >
-          <Heart
-            size={18}
-            className={isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-600 fill-none'}
-            fill={isFavorited ? '#ef4444' : 'none'}
-            color={isFavorited ? '#e11d48' : '#475569'}
-            strokeWidth={2}
-            style={{ display: 'block', width: 18, height: 18, flex: '0 0 18px' }}
-          />
+          <Heart size={16} fill={isFavorited ? 'currentColor' : 'none'} strokeWidth={2} aria-hidden="true" />
         </button>
+      </div>
 
-        {/* Link & Foto */}
-        <Link
-          to={product.detailPath || `/products/${product.id}`}
-          className="w-full h-full block"
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'block',
-            textDecoration: 'none',
-          }}
-        >
-          <CatalogImage src={product.imageUrl} alt={`Foto ${product.name}`}>
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#9ca3af',
-                fontSize: '0.85rem',
-                padding: '12px',
-                textAlign: 'center',
-                background: '#f1f5f9',
-              }}
-            >
-              <span style={{ fontSize: '2rem', marginBottom: '4px', lineHeight: 1 }}>🛍️</span>
-              <span
-                style={{
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  color: '#64748b',
-                  lineHeight: '1.2',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
-              >
-                {product.name}
-              </span>
-            </div>
-          </CatalogImage>
+      <div className="catalog-product-body">
+        <small className="catalog-product-meta" title={metaText}>{metaText || '\u00A0'}</small>
+
+        <Link to={detailPath} className="catalog-product-title" title={product.name}>
+          {product.name}
         </Link>
-      </div>
 
-      {/* Badge Diskon / Promo */}
-      {hasDiscount && (
-        <div style={{ marginBottom: '6px' }}>
-          <span
-            className="bg-red-100 text-red-600 text-xs font-extrabold px-2 py-0.5 rounded-md"
-            style={{ background: '#fee2e2', color: '#dc2626', fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px' }}
-          >
-            Hemat {discountPct}%
-          </span>
+        {/* Slot harga selalu 2 baris (harga + harga coret) agar kartu diskon & non-diskon sejajar */}
+        <div className="catalog-product-price">
+          <strong className="catalog-product-price-now">Rp {Number(product.price).toLocaleString('id-ID')}</strong>
+          {product.originalPrice && product.originalPrice > product.price ? (
+            <del className="catalog-product-price-old">Rp {Number(product.originalPrice).toLocaleString('id-ID')}</del>
+          ) : (
+            <span className="catalog-product-price-old" aria-hidden="true">{'\u00A0'}</span>
+          )}
         </div>
-      )}
 
-      {/* Kategori & Satuan */}
-      <small
-        className="text-gray-500 text-[0.78rem] mb-0.5"
-        style={{ color: '#6b7280', fontSize: '0.78rem', marginBottom: '2px' }}
-      >
-        {product.category} {product.unit ? `• /${product.unit}` : ''}
-      </small>
-
-      {/* Nama Produk */}
-      <Link
-        to={product.detailPath || `/products/${product.id}`}
-        className="catalog-product-title text-gray-900 font-bold text-base leading-snug mb-2 line-clamp-2 min-h-[2.6em] no-underline hover:text-[#1f7a4a]"
-        style={{
-          textDecoration: 'none',
-          color: '#111827',
-          fontWeight: 700,
-          fontSize: '1rem',
-          lineHeight: '1.3',
-          marginBottom: '8px',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden',
-          minHeight: '2.6em',
-        }}
-      >
-        {product.name}
-      </Link>
-
-      {/* Harga Produk */}
-      <div className="catalog-product-price" style={{ marginTop: 'auto', marginBottom: '12px' }}>
-        <div
-          className="text-xl font-black text-[#1f7a4a]"
-          style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1f7a4a' }}
+        <button
+          type="button"
+          onClick={() => onAddToCart && onAddToCart(product)}
+          className="catalog-product-add"
+          aria-label={`Tambah ${product.name} ke keranjang`}
         >
-          Rp {Number(product.price).toLocaleString('id-ID')}
-        </div>
-        {product.originalPrice && product.originalPrice > product.price && (
-          <del
-            className="text-xs text-gray-400"
-            style={{ fontSize: '0.82rem', color: '#9ca3af' }}
-          >
-            Rp {Number(product.originalPrice).toLocaleString('id-ID')}
-          </del>
-        )}
+          <Plus size={16} aria-hidden="true" />
+          <span>Tambah</span>
+        </button>
       </div>
-
-      {/* Tombol Tambah Besar & Kontras */}
-      <button
-        type="button"
-        onClick={() => onAddToCart && onAddToCart(product)}
-        className="catalog-product-add w-full min-h-[46px] rounded-xl bg-[#1f7a4a] hover:bg-[#166534] text-white font-extrabold text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer border-none"
-        style={{
-          width: '100%',
-          minHeight: '46px',
-          borderRadius: '12px',
-          background: '#1f7a4a',
-          color: '#ffffff',
-          border: 'none',
-          fontWeight: 800,
-          fontSize: '0.95rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '6px',
-          transition: 'background 0.15s',
-        }}
-      >
-        <Plus size={18} />
-        Tambah
-      </button>
     </article>
   );
 }

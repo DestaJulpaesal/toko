@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Search, MessageCircle, Menu, X, Clock, Store } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { usePublicSettings } from '../context/PublicSettingsContext';
@@ -26,6 +26,9 @@ export default function PublicHeader({ onHomeClick }) {
   const { totalItems, totalPrice } = useCart();
   const { storeProfile } = usePublicSettings();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // Bar keranjang melayang tidak perlu di halaman keranjang/checkout (menutupi total & tombol)
+  const showFloatingCart = !/^\/(cart|checkout)(\/|$)/.test(pathname);
 
   useEffect(() => {
     try {
@@ -173,6 +176,7 @@ export default function PublicHeader({ onHomeClick }) {
       </header>
 
       {/* Floating Bottom Bar Keranjang di HP */}
+      {showFloatingCart && (
       <div className="mobile-floating-cart">
         <div className="floating-cart-info">
           <ShoppingBag size={22} />
@@ -185,6 +189,7 @@ export default function PublicHeader({ onHomeClick }) {
           Lihat Keranjang
         </Link>
       </div>
+      )}
     </>
   );
 }

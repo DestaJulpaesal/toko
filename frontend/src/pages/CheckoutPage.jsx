@@ -199,9 +199,14 @@ export default function CheckoutPage() {
         </div>
         {checkoutNavigation}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+        <div className="checkout-columns">
           {/* Form Pembeli */}
-          <section style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '20px', padding: '24px' }}>
+          <section className="checkout-panel">
+            {/* Ringkasan singkat khusus HP: total terlihat tanpa scroll; daftar lengkap tetap di bawah */}
+            <div className="checkout-mini-total" aria-label="Ringkasan total belanja">
+              <span>{items.reduce((sum, item) => sum + Number(item.qty || 0), 0)} barang &middot; ambil di toko</span>
+              <strong>Rp {total.toLocaleString('id-ID')}</strong>
+            </div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', margin: '0 0 8px' }}>Data Pembeli</h2>
             <p style={{ fontSize: '0.88rem', color: '#6b7280', margin: '0 0 20px' }}>
               Cukup isi nama dan nomor HP. Data disimpan otomatis di HP ini untuk pesanan berikutnya.
@@ -299,18 +304,25 @@ export default function CheckoutPage() {
           </section>
 
           {/* Ringkasan Belanja */}
-          <aside style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '20px', padding: '24px', height: 'fit-content' }}>
+          <aside className="checkout-panel">
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', margin: '0 0 16px' }}>Daftar Belanjaan</h2>
-            <div style={{ maxHeight: '320px', overflowY: 'auto', marginBottom: '16px' }}>
+            <div className="checkout-item-list">
               {items.map((item) => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
-                  <div>
-                    <strong style={{ display: 'block', fontSize: '0.95rem', color: '#1f2937' }}>{item.name}</strong>
-                    <small style={{ color: '#6b7280' }}>
+                <div key={item.id} className="checkout-item-row">
+                  <div className="checkout-item-thumbnail">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} width="80" height="80" loading="lazy" decoding="async" />
+                    ) : (
+                      <span aria-hidden="true">🛍️</span>
+                    )}
+                  </div>
+                  <div className="checkout-item-info">
+                    <strong>{item.name}</strong>
+                    <small>
                       {item.qty} {item.unit || 'item'} x Rp {Number(item.price).toLocaleString('id-ID')}
                     </small>
                   </div>
-                  <strong style={{ fontSize: '0.95rem', color: '#1f7a4a' }}>
+                  <strong className="checkout-item-total">
                     Rp {(item.price * item.qty).toLocaleString('id-ID')}
                   </strong>
                 </div>

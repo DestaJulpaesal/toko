@@ -1,12 +1,12 @@
 .globot-widget {
   position: fixed;
   right: max(20px, env(safe-area-inset-right));
-  bottom: max(92px, calc(env(safe-area-inset-bottom) + 84px));
+  bottom: max(104px, calc(env(safe-area-inset-bottom) + 96px));
   z-index: 120;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: 12px;
   font-family: inherit;
 }
 
@@ -20,51 +20,59 @@
 
 .globot-launcher {
   display: inline-flex;
-  min-height: 48px;
+  min-height: 50px;
   align-items: center;
   justify-content: center;
   gap: 9px;
-  padding: 0 16px;
-  border-radius: 28px;
-  background: #12874d;
+  padding: 0 17px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 999px;
+  background: #12834a;
   color: #fff;
-  box-shadow: 0 9px 25px rgba(12, 76, 45, .28);
-  transition: transform .2s ease, background-color .2s ease;
+  box-shadow: 0 8px 22px rgba(12, 76, 45, .24);
   font-size: .86rem;
-  font-weight: 750;
+  font-weight: 700;
+  transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
 
 .globot-launcher:hover {
   transform: translateY(-2px);
-  background: #0d7440;
+  background: #0d7040;
+  box-shadow: 0 11px 26px rgba(12, 76, 45, .3);
+}
+
+.globot-widget.is-open .globot-launcher {
+  display: none;
 }
 
 .globot-panel {
   display: flex;
-  width: min(390px, calc(100vw - 32px));
-  height: min(650px, calc(100dvh - 185px));
-  min-height: 360px;
+  width: min(400px, calc(100vw - 32px));
+  height: min(640px, calc(100dvh - 160px));
+  min-height: min(360px, calc(100dvh - 120px));
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #dce9e1;
-  border-radius: 22px;
+  border: 1px solid #dce8df;
+  border-radius: 20px;
   background: #fff;
-  box-shadow: 0 22px 70px rgba(17, 48, 31, .24);
-  animation: globot-panel-enter .2s ease-out both;
+  box-shadow: 0 18px 52px rgba(24, 54, 35, .2);
+  animation: globot-panel-enter .18s ease-out both;
 }
 
 .globot-header {
   display: flex;
-  min-height: 76px;
+  min-height: 72px;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 12px 16px;
-  background: linear-gradient(120deg, #138c50, #087643);
+  background: #147b46;
   color: #fff;
 }
 
 .globot-header-identity {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 11px;
 }
@@ -73,10 +81,11 @@
   display: grid;
   width: 42px;
   height: 42px;
+  flex: 0 0 42px;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, .35);
-  border-radius: 15px;
-  background: rgba(255, 255, 255, .16);
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .14);
 }
 
 .globot-header h2,
@@ -86,12 +95,16 @@
 
 .globot-header h2 {
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 750;
+  letter-spacing: -.01em;
 }
 
 .globot-header p {
-  margin-top: 3px;
-  color: rgba(255, 255, 255, .82);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, .84);
   font-size: .76rem;
 }
 
@@ -99,14 +112,15 @@
   display: grid;
   width: 38px;
   height: 38px;
+  flex: 0 0 38px;
   place-items: center;
-  border-radius: 50%;
+  border-radius: 11px;
   background: transparent;
   color: #fff;
 }
 
 .globot-close:hover {
-  background: rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .13);
 }
 
 .globot-quick-links {
@@ -114,9 +128,11 @@
   flex: 0 0 auto;
   gap: 7px;
   overflow-x: auto;
-  padding: 11px 13px;
-  border-bottom: 1px solid #edf2ee;
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf1ed;
+  background: #fff;
   scrollbar-width: none;
+  overscroll-behavior-x: contain;
 }
 
 .globot-quick-links::-webkit-scrollbar {
@@ -126,46 +142,41 @@
 .globot-quick-links button,
 .globot-quick-links a {
   display: inline-flex;
-  min-height: 34px;
+  min-height: 36px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  padding: 0 11px;
-  border: 1px solid #d8e9de;
-  border-radius: 18px;
-  background: #f5faf6;
-  color: #17683e;
-  font: inherit;
-  font-size: .74rem;
-  font-weight: 700;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.globot-quick-links a span {
-  display: inline-grid;
-  min-width: 19px;
-  height: 19px;
-  place-items: center;
-  padding-inline: 4px;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid #e0e9e2;
   border-radius: 10px;
-  background: #e2f2e7;
-  color: #17683e;
-  font-size: .68rem;
+  background: #f8faf8;
+  color: #355744;
+  font: inherit;
+  font-size: .73rem;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color .16s ease, background-color .16s ease;
 }
 
 .globot-quick-links button:hover,
 .globot-quick-links a:hover {
-  background: #e7f4eb;
+  border-color: #b9d5c1;
+  background: #eef6f0;
 }
 
-.globot-quick-links :is(button, a):focus-visible,
-.globot-close:focus-visible,
-.globot-launcher:focus-visible,
-.globot-composer button:focus-visible,
-.globot-message-actions a:focus-visible {
-  outline: 3px solid #91cda5;
-  outline-offset: 2px;
+.globot-quick-links a span {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #e5f1e8;
+  color: #23613c;
+  font-size: .67rem;
 }
 
 .globot-messages {
@@ -175,15 +186,93 @@
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  padding: 16px 13px;
-  background: #f8faf8;
+  padding: 16px;
+  background: #f7f9f7;
   overscroll-behavior: contain;
+}
+
+.globot-welcome-card {
+  padding: 16px;
+  border: 1px solid #e3ebe4;
+  border-radius: 15px;
+  background: #fff;
+}
+
+.globot-welcome-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: #eaf4ec;
+  color: #157644;
+}
+
+.globot-welcome-eyebrow {
+  margin: 13px 0 5px;
+  color: #43805a;
+  font-size: .65rem;
+  font-weight: 750;
+  letter-spacing: .08em;
+}
+
+.globot-welcome-card h3 {
+  margin: 0;
+  color: #24352a;
+  font-size: 1.06rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.35;
+}
+
+.globot-welcome-copy {
+  margin: 7px 0 0;
+  color: #627067;
+  font-size: .8rem;
+  line-height: 1.55;
+}
+
+.globot-suggestions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.globot-suggestions :is(a, button) {
+  display: flex;
+  min-width: 0;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 1px solid #e0e9e2;
+  border-radius: 9px;
+  background: #f9fbf9;
+  color: #376449;
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease;
+}
+
+.globot-suggestions :is(a, button):hover:not(:disabled) {
+  border-color: #b9d5c1;
+  background: #eef6f0;
+}
+
+.globot-suggestions button:disabled {
+  cursor: wait;
+  opacity: .6;
 }
 
 .globot-message {
   display: flex;
   max-width: 90%;
   flex-direction: column;
+  align-self: flex-start;
   gap: 7px;
 }
 
@@ -191,59 +280,28 @@
   align-self: flex-end;
 }
 
-.globot-message--assistant {
-  align-self: flex-start;
-}
-
 .globot-message-bubble {
-  padding: 11px 13px;
-  border-radius: 16px;
-  color: #28352d;
-  font-size: .85rem;
+  padding: 10px 12px;
+  border: 1px solid #e5ebe6;
+  border-radius: 15px 15px 15px 5px;
+  background: #fff;
+  color: #2d3b32;
+  font-size: .84rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
-.globot-message--assistant .globot-message-bubble {
-  border: 1px solid #e7eee9;
-  border-bottom-left-radius: 5px;
-  background: #fff;
-}
-
 .globot-message--user .globot-message-bubble {
-  border-bottom-right-radius: 5px;
-  background: #16874e;
+  border-color: #147b46;
+  border-radius: 15px 15px 5px 15px;
+  background: #147b46;
   color: #fff;
 }
 
 .globot-product-results {
   display: grid;
   gap: 6px;
-}
-
-.globot-message-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.globot-message-actions a {
-  display: inline-flex;
-  min-height: 36px;
-  align-items: center;
-  padding: 0 11px;
-  border: 1px solid #cfe5d5;
-  border-radius: 18px;
-  background: #f3faf5;
-  color: #176b3e;
-  font-size: .75rem;
-  font-weight: 750;
-  text-decoration: none;
-}
-
-.globot-message-actions a:hover {
-  background: #e4f3e8;
 }
 
 .globot-product-result {
@@ -253,16 +311,16 @@
   justify-content: space-between;
   gap: 10px;
   padding: 10px;
-  border: 1px solid #e3ece5;
-  border-radius: 12px;
+  border: 1px solid #e3ebe4;
+  border-radius: 11px;
   background: #fff;
-  color: #25352b;
+  color: #28392e;
   text-decoration: none;
 }
 
 .globot-product-result:hover {
-  border-color: #9ccdaf;
-  background: #f7fcf8;
+  border-color: #b4d2bd;
+  background: #fbfdfb;
 }
 
 .globot-product-result span {
@@ -273,36 +331,60 @@
 
 .globot-product-result strong {
   overflow: hidden;
-  font-size: .78rem;
+  font-size: .77rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .globot-product-result small {
-  color: #728078;
+  color: #6d7b71;
   font-size: .68rem;
 }
 
 .globot-product-result b {
   flex: 0 0 auto;
   color: #147343;
-  font-size: .76rem;
+  font-size: .75rem;
+}
+
+.globot-message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.globot-message-actions a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #d7e7db;
+  border-radius: 9px;
+  background: #fff;
+  color: #28633e;
+  font-size: .73rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.globot-message-actions a:hover {
+  background: #eef6f0;
 }
 
 .globot-loading {
   align-self: flex-start;
   margin: 0;
-  color: #68786e;
-  font-size: .78rem;
+  color: #68776d;
+  font-size: .77rem;
 }
 
 .globot-error {
   padding: 11px;
-  border: 1px solid #f0d6ca;
-  border-radius: 13px;
-  background: #fff8f5;
-  color: #6d3c2b;
-  font-size: .78rem;
+  border: 1px solid #eed9d0;
+  border-radius: 11px;
+  background: #fff9f6;
+  color: #704532;
+  font-size: .77rem;
 }
 
 .globot-error p {
@@ -313,19 +395,26 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #126e3e;
-  font-weight: 750;
+  color: #176d40;
+  font-weight: 700;
 }
 
 .globot-cart-shortcut {
   display: flex;
+  min-height: 44px;
   min-width: 0;
   align-items: center;
-  gap: 7px;
-  padding: 9px 13px;
-  border-top: 1px solid #edf2ee;
-  color: #415249;
-  font-size: .74rem;
+  gap: 8px;
+  padding: 7px 13px;
+  border-top: 1px solid #edf1ed;
+  background: #fff;
+  color: #526158;
+  font-size: .73rem;
+}
+
+.globot-cart-shortcut > svg {
+  flex: 0 0 auto;
+  color: #167846;
 }
 
 .globot-cart-shortcut span {
@@ -337,9 +426,17 @@
 
 .globot-cart-shortcut a {
   flex: 0 0 auto;
-  color: #12733f;
-  font-weight: 800;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #eef6f0;
+  color: #176b3f;
+  font-weight: 700;
   text-decoration: none;
+}
+
+.globot-cart-shortcut a:last-child {
+  background: #147b46;
+  color: #fff;
 }
 
 .globot-composer {
@@ -347,29 +444,29 @@
   align-items: flex-end;
   gap: 8px;
   padding: 10px 12px;
-  border-top: 1px solid #edf2ee;
+  border-top: 1px solid #edf1ed;
   background: #fff;
 }
 
 .globot-composer textarea {
   width: 100%;
   min-width: 0;
-  max-height: 90px;
   min-height: 42px;
+  max-height: 92px;
   resize: none;
-  padding: 11px 12px;
-  border: 1px solid #dce6df;
-  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid #dce5de;
+  border-radius: 12px;
   outline: none;
-  background: #f9fbf9;
-  color: #203128;
+  background: #fafbfa;
+  color: #24352a;
   font: inherit;
   font-size: .85rem;
 }
 
 .globot-composer textarea:focus {
-  border-color: #4a9d6d;
-  box-shadow: 0 0 0 3px rgba(39, 137, 77, .12);
+  border-color: #4e9a68;
+  box-shadow: 0 0 0 3px rgba(39, 137, 77, .11);
 }
 
 .globot-composer button {
@@ -378,30 +475,27 @@
   height: 42px;
   flex: 0 0 42px;
   place-items: center;
-  border-radius: 13px;
-  background: #14864b;
+  border-radius: 12px;
+  background: #147b46;
   color: #fff;
+  transition: background-color .16s ease;
+}
+
+.globot-composer button:hover:not(:disabled) {
+  background: #0d6e3e;
 }
 
 .globot-composer button:disabled {
-  background: #b8c9bd;
+  background: #b8c8bc;
   cursor: not-allowed;
 }
 
 .globot-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 14px 10px;
+  padding: 0 13px 10px;
   background: #fff;
-  color: #77837b;
-  font-size: .65rem;
-}
-
-.globot-footer a {
-  display: grid;
-  color: #668071;
+  color: #778279;
+  font-size: .64rem;
+  line-height: 1.4;
 }
 
 .globot-sr-only {
@@ -414,28 +508,33 @@
   clip-path: inset(50%);
 }
 
+.globot-quick-links :is(button, a):focus-visible,
+.globot-close:focus-visible,
+.globot-launcher:focus-visible,
+.globot-composer button:focus-visible,
+.globot-message-actions a:focus-visible,
+.globot-suggestions a:focus-visible,
+.globot-suggestions button:focus-visible,
+.globot-cart-shortcut a:focus-visible {
+  outline: 3px solid #83bd94;
+  outline-offset: 2px;
+}
+
 @keyframes globot-panel-enter {
-  from { opacity: 0; transform: translateY(8px) scale(.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 600px) {
   .globot-widget {
     right: max(12px, env(safe-area-inset-right));
-    bottom: calc(max(82px, env(safe-area-inset-bottom) + 74px));
-    gap: 7px;
+    bottom: max(136px, calc(env(safe-area-inset-bottom) + 124px));
+    gap: 10px;
   }
 
   .globot-launcher {
-    min-height: 46px;
-    padding-inline: 14px;
-  }
-
-  .globot-panel {
-    width: min(calc(100vw - 24px), 410px);
-    height: min(610px, calc(100dvh - 175px - env(safe-area-inset-bottom)));
-    min-height: 330px;
-    border-radius: 20px;
+    min-height: 48px;
+    padding-inline: 15px;
   }
 
   .globot-widget.is-open {
@@ -445,109 +544,103 @@
     justify-content: stretch;
     gap: 0;
     overflow: hidden;
-    background: rgba(10, 30, 18, .45);
+    background: #fff;
   }
 
   .globot-widget.is-open .globot-panel {
     width: 100%;
-    height: 100vh;
+    height: 100%;
     height: 100dvh;
     min-height: 0;
     max-height: 100dvh;
-    margin: 0;
     border: 0;
     border-radius: 0;
     box-shadow: none;
-    animation: globot-panel-enter .18s ease-out both;
   }
 
   .globot-widget.is-open .globot-header {
-    padding-top: max(12px, env(safe-area-inset-top));
-  }
-
-  .globot-widget.is-open .globot-launcher {
-    display: none;
+    min-height: 68px;
+    padding-top: max(11px, env(safe-area-inset-top));
   }
 
   .globot-quick-links {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    padding: 12px;
-    overflow: visible;
+    gap: 6px;
+    padding: 9px 11px;
   }
 
   .globot-quick-links button,
   .globot-quick-links a {
-    min-width: 0;
-    min-height: 42px;
-    gap: 6px;
-    padding-inline: 8px;
-    font-size: .78rem;
-    white-space: nowrap;
-  }
-
-  .globot-quick-links > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
+    min-height: 36px;
+    padding-inline: 9px;
+    font-size: .71rem;
   }
 
   .globot-messages {
-    padding: 18px 14px;
+    padding: 13px 12px;
   }
 
-  .globot-message {
-    max-width: min(88%, 440px);
+  .globot-welcome-card {
+    padding: 14px;
   }
 
-  .globot-message-bubble {
-    padding: 12px 14px;
-    font-size: .92rem;
+  .globot-welcome-card h3 {
+    font-size: 1rem;
   }
 
   .globot-composer {
-    padding: 11px 12px;
+    padding: 9px 11px;
   }
 
   .globot-composer textarea {
-    min-height: 46px;
-    padding-block: 12px;
+    min-height: 44px;
     font-size: 16px;
   }
 
   .globot-composer button {
-    width: 46px;
-    height: 46px;
-    flex-basis: 46px;
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
   }
 
   .globot-footer {
-    padding: 2px 14px max(11px, env(safe-area-inset-bottom));
+    padding: 0 12px max(10px, env(safe-area-inset-bottom));
   }
+
 }
 
-@media (max-width: 380px) {
-  .globot-message {
-    max-width: 94%;
-  }
-
-  .globot-product-result {
-    padding: 9px 8px;
-  }
-
+@media (max-width: 360px) {
   .globot-quick-links {
-    gap: 6px;
-    padding: 10px;
+    gap: 5px;
+    padding-inline: 8px;
   }
 
   .globot-quick-links button,
   .globot-quick-links a {
-    font-size: .74rem;
+    gap: 4px;
+    padding-inline: 7px;
+    font-size: .68rem;
+  }
+
+  .globot-suggestions {
+    gap: 5px;
+  }
+
+  .globot-suggestions :is(a, button) {
+    padding-inline: 5px;
+    font-size: .68rem;
+  }
+
+  .globot-welcome-copy {
+    font-size: .77rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .globot-launcher,
-  .globot-panel {
+  .globot-panel,
+  .globot-quick-links button,
+  .globot-quick-links a,
+  .globot-suggestions :is(a, button) {
     animation: none;
     transition: none;
   }

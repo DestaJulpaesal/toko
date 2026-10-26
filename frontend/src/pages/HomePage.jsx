@@ -4,6 +4,7 @@ import { ShoppingBag, MessageCircle, Store, ChevronRight, ChevronLeft, Tag, Phon
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
+import ProductTile from '../components/ProductTile';
 import { useCart } from '../context/CartContext';
 import { usePublicSettings } from '../context/PublicSettingsContext';
 import { normalizeIndonesianPhone } from '../utils/phoneUtils';
@@ -432,45 +433,15 @@ export default function HomePage() {
                   </div>
                 ) : (
                   flashSaleProducts.slice(0, 12).map((product) => (
-                    <article key={product.id} className="fresh-product-card home-flash-sale-card">
-                      <span className="home-flash-sale-badge">
-                        {product.originalPrice > product.price
-                          ? `-${Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%`
-                          : 'Flash Sale'}
-                      </span>
-                      <Link
-                        to={`/products/${product.id}`}
-                        className="home-product-detail-link"
-                        aria-label={`Lihat detail ${product.name}`}
-                      >
-                        <div className="product-photo-box home-flash-sale-photo">
-                          {product.imageUrl ? (
-                            <img src={product.imageUrl} alt={product.name} className="product-real-img" loading="lazy" />
-                          ) : (
-                            <span className="product-placeholder-icon">🛍️</span>
-                          )}
-                        </div>
-                        <div className="product-details">
-                          <span className="product-category-label">{product.category}</span>
-                          <h3 className="product-card-title">{product.name}</h3>
-                          {product.originalPrice > product.price && (
-                            <del className="home-flash-sale-original-price">
-                              Rp {product.originalPrice.toLocaleString('id-ID')}
-                            </del>
-                          )}
-                          <div className="product-price-fresh">
-                            Rp {product.price.toLocaleString('id-ID')}
-                          </div>
-                        </div>
-                      </Link>
-                      <button
-                        className="btn-add-cart-fresh"
-                        onClick={(e) => handleAddToCart(product, e)}
-                        aria-label={`Tambah ${product.name} ke keranjang`}
-                      >
-                        <Plus size={18} /> Tambah ke Keranjang
-                      </button>
-                    </article>
+                    <ProductTile
+                      key={product.id}
+                      product={product}
+                      badge={product.originalPrice > product.price
+                        ? `-${Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%`
+                        : 'Flash Sale'}
+                      badgeTone="is-flash"
+                      onAdd={handleAddToCart}
+                    />
                   ))
                 )}
               </div>
@@ -499,37 +470,7 @@ export default function HomePage() {
                   <div className="products-empty">Belum ada rekomendasi.</div>
                 ) : (
                   recommendedProducts.slice(0, 12).map((product) => (
-                    <article key={product.id} className="fresh-product-card home-recommendation-card">
-                      {product.badge && <span className="product-badge-fresh">{product.badge}</span>}
-                      <Link
-                        to={`/products/${product.id}`}
-                        className="home-product-detail-link"
-                        aria-label={`Lihat detail ${product.name}`}
-                      >
-                        <div className="product-photo-box">
-                          {product.imageUrl ? (
-                            <img src={product.imageUrl} alt={product.name} className="product-real-img" loading="lazy" />
-                          ) : (
-                            <span className="product-placeholder-icon">🛍️</span>
-                          )}
-                        </div>
-                        <div className="product-details">
-                          <span className="product-category-label">{product.category}</span>
-                          <h3 className="product-card-title">{product.name}</h3>
-                          <div className="product-price-fresh">Rp {product.price.toLocaleString('id-ID')}</div>
-                          {product.originalPrice > product.price && (
-                            <del className="home-product-original-price">Rp {product.originalPrice.toLocaleString('id-ID')}</del>
-                          )}
-                        </div>
-                      </Link>
-                      <button
-                        className="btn-add-cart-fresh"
-                        onClick={(event) => handleAddToCart(product, event)}
-                        aria-label={`Tambah ${product.name} ke keranjang`}
-                      >
-                        <Plus size={18} /> Tambah
-                      </button>
-                    </article>
+                    <ProductTile key={product.id} product={product} badge={product.badge} onAdd={handleAddToCart} />
                   ))
                 )}
               </div>
@@ -584,7 +525,8 @@ export default function HomePage() {
                       onClick={(event) => handleAddToCart(product, event)}
                       aria-label={`Tambah ${product.name} ke keranjang`}
                     >
-                      <Plus size={18} />
+                      <Plus size={15} />
+                      <span>Tambah</span>
                     </button>
                   </article>
                 ))

@@ -234,7 +234,7 @@ export default function ProductDetailPage() {
               </label>
               <button className="btn btn-primary detail-add-button" onClick={addToCart} disabled={!canAddToCart}>
                 <ShoppingBag size={18} />
-                {availableStock > 0 ? 'Tambah ke keranjang' : 'Stok habis'}
+                {availableStock > 0 ? 'Tambah' : 'Stok habis'}
               </button>
             </div>
             {loading && <p className="detail-refresh-note" role="status">Memperbarui informasi produk...</p>}

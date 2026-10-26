@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
+import ProductTile from '../components/ProductTile';
 import { useCart } from '../context/CartContext';
 
 const promoFaqs = [
@@ -73,6 +74,8 @@ export default function PromoPage() {
               originalPrice: Number(product.originalPrice || product.price || 0),
               discountPercent: product.discountPercent || Math.round(((Number(product.originalPrice || product.price || 0) - Number(product.price || 0)) / Number(product.originalPrice || product.price || 1)) * 100),
               stock: Number(product.stock || 0),
+              imageUrl: product.imageUrl,
+              unit: product.unit,
               badge: 'Diskon Langsung',
             }))
         );
@@ -303,43 +306,17 @@ export default function PromoPage() {
 
           <div className="promo-product-grid">
             {flashSaleProducts.map((product) => (
-              <article key={product.id} className="catalog-card promo-product-card">
-                <div className="catalog-badges-wrap">
-                  <span className="catalog-badge">{product.badge}</span>
-                  <span className="discount-tag">-{product.discountPercent}%</span>
-                </div>
-                <Link to={`/products/${product.id}`} className="catalog-image product-art-link">
-                  <span className="product-art-label">{product.name.split(' ').slice(0, 2).join(' ')}</span>
-                  <small>{product.category}</small>
-                </Link>
-                <Link to={`/products/${product.id}`} className="catalog-title-link">
-                  <h3>{product.name}</h3>
-                </Link>
-                <p>{product.category}</p>
-
-                <div className="catalog-meta">
-                  <div className="price-stack">
-                    <strong className="current-price">Rp {product.price.toLocaleString('id-ID')}</strong>
-                    <div className="original-price-row">
-                      <del className="original-price">Rp {product.originalPrice.toLocaleString('id-ID')}</del>
-                      <span className="save-pill">Hemat Rp {(product.originalPrice - product.price).toLocaleString('id-ID')}</span>
-                    </div>
-                  </div>
-                  <small>{product.stock} stok</small>
-                </div>
-
-                <div className="promo-card-actions">
-                  <button
-                    className="btn btn-primary full"
-                    onClick={() => {
-                      addItem(product);
-                      showToast(`✓ "${product.name}" berhasil ditambahkan ke keranjang!`);
-                    }}
-                  >
-                    Tambah ke Keranjang
-                  </button>
-                </div>
-              </article>
+              <ProductTile
+                key={product.id}
+                product={product}
+                badge={`-${product.discountPercent}%`}
+                badgeTone="is-flash"
+                meta={`${product.category} \u2022 ${product.stock} stok`}
+                onAdd={(item) => {
+                  addItem(item);
+                  showToast(`\u2713 "${item.name}" berhasil ditambahkan ke keranjang!`);
+                }}
+              />
             ))}
           </div>
         </section>

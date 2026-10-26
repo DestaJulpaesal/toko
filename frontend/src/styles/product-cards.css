@@ -1,0 +1,561 @@
+/* =====================================================================
+   product-cards.css — SATU-SATUNYA sumber gaya untuk:
+     1) Kartu produk katalog  (.catalog-product-card, dipakai ProductCard.jsx)
+        di grid: .catalog-page-product-grid (/products),
+                 .detail-related-grid       (detail produk, "terkait"),
+                 .home-section-products-grid (seksi beranda).
+     2) Thumbnail baris item di Checkout (.checkout-item-*) dan Keranjang (.cart-item-thumbnail).
+
+   Aturan lama untuk kelas-kelas di atas sudah dihapus dari index.css & public-responsive.css.
+   Mau ubah ukuran? Cukup ubah TOKEN di bagian paling atas (per breakpoint).
+   ===================================================================== */
+
+:root {
+  /* --- Grid kartu --- */
+  --pc-cols: 2;                 /* jumlah kolom */
+  --pc-gap: 10px;               /* jarak antar kartu */
+  --pc-card-min: 170px;         /* lebar minimum kartu di tablet/desktop (= ukuran kartu di Beranda) */
+  /* --- Kartu --- */
+  --pc-pad: 8px;                /* padding dalam kartu */
+  --pc-radius: 14px;
+  --pc-ratio: 4 / 3;            /* rasio area gambar (SAMA untuk semua kartu) */
+  --pc-img-fit: contain;        /* contain = kemasan tidak terpotong; ganti ke cover bila ingin penuh */
+  --pc-img-pad: 4px;            /* ruang di sekeliling foto saat contain (isi 0 jika cover) */
+  --pc-meta-size: 11px;
+  --pc-title-size: 13px;        /* nama produk */
+  --pc-title-lines: 2;
+  --pc-price-size: 15px;        /* harga */
+  --pc-old-size: 11px;          /* harga coret */
+  --pc-btn-h: 38px;             /* tinggi tombol Tambah (>= 36px agar nyaman disentuh) */
+  --pc-btn-size: 13px;
+  --pc-fav: 32px;               /* ukuran tombol favorit */
+  /* --- Thumbnail checkout / keranjang --- */
+  --thumb-size: 64px;
+  --thumb-radius: 12px;
+}
+
+@media (min-width: 481px) {               /* HP besar / tablet kecil */
+  :root {
+    --pc-cols: 3;
+    --pc-gap: 12px;
+    --pc-pad: 10px;
+    --pc-title-size: 14px;
+    --pc-price-size: 15px;
+    --pc-btn-h: 38px;
+  }
+}
+
+@media (min-width: 768px) {               /* tablet */
+  :root {
+    --pc-cols: 3;
+    --pc-gap: 14px;
+    --thumb-size: 80px;
+  }
+}
+
+@media (min-width: 1024px) {              /* desktop */
+  :root {
+    --pc-cols: 4;
+    --pc-gap: 16px;
+    --pc-pad: 12px;
+    --pc-radius: 16px;
+    --pc-meta-size: 12px;
+    --pc-title-size: 15px;
+    --pc-price-size: 17px;
+    --pc-old-size: 12px;
+    --pc-btn-h: 40px;
+    --pc-btn-size: 14px;
+    --pc-fav: 36px;
+    --thumb-size: 88px;
+  }
+}
+
+@media (min-width: 1600px) {              /* layar sangat lebar */
+  :root { --pc-cols: 5; }
+}
+
+/* ---------------------------------------------------------------------
+   Grid kartu: kolom sama lebar, semua kartu sebaris meregang sama tinggi
+   --------------------------------------------------------------------- */
+.catalog-page-product-grid,
+.detail-related-grid,
+.home-section-products-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--pc-cols), minmax(0, 1fr));
+  grid-auto-rows: auto;
+  align-items: stretch;
+  gap: var(--pc-gap);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* Tablet & desktop: jumlah kolom OTOMATIS mengikuti lebar layar, lebar kartu dijaga ±170-200px
+   (sama dengan kartu di Beranda) sehingga kartu tidak melar di layar lebar.
+   Mau kartu lebih besar/kecil? Ubah --pc-card-min di :root. */
+@media (min-width: 768px) {
+  .catalog-page-product-grid,
+  .detail-related-grid,
+  .home-section-products-grid,
+  .promo-product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(var(--pc-card-min), 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Kartu: flex column, tinggi mengikuti baris grid (bukan gambar)
+   --------------------------------------------------------------------- */
+.catalog-product-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 100%;
+  padding: var(--pc-pad);
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--pc-radius);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+.catalog-product-card:hover,
+.catalog-product-card:focus-within {
+  border-color: #cfe3d6;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .09);
+}
+
+/* Area gambar: rasio tetap, gambar tidak pernah menentukan tinggi kartu */
+.catalog-product-image {
+  position: relative;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: var(--pc-ratio);
+  margin: 0 0 8px;
+  overflow: hidden;
+  background: #f3f5f4;
+  border-radius: calc(var(--pc-radius) - 4px);
+}
+
+.catalog-product-image-link {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: block;
+  text-decoration: none;
+}
+
+.catalog-product-image .catalog-photo {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  padding: var(--pc-img-pad);
+  object-fit: var(--pc-img-fit);
+  object-position: center;
+  mix-blend-mode: multiply;
+}
+
+/* Fallback bila foto kosong / gagal dimuat: ukuran sama persis dengan area gambar */
+.catalog-product-placeholder {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.4rem, 8vw, 2.2rem);
+  line-height: 1;
+  color: #9ca3af;
+  background: linear-gradient(145deg, #f5f7f4, #e9f0ea);
+}
+
+.catalog-product-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  max-width: calc(100% - var(--pc-fav) - 16px);
+  padding: 2px 6px;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #b91c1c;
+  background: #fee2e2;
+  border-radius: 6px;
+}
+
+.catalog-product-fav {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--pc-fav);
+  min-width: var(--pc-fav);
+  height: var(--pc-fav);
+  min-height: var(--pc-fav);
+  padding: 0;
+  color: #64748b;
+  cursor: pointer;
+  background: rgba(255, 255, 255, .95);
+  border: 1px solid rgba(229, 231, 235, .9);
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .14);
+  transition: color .15s ease, background .15s ease, transform .15s ease;
+}
+
+/* perluas area sentuh tanpa memperbesar tampilan */
+.catalog-product-fav::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  bottom: -6px;
+  left: -6px;
+}
+
+.catalog-product-fav.is-active {
+  color: #e11d48;
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.catalog-product-fav svg { display: block; flex: 0 0 auto; }
+
+/* Isi kartu */
+.catalog-product-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.catalog-product-meta {
+  display: block;
+  margin: 0 0 2px;
+  overflow: hidden;
+  font-size: var(--pc-meta-size);
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #6b7280;
+}
+
+/* Nama: selalu setinggi 2 baris (pendek maupun panjang), dipotong di baris ke-2 */
+.catalog-product-title {
+  display: -webkit-box;
+  box-sizing: content-box;
+  height: calc(var(--pc-title-size) * 1.3 * var(--pc-title-lines));
+  margin: 0 0 6px;
+  overflow: hidden;
+  font-size: var(--pc-title-size);
+  font-weight: 700;
+  line-height: 1.3;
+  color: #111827;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--pc-title-lines);
+  line-clamp: var(--pc-title-lines);
+}
+
+.catalog-product-title:hover { color: #1f7a4a; }
+
+/* Harga + harga coret: slot 2 baris tetap, menempel ke bawah (di atas tombol) */
+.catalog-product-price {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin: auto 0 8px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.catalog-product-price-now {
+  display: block;
+  overflow: hidden;
+  font-size: var(--pc-price-size);
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #1f7a4a;
+}
+
+.catalog-product-price-old {
+  display: block;
+  min-height: calc(var(--pc-old-size) * 1.3);
+  overflow: hidden;
+  font-size: var(--pc-old-size);
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #9ca3af;
+}
+
+.catalog-product-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--pc-btn-h);
+  padding: 0 8px;
+  font-size: var(--pc-btn-size);
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  cursor: pointer;
+  background: #1f7a4a;
+  border: 0;
+  border-radius: 10px;
+  transition: background .15s ease;
+}
+
+.catalog-product-add:hover { background: #166534; }
+.catalog-product-add:active { background: #14532d; }
+
+.catalog-product-add:focus-visible,
+.catalog-product-fav:focus-visible,
+.catalog-product-title:focus-visible,
+.catalog-product-image-link:focus-visible {
+  outline: 2px solid #1f7a4a;
+  outline-offset: 2px;
+}
+
+/* =====================================================================
+   Thumbnail item — Checkout & Keranjang
+   Baris:  [thumbnail] [nama (maks 2 baris), qty x harga] [subtotal]
+   ===================================================================== */
+.checkout-item-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+@media (min-width: 768px) {
+  .checkout-item-list { max-height: 460px; padding-right: 2px; overflow-y: auto; }
+}
+
+.checkout-item-row {
+  display: grid;
+  grid-template-columns: var(--thumb-size) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #e8eee7;
+  border-radius: 14px;
+}
+
+.checkout-item-thumbnail,
+.cart-item-thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--thumb-size);
+  box-sizing: border-box;
+  width: var(--thumb-size);
+  min-width: var(--thumb-size);
+  height: var(--thumb-size);
+  overflow: hidden;
+  font-size: calc(var(--thumb-size) * .4);
+  line-height: 1;
+  background: linear-gradient(145deg, #f5f7f4, #e9f0ea);
+  border: 1px solid #eef0e9;
+  border-radius: var(--thumb-radius);
+}
+
+.checkout-item-thumbnail img,
+.cart-item-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  padding: 0;
+  object-fit: cover;
+  mix-blend-mode: normal;
+}
+
+.checkout-item-info {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.checkout-item-info > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.checkout-item-info > small {
+  font-size: 12px;
+  line-height: 1.3;
+  color: #6b7280;
+}
+
+.checkout-item-total {
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: #176b40;
+}
+
+@media (min-width: 768px) {
+  .checkout-item-info > strong { font-size: 14px; }
+  .checkout-item-info > small  { font-size: 13px; }
+  .checkout-item-total         { font-size: 14px; }
+}
+
+/* layar sempit: subtotal turun ke bawah nama supaya nama tidak terjepit */
+@media (max-width: 359px) {
+  .checkout-item-row { grid-template-columns: var(--thumb-size) minmax(0, 1fr); }
+  .checkout-item-total { grid-column: 2; justify-self: end; }
+}
+
+/* Panel Checkout: padding rapat di HP, longgar di tablet/desktop */
+.checkout-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.checkout-panel {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+}
+
+@media (min-width: 768px) {
+  .checkout-columns { gap: 24px; }
+  .checkout-panel { padding: 24px; border-radius: 20px; }
+}
+
+/* =====================================================================
+   Keranjang: thumbnail memakai ukuran yang sama dengan checkout
+   ===================================================================== */
+.cart-list .cart-item {
+  grid-template-columns: var(--thumb-size) minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.cart-list .cart-info { min-width: 0; }
+
+.cart-list .cart-info h3 {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+@media (max-width: 560px) {
+  .cart-list .cart-item { grid-template-columns: var(--thumb-size) minmax(0, 1fr); }
+  .cart-list .cart-actions { grid-column: 1 / -1; }
+}
+
+/* =====================================================================
+   Beranda (flash sale & rekomendasi) dan /promo
+   Kartunya = <ProductTile/> yang memakai kelas .catalog-product-* di atas,
+   jadi ukurannya otomatis ikut token. Di sini hanya kontainer list/grid-nya.
+   ===================================================================== */
+.catalog-product-badge.is-flash {
+  color: #fff;
+  background: #e5483a;
+}
+
+.products-scroll-container.home-flash-sale-list,
+.home-recommendations-list,
+.promo-product-grid {
+  display: grid;
+  align-items: stretch;
+  gap: var(--pc-gap);
+  min-width: 0;
+}
+
+.promo-product-grid {
+  grid-template-columns: repeat(var(--pc-cols), minmax(0, 1fr));
+}
+
+
+.products-scroll-container.home-flash-sale-list > .catalog-product-card,
+.home-recommendations-list > .catalog-product-card,
+.promo-product-grid > .catalog-product-card {
+  width: 100%;
+}
+
+/* Checkout (HP): total ringkas di atas form agar langsung terlihat; disembunyikan di tablet/desktop
+   karena ringkasan lengkap sudah tampil di kolom samping. */
+.checkout-mini-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+}
+
+.checkout-mini-total strong {
+  font-size: 16px;
+  font-weight: 900;
+  white-space: nowrap;
+  color: #1f7a4a;
+}
+
+@media (min-width: 768px) {
+  .checkout-mini-total { display: none; }
+}
+
+/* Fallback iOS/Safari lama (<15) yang belum mengenal aspect-ratio: area gambar kartu tetap 4:3.
+   Nilai 75% harus sama dengan --pc-ratio (4/3). */
+@supports not (aspect-ratio: 4 / 3) {
+  .catalog-product-image::before {
+    content: "";
+    display: block;
+    padding-top: 75%;
+  }
+}

@@ -8,6 +8,7 @@ import './styles/ui.css';
 import './styles/public-responsive.css';
 import './styles/admin-responsive.css';
 import './styles/globot.css';
+import './styles/product-cards.css';
 import { purgeLegacyCatalogCache } from './utils/catalogStorage';
 
 purgeLegacyCatalogCache();
