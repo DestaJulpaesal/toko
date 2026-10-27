@@ -10,7 +10,7 @@ import ProductCard from '../components/ProductCard';
 import { PUBLIC_CATALOG_CACHE_KEY, readJsonStorage, stripSensitive } from '../utils/catalogStorage';
 import { publicCategoriesOrDefault, sortPublicCategories } from '../utils/publicContentDefaults';
 import { showSuccess } from '../utils/noticeService';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, ShoppingBag, X } from 'lucide-react';
 
 const publicCatalogRequests = new Map();
 
@@ -221,6 +221,7 @@ export default function ProductPage() {
           <div>
             <span className="catalog-page-eyebrow">Katalog Produk</span>
             <h1>Belanja Grosir & Eceran</h1>
+            <p>Temukan kebutuhan harian dan masukkan ke keranjang dengan mudah.</p>
           </div>
           <div className="catalog-page-heading-actions">
             <Link to="/cart" className="btn btn-primary">
@@ -231,7 +232,10 @@ export default function ProductPage() {
 
         <section className="glosir-category-section catalog-category-section" aria-labelledby="catalog-category-heading">
           <div className="section-title-wrap">
-            <h2 id="catalog-category-heading">Kategori Belanja</h2>
+            <div>
+              <h2 id="catalog-category-heading">Jelajahi kategori</h2>
+              <p>Pilih kategori untuk menemukan produk lebih cepat.</p>
+            </div>
           </div>
           <div className="catalog-category-track-wrap">
             {categoryScrollEdges.left && (
@@ -250,6 +254,16 @@ export default function ProductPage() {
               ref={categoryScrollRef}
               onScroll={updateCategoryScrollEdges}
             >
+              <button
+                type="button"
+                className={`category-big-card catalog-category-all${!activeFilter ? ' is-active' : ''}`}
+                onClick={() => setActiveFilter('')}
+                aria-pressed={!activeFilter}
+                aria-label="Tampilkan semua produk"
+              >
+                <span className="category-icon-big" aria-hidden="true">🛍️</span>
+                <span className="category-card-name">Semua</span>
+              </button>
               {filters.map((filter) => {
                 const meta = CATEGORY_META[filter] || { icon: '🛍️' };
                 const categoryImage = categories.find((category) => category.name === filter)?.imageUrl;
@@ -281,7 +295,6 @@ export default function ProductPage() {
                       </span>
                     </span>
                     <span className="category-card-name">{filter}</span>
-                    {isActive && <span className="category-selected-mark">Dipilih</span>}
                   </button>
                 );
               })}
@@ -299,30 +312,25 @@ export default function ProductPage() {
           </div>
         </section>
 
-        {activeFilter && (
-          <div className="category-active-banner" aria-live="polite">
-            <div className="category-active-copy">
-              <span className="category-active-pill">Sedang melihat</span>
-              <strong>{activeFilter}</strong>
-              <span className="category-active-count">
-                {loading ? 'Memuat produk...' : `${visibleProducts.length} produk ditemukan`}
-              </span>
-            </div>
-            <button type="button" className="category-clear-filter" onClick={() => setActiveFilter('')}>
-              Lihat semua kategori
-            </button>
-          </div>
-        )}
-
-        {/* Pencarian & Urutan */}
         <div className="catalog-page-tools">
           <div className="catalog-page-search">
             <Search size={18} aria-hidden="true" />
             <input
+              aria-label="Cari produk berdasarkan nama atau kategori"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari nama barang..."
+              placeholder="Cari nama produk atau kategori..."
             />
+            {search && (
+              <button
+                type="button"
+                className="catalog-search-clear"
+                onClick={() => setSearch('')}
+                aria-label="Hapus pencarian"
+              >
+                <X size={17} />
+              </button>
+            )}
           </div>
           <select
             value={sort}
@@ -335,7 +343,21 @@ export default function ProductPage() {
           </select>
         </div>
 
-        {/* Grid Produk Style FreshMart: Gambar Besar, Harga Jelas, Tombol Tambah Besar */}
+        <div className="catalog-results-summary" aria-live="polite">
+          <div>
+            <h2>{activeFilter || (search ? 'Hasil pencarian' : 'Semua produk')}</h2>
+            <span>
+              {loading ? 'Memuat katalog...' : `${visibleProducts.length} produk`}
+              {search ? ` untuk “${search}”` : ''}
+            </span>
+          </div>
+          {(search || activeFilter) && (
+            <button type="button" onClick={() => { setSearch(''); setActiveFilter(''); }}>
+              Hapus filter
+            </button>
+          )}
+        </div>
+
         <div className="catalog-page-product-grid">
           {visibleProducts.map((product) => (
             <ProductCard
@@ -349,14 +371,33 @@ export default function ProductPage() {
         </div>
 
         {loading && (
-          <div style={{ textAlign: 'center', padding: '40px 16px', color: '#6b7280' }}>
-            Memuat katalog produk...
-          </div>
+          visibleProducts.length === 0 && (
+            <div className="catalog-loading-state" role="status" aria-label="Memuat produk">
+              {Array.from({ length: 8 }, (_, index) => (
+                <div className="catalog-loading-card" key={index}>
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {!loading && visibleProducts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 16px', color: '#6b7280' }}>
-            Belum ada produk yang cocok dengan pencarian.
+          <div className="catalog-empty-state">
+            <span className="catalog-empty-icon"><ShoppingBag size={26} /></span>
+            <h3>{search || activeFilter ? 'Produk belum ditemukan' : 'Katalog sedang kosong'}</h3>
+            <p>
+              {search || activeFilter
+                ? 'Coba kata kunci lain atau hapus filter untuk melihat produk lainnya.'
+                : 'Produk yang tersedia akan muncul di sini.'}
+            </p>
+            {(search || activeFilter) && (
+              <button type="button" onClick={() => { setSearch(''); setActiveFilter(''); }}>
+                Tampilkan semua produk
+              </button>
+            )}
           </div>
         )}
       </main>

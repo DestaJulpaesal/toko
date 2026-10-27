@@ -217,6 +217,27 @@ router.patch('/messages/:id/read', authenticateToken, requireRole('OWNER'), asyn
   }
 });
 
+router.delete('/messages/:id', authenticateToken, requireRole('OWNER'), async (req, res) => {
+  try {
+    const result = await prisma.contactMessage.deleteMany({ where: { id: req.params.id } });
+    if (!result.count) return res.status(404).json({ success: false, message: 'Pesan tidak ditemukan.' });
+    return res.json({ success: true, deletedCount: result.count, message: 'Pesan berhasil dihapus.' });
+  } catch (error) {
+    console.error('Contact message delete failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Pesan belum bisa dihapus.' });
+  }
+});
+
+router.delete('/messages', authenticateToken, requireRole('OWNER'), async (_req, res) => {
+  try {
+    const result = await prisma.contactMessage.deleteMany();
+    return res.json({ success: true, deletedCount: result.count, message: 'Semua pesan berhasil dihapus.' });
+  } catch (error) {
+    console.error('Contact messages bulk delete failed:', error.message);
+    return res.status(503).json({ success: false, message: 'Semua pesan belum bisa dihapus.' });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const { type, publishedOnly = 'false' } = req.query || {};

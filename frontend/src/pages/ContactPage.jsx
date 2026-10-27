@@ -5,6 +5,7 @@ import PublicFooter from '../components/PublicFooter';
 import { apiFetch } from '../services/api';
 import { usePublicSettings } from '../context/PublicSettingsContext';
 import { normalizeIndonesianPhone } from '../utils/phoneUtils';
+import { validateContactMessage } from '../utils/contactMessageValidation';
 
 const EMPTY_FORM = {
   name: '',
@@ -42,6 +43,7 @@ function isPlaceholderContactValue(value = '') {
 export default function ContactPage() {
   const { storeProfile } = usePublicSettings();
   const [form, setForm] = useState(EMPTY_FORM);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -92,12 +94,23 @@ export default function ContactPage() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    const updatedForm = { ...form, [name]: value };
+    setForm(updatedForm);
+    if (fieldErrors[name]) setFieldErrors((current) => ({ ...current, [name]: validateContactMessage(updatedForm)[name] }));
     if (feedback) setFeedback(null);
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    const formElement = event.currentTarget;
+    const errors = validateContactMessage(form);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      setFeedback({ type: 'error', text: 'Periksa kembali isian yang ditandai.' });
+      formElement.elements.namedItem(Object.keys(errors)[0])?.focus();
+      return;
+    }
+
     setSubmitting(true);
     setFeedback(null);
 
@@ -110,13 +123,31 @@ export default function ContactPage() {
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
+        if (Array.isArray(data.errors) && data.errors.length) {
+          const serverErrors = data.errors.reduce((result, issue) => {
+            if (['name', 'phone', 'message'].includes(issue.field)) result[issue.field] = issue.message;
+            return result;
+          }, {});
+          if (Object.keys(serverErrors).length) {
+            setFieldErrors(serverErrors);
+            formElement.elements.namedItem(Object.keys(serverErrors)[0])?.focus();
+            setFeedback({ type: 'error', text: 'Periksa kembali isian yang ditandai.' });
+            return;
+          }
+        }
         throw new Error(data.message || 'Pesan belum bisa dikirim. Coba lagi sebentar.');
       }
 
       setForm(EMPTY_FORM);
+      setFieldErrors({});
       setFeedback({ type: 'success', text: data.message });
     } catch (error) {
-      setFeedback({ type: 'error', text: error.message || 'Terjadi kendala saat mengirim pesan.' });
+      setFeedback({
+        type: 'error',
+        text: error instanceof TypeError
+          ? 'Koneksi sedang bermasalah. Periksa jaringan internet lalu coba lagi.'
+          : error.message || 'Pesan belum dapat dikirim. Silakan coba lagi.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -197,19 +228,23 @@ export default function ContactPage() {
               <p>Tulis nama dan pesanmu. Nomor WhatsApp boleh dikosongkan.</p>
             </div>
 
-            <form className="contact-form" onSubmit={handleSubmit}>
+            <form className="contact-form" onSubmit={handleSubmit} noValidate>
               <div className="contact-form-grid">
                 <label>
                   Nama <span aria-hidden="true">*</span>
-                  <input name="name" value={form.name} onChange={handleChange} autoComplete="name" required minLength={2} maxLength={100} placeholder="Nama lengkap" />
+                  <input id="contact-name" name="name" value={form.name} onChange={handleChange} autoComplete="name" maxLength={100} placeholder="Nama lengkap" aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? 'contact-name-error' : undefined} />
+                  {fieldErrors.name && <small className="contact-field-error" id="contact-name-error" role="alert">{fieldErrors.name}</small>}
                 </label>
                 <label>
                   Nomor WhatsApp <span className="contact-optional-label">(opsional)</span>
-                  <input name="phone" value={form.phone} onChange={handleChange} autoComplete="tel" maxLength={30} placeholder="08xx xxxx xxxx" />
+                  <input id="contact-phone" name="phone" value={form.phone} onChange={handleChange} autoComplete="tel" inputMode="tel" maxLength={30} placeholder="08xx xxxx xxxx" aria-invalid={Boolean(fieldErrors.phone)} aria-describedby={fieldErrors.phone ? 'contact-phone-error' : undefined} />
+                  {fieldErrors.phone && <small className="contact-field-error" id="contact-phone-error" role="alert">{fieldErrors.phone}</small>}
                 </label>
                 <label className="contact-message-field">
                   Pesan <span aria-hidden="true">*</span>
-                  <textarea name="message" value={form.message} onChange={handleChange} required minLength={3} maxLength={2000} rows={5} placeholder="Tulis pesanmu di sini..." />
+                  <textarea id="contact-message" name="message" value={form.message} onChange={handleChange} maxLength={2000} rows={5} placeholder="Tulis pesanmu di sini..." aria-invalid={Boolean(fieldErrors.message)} aria-describedby={fieldErrors.message ? 'contact-message-error' : undefined} />
+                  <small className="contact-message-counter">{form.message.length}/2.000 karakter</small>
+                  {fieldErrors.message && <small className="contact-field-error" id="contact-message-error" role="alert">{fieldErrors.message}</small>}
                 </label>
               </div>
 

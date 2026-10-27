@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { updateFinanceLoggingStreak } from '../services/financeStreakService.js';
+import { generateGlobotReply } from '../services/globotService.js';
 import { createIdempotencyGuard, verifyWebhookSecret } from '../services/webhookSecurity.js';
 import { normalizeIndonesianPhone } from '../utils/phoneUtils.js';
 
@@ -10,6 +11,7 @@ const router = express.Router();
 const idempotency = createIdempotencyGuard();
 const normalizePhone = normalizeIndonesianPhone;
 const allowedNumbers = () => String(process.env.OWNER_WHATSAPP_NUMBER || '').split(',').map(normalizePhone).filter(Boolean);
+const brainwareNumbers = () => String(process.env.BRAINWARE_WHATSAPP_NUMBERS || '').split(',').map(normalizePhone).filter(Boolean);
 const money = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 
 function parseAmount(value) {
@@ -37,12 +39,15 @@ async function logWhatsAppTransaction(sender, type, amount, description) {
 }
 
 async function sendReply(target, message) {
-  if (!process.env.FONNTE_API_KEY) return;
-  await fetch('https://api.fonnte.com/send', {
+  if (!process.env.FONNTE_API_KEY) throw new Error('FONNTE_API_KEY belum dikonfigurasi.');
+  const response = await fetch('https://api.fonnte.com/send', {
     method: 'POST',
     headers: { Authorization: process.env.FONNTE_API_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ target, message }),
   });
+  if (!response.ok) throw new Error(`Fonnte mengembalikan HTTP ${response.status}.`);
+  const result = await response.json();
+  if (result.status === false) throw new Error('Fonnte menolak pengiriman pesan.');
 }
 
 async function answerOwner(command, sender) {
@@ -92,11 +97,13 @@ async function answerOwner(command, sender) {
     const products = await prisma.product.findMany({ where: { name: { contains: query, mode: 'insensitive' } }, select: { name: true, variants: { where: { isDefault: true, isActive: true }, select: { stockQty: true, unit: true }, take: 1 } }, take: 5 });
     return products.length ? products.map((item) => `• ${item.name}: ${item.variants[0]?.stockQty || 0} ${item.variants[0]?.unit || 'unit'}`).join('\n') : `Barang "${query}" tidak ditemukan.`;
   }
-  return 'Perintah belum dikenali. Ketik *bantuan* untuk melihat daftar perintah.';
+  return null;
 }
 
 async function answerCustomer(sender, command) {
   const text = String(command || '').trim().toLowerCase();
+  const isOrderQuestion = text === 'cek pesanan' || text === 'status' || text.startsWith('lacak ');
+  if (!isOrderQuestion) return null;
   const customer = await prisma.customer.findFirst({ where: { phone: sender } });
   if (!customer) return 'Nomor ini belum memiliki pesanan Glosir yang tercatat.';
   const baseWhere = { customerId: customer.id, status: { notIn: ['COMPLETED', 'CANCELLED', 'VOIDED'] } };
@@ -125,7 +132,8 @@ router.post('/', async (req, res) => {
   const sender = normalizePhone(req.body?.sender || req.body?.from || req.body?.phone);
   if (!sender) return res.json({ success: true, ignored: true });
 
-  const message = req.body?.message || req.body?.text || req.body?.body || '';
+  const message = String(req.body?.message || req.body?.text || req.body?.body || '').trim().slice(0, 1200);
+  if (!message) return res.json({ success: true, ignored: true });
   const timestamp = req.body?.timestamp || '';
 
   // 2. Pesan yang sama (pengirim + isi + waktu kirim) tidak diproses dua kali. Provider WA
@@ -135,7 +143,30 @@ router.post('/', async (req, res) => {
     return res.json({ success: true, duplicate: true });
   }
 
-  try {    const reply = allowedNumbers().includes(sender) ? await answerOwner(message, sender) : await answerCustomer(sender, message);
+  try {
+    const isOwner = allowedNumbers().includes(sender);
+    const isBrainware = isOwner || brainwareNumbers().includes(sender);
+    let reply = isOwner ? await answerOwner(message, sender) : await answerCustomer(sender, message);
+    if (!reply) {
+      try {
+        const result = await generateGlobotReply({
+          db: prisma,
+          messages: [{ role: 'user', content: message }],
+          context: { path: '/whatsapp', title: 'Percakapan WhatsApp' },
+          audience: isBrainware ? 'brainware' : 'customer',
+        });
+        reply = result.answer;
+      } catch (error) {
+        console.error(`Globot WhatsApp reply failed: ${error.message}`);
+        if (error.code === 'GLOBOT_NOT_CONFIGURED') {
+          reply = isBrainware
+            ? 'Perintah AI belum diaktifkan. Perintah operasional tetap tersedia; ketik *bantuan* untuk melihat daftarnya.'
+            : 'Maaf kak, Globot sedang disiapkan. Untuk bantuan, silakan hubungi admin toko.';
+        } else {
+          reply = 'Maaf, Globot sedang mengalami gangguan. Silakan coba lagi atau hubungi admin toko.';
+        }
+      }
+    }
     await sendReply(sender, reply);
     return res.json({ success: true, replied: true });
   } catch (error) {

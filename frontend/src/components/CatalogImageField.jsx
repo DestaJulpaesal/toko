@@ -29,8 +29,8 @@ export default function CatalogImageField({ value, onChange, group, label = 'Fot
     setUploading(true);
     try {
       const body = new FormData();
-      body.append('image', file);
       body.append('group', group);
+      body.append('image', file);
       const response = await apiFetch('/media/catalog-image', { method: 'POST', body, silentNotify: true });
       const data = await response.json();
       if (!response.ok || !data.success || !data.imageUrl) throw new Error(data.message || 'Gambar gagal diunggah.');

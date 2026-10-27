@@ -69,9 +69,9 @@ Glosir/
 5. Salin `frontend/.env.example` menjadi `frontend/.env`, atur `VITE_API_URL`
    (lokal: `http://127.0.0.1:5000/api`), kemudian jalankan `cd frontend`,
    `npm ci`, dan `npm run dev`.
-6. Supabase masih dipakai untuk Storage gambar produk. Isi `SUPABASE_URL` dan
-   `SUPABASE_SERVICE_ROLE_KEY` di `backend/.env` jika fitur upload gambar
-   diperlukan; PostgreSQL Docker menggantikan database Supabase, bukan Storage.
+6. Gambar katalog disimpan di `backend/uploads` dan dilayani langsung oleh
+   backend; upload tidak memerlukan Supabase Storage. Folder ini sudah
+   dikecualikan dari Git agar foto lokal tidak ikut ter-commit.
 
 ## Pemeriksaan
 
@@ -135,7 +135,17 @@ sudah terdaftar di Glosir; akun baru tidak otomatis dibuat.
 
 ### Catalog Images
 
-Create a public Supabase Storage bucket named `catalog-images`. The backend requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_ANON_KEY` when its Storage policy permits uploads); `SUPABASE_CATALOG_BUCKET` is optional and defaults to `catalog-images`. Owners and admins can upload JPG, PNG, or WebP files up to 5 MB from the product, parsel, and event-package forms. Files are placed under `products/`, `parcels/`, or `event-packages/`, and only the returned public URL is saved in the existing database record.
+### Catalog Images
+
+Owners and admins can upload JPG, PNG, or WebP files up to 5 MB from product,
+category, parsel, and event-package forms. Images are stored under
+`backend/uploads/catalog/` and served from `/uploads/catalog/...`; no Supabase
+Storage bucket or credentials are required. The PostgreSQL Docker volume stores
+database records, while these image files live on the backend filesystem. Keep
+`backend/uploads/` persistent and backed up. When the backend is hosted behind
+a reverse proxy or on a different domain from the frontend, set `PUBLIC_API_URL`
+to the public backend origin (for example `https://api.example.com`) so saved
+image URLs point to the correct server.
 
 ## Implemented Controls
 
@@ -147,8 +157,8 @@ Create a public Supabase Storage bucket named `catalog-images`. The backend requ
 - Admin routes: `/admin/stock-opname` and `/admin/event-packages`; public catalog: `/paket-acara`.
 - Owner mengelola akun Owner, Admin, Kasir, dan Manager Parsel di `/admin/accounts`. Undangan karyawan dan reset password akun tim tersedia di halaman tersebut; profil toko tetap dikelola di `/admin/profile`. Kasir tidak ditampilkan sebagai manager parsel.
 - Optional nightly WhatsApp recap uses Fonnte when `ENABLE_NIGHTLY_RECAP=true`, `FONNTE_API_KEY`, and `OWNER_WHATSAPP_NUMBER` are configured.
-- WhatsApp owner commands are available at `POST /api/whatsapp/webhook`; configure the owner whitelist and optional `WHATSAPP_WEBHOOK_SECRET` before connecting a provider.
-- Customer WhatsApp commands: `cek pesanan`, `status`, and `lacak [nomor order]`. Status notifications are sent after admin updates an order through `PATCH /api/orders/:id/status`.
+- WhatsApp replies use Fonnte at `POST /api/whatsapp/webhook`. Configure `FONNTE_API_KEY`, `WHATSAPP_WEBHOOK_SECRET` (required as the `x-webhook-secret` header), and the AI provider settings `GLOBOT_CHAT_COMPLETIONS_URL`, `GLOBOT_MODEL`, and `GLOBOT_API_KEY` to enable conversational replies. Set `OWNER_WHATSAPP_NUMBER` for owner-only operational commands and optionally `BRAINWARE_WHATSAPP_NUMBERS` (comma-separated) for team members who can chat with Globot.
+- Globot answers general WhatsApp questions from customers and configured brainware. Customers can still use `cek pesanan`, `status`, and `lacak [nomor order]`; owner commands such as `saldo` and `stok` continue to be handled locally and are not sent to the AI provider. Status notifications are sent after admin updates an order through `PATCH /api/orders/:id/status`.
 - Parsel now uses `ProductVariant` contents, supports automatic/manual pricing, shows contents publicly, and deducts component stock during POS checkout.
 
 Integrasi WhatsApp, email, Google OAuth, dan penyimpanan gambar memerlukan

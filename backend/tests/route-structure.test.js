@@ -9,6 +9,8 @@ import adminDashboardRoutes from '../src/routes/adminDashboardRoutes.js';
 import customerRoutes from '../src/routes/customerRoutes.js';
 import orderRoutes from '../src/routes/orderRoutes.js';
 import productRoutes from '../src/routes/productRoutes.js';
+import siteContentRoutes from '../src/routes/siteContentRoutes.js';
+import { contactMessageSchema } from '../src/middleware/security.js';
 
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -25,6 +27,20 @@ test('critical endpoints exist on router import, without invoking parent handler
   assert.ok(directPaths(productRoutes, 'patch').includes('/:id/variants/:variantId'));
   assert.ok(directPaths(analyticsRoutes, 'get').includes('/sales-report'));
   assert.ok(directPaths(adminDashboardRoutes, 'get').includes('/summary'));
+  assert.ok(directPaths(siteContentRoutes, 'delete').includes('/messages/:id'));
+  assert.ok(directPaths(siteContentRoutes, 'delete').includes('/messages'));
+});
+
+test('public contact message schema validates Indonesian WhatsApp numbers with clear messages', () => {
+  const validWithoutPhone = contactMessageSchema.safeParse({ name: 'Udin', message: 'Halo Glosir' });
+  assert.equal(validWithoutPhone.success, true);
+
+  const invalidPhone = contactMessageSchema.safeParse({ name: 'Udin', phone: '021-555-0123', message: 'Halo Glosir' });
+  assert.equal(invalidPhone.success, false);
+  assert.equal(
+    invalidPhone.error.issues.find((issue) => issue.path[0] === 'phone')?.message,
+    'Masukkan nomor WhatsApp Indonesia yang valid, misalnya 0812 3456 7890.',
+  );
 });
 
 test('route and service source contains no route declarations inside handlers', () => {

@@ -14,6 +14,63 @@ const roleLabels = {
   CASHIER: 'Kasir',
   PARCEL_MANAGER: 'Manager Parsel',
 };
+const commonPasswords = new Set(['password', 'password123', '12345678', 'qwerty123', 'qwertyui', 'admin123', 'glosir123']);
+
+function validateAccountForm(form, editing) {
+  const errors = {};
+  const name = form.name.trim();
+  const email = form.email.trim();
+
+  if (!name) errors.name = 'Nama lengkap wajib diisi.';
+  else if (name.length > 100) errors.name = 'Nama lengkap maksimal 100 karakter.';
+
+  if (!email) errors.email = 'Alamat email wajib diisi.';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Masukkan alamat email dengan format yang benar.';
+
+  if (editing && form.password && form.password.length < 8) {
+    errors.password = 'Kata sandi baru minimal 8 karakter.';
+  } else if (editing && commonPasswords.has(form.password.trim().toLowerCase())) {
+    errors.password = 'Kata sandi terlalu mudah ditebak. Gunakan kata sandi yang lebih kuat.';
+  }
+
+  if (form.role === 'PARCEL_MANAGER' && !form.regionId) {
+    errors.regionId = 'Pilih wilayah tugas untuk Manager Parsel.';
+  }
+
+  return errors;
+}
+
+function validatePasswordForm(form) {
+  const errors = {};
+  if (!form.newPassword) errors.newPassword = 'Kata sandi baru wajib diisi.';
+  else if (form.newPassword.length < 8) errors.newPassword = 'Kata sandi baru minimal 8 karakter.';
+  else if (commonPasswords.has(form.newPassword.trim().toLowerCase())) {
+    errors.newPassword = 'Kata sandi terlalu mudah ditebak. Gunakan kata sandi yang lebih kuat.';
+  }
+
+  if (!form.passwordConfirmation) errors.passwordConfirmation = 'Ulangi kata sandi baru.';
+  else if (form.newPassword !== form.passwordConfirmation) errors.passwordConfirmation = 'Kata sandi yang diulang belum sama.';
+  return errors;
+}
+
+function translateAccountValidationIssues(issues = []) {
+  const errors = {};
+  issues.forEach(({ field }) => {
+    if (field === 'name') errors.name = 'Periksa kembali nama lengkap (maksimal 100 karakter).';
+    if (field === 'email') errors.email = 'Masukkan alamat email dengan format yang benar.';
+    if (field === 'regionId') errors.regionId = 'Pilih wilayah tugas yang masih tersedia.';
+    if (field === 'password') errors.password = 'Kata sandi baru minimal 8 karakter dan tidak mudah ditebak.';
+    if (field === 'newPassword') errors.newPassword = 'Kata sandi baru minimal 8 karakter dan tidak mudah ditebak.';
+    if (field === 'passwordConfirmation') errors.passwordConfirmation = 'Pastikan kata sandi yang diulang sudah sama dan minimal 8 karakter.';
+  });
+  return errors;
+}
+
+function getIndonesianError(error, fallback) {
+  if (error instanceof TypeError) return 'Koneksi ke server bermasalah. Periksa internet lalu coba lagi.';
+  if (error instanceof SyntaxError) return 'Respons server tidak dapat dibaca. Coba muat ulang halaman.';
+  return error.message || fallback;
+}
 
 function getCurrentUser() {
   try {
@@ -34,9 +91,11 @@ export default function AccountManagementPage() {
   const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
   const [accountForm, setAccountForm] = useState(emptyAccountForm);
+  const [accountFieldErrors, setAccountFieldErrors] = useState({});
   const [editingAccount, setEditingAccount] = useState(null);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', passwordConfirmation: '' });
+  const [passwordFieldErrors, setPasswordFieldErrors] = useState({});
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [sessionAction, setSessionAction] = useState('');
 
@@ -57,7 +116,7 @@ export default function AccountManagementPage() {
       setAccounts(accountData.accounts || []);
       setRegions(regionData.regions || []);
     } catch (error) {
-      setNotice(error.message || 'Data akun gagal dimuat.');
+      setNotice(getIndonesianError(error, 'Data akun belum berhasil dimuat.'));
     } finally {
       setLoading(false);
     }
@@ -72,9 +131,37 @@ export default function AccountManagementPage() {
       .some((value) => String(value || '').toLowerCase().includes(query)));
   }, [accounts, search]);
 
+  const updateAccountField = (field, value) => {
+    setAccountForm((current) => ({ ...current, [field]: value }));
+    setAccountFieldErrors((current) => {
+      const next = { ...current };
+      delete next[field];
+      if (field === 'role' && value !== 'PARCEL_MANAGER') delete next.regionId;
+      return next;
+    });
+  };
+
+  const updatePasswordField = (field, value) => {
+    const updated = { ...passwordForm, [field]: value };
+    setPasswordForm(updated);
+    setPasswordFieldErrors((current) => {
+      const next = { ...current };
+      delete next[field];
+      if (field === 'newPassword' && next.passwordConfirmation) {
+        if (updated.newPassword !== updated.passwordConfirmation) {
+          next.passwordConfirmation = 'Kata sandi yang diulang belum sama.';
+        } else {
+          delete next.passwordConfirmation;
+        }
+      }
+      return next;
+    });
+  };
+
   const openInviteForm = () => {
     setEditingAccount(null);
     setAccountForm(emptyAccountForm);
+    setAccountFieldErrors({});
     setNotice('');
     setAccountModalOpen(true);
   };
@@ -89,6 +176,7 @@ export default function AccountManagementPage() {
       regionId: account.regionId || '',
       password: '',
     });
+    setAccountFieldErrors({});
     setNotice('');
     setAccountModalOpen(true);
   };
@@ -96,6 +184,13 @@ export default function AccountManagementPage() {
   const submitAccount = async (event) => {
     event.preventDefault();
     if (saving) return;
+    const errors = validateAccountForm(accountForm, Boolean(editingAccount));
+    setAccountFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      setNotice('');
+      document.getElementById(Object.keys(errors)[0] === 'regionId' ? 'account-region' : `account-${Object.keys(errors)[0]}`)?.focus();
+      return;
+    }
     setSaving(true);
     setNotice('');
     try {
@@ -120,12 +215,21 @@ export default function AccountManagementPage() {
         },
       );
       const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.message || 'Akun gagal disimpan.');
+      if (!response.ok || !data.success) {
+        const serverErrors = translateAccountValidationIssues(data.errors);
+        if (Object.keys(serverErrors).length) {
+          setAccountFieldErrors(serverErrors);
+          document.getElementById(Object.keys(serverErrors)[0] === 'regionId' ? 'account-region' : `account-${Object.keys(serverErrors)[0]}`)?.focus();
+          return;
+        }
+        throw new Error(data.message || 'Akun belum berhasil disimpan. Silakan coba lagi.');
+      }
       setAccountModalOpen(false);
+      setAccountFieldErrors({});
       setNotice(data.message || (editingAccount ? 'Akun berhasil diperbarui.' : 'Undangan akun berhasil dikirim.'));
       await loadAccounts();
     } catch (error) {
-      setNotice(error.message || 'Akun gagal disimpan.');
+      setNotice(getIndonesianError(error, 'Akun belum berhasil disimpan. Silakan coba lagi.'));
     } finally {
       setSaving(false);
     }
@@ -149,14 +253,17 @@ export default function AccountManagementPage() {
         : `Akun ${account.name} berhasil diaktifkan kembali.`);
       await loadAccounts();
     } catch (error) {
-      setNotice(error.message || 'Status akun gagal diperbarui.');
+      setNotice(getIndonesianError(error, 'Status akun belum berhasil diperbarui.'));
     }
   };
 
   const changePassword = async (event) => {
     event.preventDefault();
-    if (passwordForm.newPassword !== passwordForm.passwordConfirmation) {
-      setNotice('Password baru dan konfirmasi password harus sama.');
+    const errors = validatePasswordForm(passwordForm);
+    setPasswordFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      setNotice('');
+      document.getElementById(`account-${Object.keys(errors)[0]}`)?.focus();
       return;
     }
     setPasswordSaving(true);
@@ -169,14 +276,23 @@ export default function AccountManagementPage() {
         silentNotify: true,
       });
       const data = await response.json();
-      if (!response.ok || !data.success) throw new Error(data.message || 'Password gagal diganti.');
-      if (!data.token) throw new Error('Password berubah, tetapi sesi baru tidak diterima. Silakan login kembali.');
+      if (!response.ok || !data.success) {
+        const serverErrors = translateAccountValidationIssues(data.errors);
+        if (Object.keys(serverErrors).length) {
+          setPasswordFieldErrors(serverErrors);
+          document.getElementById(`account-${Object.keys(serverErrors)[0]}`)?.focus();
+          return;
+        }
+        throw new Error(data.message || 'Kata sandi belum berhasil diganti. Silakan coba lagi.');
+      }
+      if (!data.token) throw new Error('Kata sandi berubah, tetapi sesi baru tidak diterima. Silakan masuk kembali.');
       localStorage.setItem('glosir_token', data.token);
       monitorSessionExpiry();
       setPasswordForm({ newPassword: '', passwordConfirmation: '' });
-      setNotice('Password berhasil diganti.');
+      setPasswordFieldErrors({});
+      setNotice('Kata sandi berhasil diganti.');
     } catch (error) {
-      setNotice(error.message || 'Password gagal diganti.');
+      setNotice(getIndonesianError(error, 'Kata sandi belum berhasil diganti. Silakan coba lagi.'));
     } finally {
       setPasswordSaving(false);
     }
@@ -194,7 +310,7 @@ export default function AccountManagementPage() {
       monitorSessionExpiry();
       setNotice(data.message || 'Sesi perangkat lain berhasil dikeluarkan.');
     } catch (error) {
-      setNotice(error.message || 'Sesi perangkat lain gagal dikeluarkan.');
+      setNotice(getIndonesianError(error, 'Sesi perangkat lain gagal dikeluarkan.'));
     } finally {
       setSessionAction('');
     }
@@ -213,7 +329,7 @@ export default function AccountManagementPage() {
       clearStaffCaches();
       navigate('/login', { replace: true });
     } catch (error) {
-      setNotice(error.message || 'Sesi gagal dikeluarkan.');
+      setNotice(getIndonesianError(error, 'Sesi gagal dikeluarkan.'));
       setSessionAction('');
     }
   };
@@ -222,9 +338,9 @@ export default function AccountManagementPage() {
     <AdminShell active="Akun & Akses" mainClassName="account-management-page">
       <header className="admin-header account-page-header">
         <div>
-          <p className="eyebrow light">PENGATURAN KEAMANAN</p>
+          <p className="eyebrow light">{isOwner ? 'PENGELOLAAN TOKO' : 'PENGATURAN KEAMANAN'}</p>
           <h1>{isOwner ? 'Akun & Akses' : 'Keamanan Akun'}</h1>
-          <p className="admin-subtitle">{isOwner ? 'Kelola akun Owner, Admin, Kasir, dan Manager Parsel dari satu tempat.' : 'Ubah password dan kelola sesi login akun Anda.'}</p>
+          <p className="admin-subtitle">{isOwner ? 'Kelola akun Owner, Admin, Kasir, dan Manager Parsel dari satu tempat.' : 'Ubah kata sandi dan kelola sesi masuk akun Anda.'}</p>
         </div>
         {isOwner && <button type="button" className="btn btn-secondary" onClick={loadAccounts} disabled={loading}><RefreshCw size={15} /> {loading ? 'Memuat...' : 'Muat ulang'}</button>}
       </header>
@@ -245,28 +361,31 @@ export default function AccountManagementPage() {
         {isOwner && (
           <section className="dashboard-panel account-list-panel">
             <div className="dashboard-panel-heading">
-              <div><span className="panel-kicker">Akun terdaftar</span><h2>Semua akun</h2></div>
+              <div><span className="panel-kicker">AKUN TERDAFTAR</span><h2>Semua akun</h2><p>Kelola akses dan peran tim toko.</p></div>
               <button type="button" className="btn btn-primary" onClick={openInviteForm}><Plus size={16} /> Undang akun</button>
             </div>
             <div className="account-list-toolbar">
-              <p>Hapus akses akun dengan ikon tong sampah. Akun dinonaktifkan dan riwayatnya tetap tersimpan.</p>
-              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama, email, peran..." aria-label="Cari akun" />
+              <p>{loading ? 'Memuat daftar akun...' : `Menampilkan ${filteredAccounts.length} dari ${accounts.length} akun. Menonaktifkan akun akan mempertahankan riwayatnya.`}</p>
+              <label className="account-search-field">
+                <span className="sr-only">Cari akun</span>
+                <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama, email, peran..." aria-label="Cari akun" />
+              </label>
             </div>
             <div className="account-table-wrap">
               <table className="account-table">
-                <thead><tr><th>Nama / Email</th><th>Peran</th><th>Wilayah</th><th>Status</th><th>Email</th><th>Aksi</th></tr></thead>
+                <thead><tr><th scope="col">Nama akun</th><th scope="col">Peran</th><th scope="col">Wilayah tugas</th><th scope="col">Status akun</th><th scope="col">Verifikasi email</th><th scope="col">Tindakan</th></tr></thead>
                 <tbody>
                   {filteredAccounts.map((account) => {
                     const protectedAccount = account.role === 'OWNER';
                     return <tr key={account.id}>
-                      <td data-label="Nama / Email"><strong>{account.name}</strong><small>{account.email}{account.phone ? ` · ${account.phone}` : ''}</small></td>
+                      <td data-label="Nama akun"><strong>{account.name}</strong><small>{account.email}</small>{account.phone && <small className="account-phone">{account.phone}</small>}</td>
                       <td data-label="Peran"><span className={`account-role-badge role-${account.role.toLowerCase()}`}>{roleLabels[account.role] || account.role}</span></td>
-                      <td data-label="Wilayah">{account.regionName || '—'}</td>
-                      <td data-label="Status"><span className={`account-status ${account.isActive ? 'is-active' : 'is-inactive'}`}>{account.isActive ? 'Aktif' : 'Nonaktif'}</span></td>
-                      <td data-label="Email">{account.emailVerifiedAt ? 'Terverifikasi' : 'Belum verifikasi'}</td>
+                      <td data-label="Wilayah tugas">{account.regionName || <span className="account-table-muted">Tidak ditetapkan</span>}</td>
+                      <td data-label="Status akun"><span className={`account-status ${account.isActive ? 'is-active' : 'is-inactive'}`}><i />{account.isActive ? 'Aktif' : 'Nonaktif'}</span></td>
+                      <td data-label="Verifikasi email"><span className={`account-verification ${account.emailVerifiedAt ? 'is-verified' : 'is-pending'}`}>{account.emailVerifiedAt ? 'Terverifikasi' : 'Belum diverifikasi'}</span></td>
                       <td data-label="Aksi" className="account-row-actions">
                         {protectedAccount
-                          ? <span className="account-protected-label"><ShieldCheck size={14} /> Dilindungi</span>
+                          ? <span className="account-protected-label"><ShieldCheck size={14} /> Akun utama</span>
                           : <>
                             <button type="button" className="icon-action" onClick={() => openEditForm(account)} aria-label={`Edit akun ${account.name}`} title="Edit akun"><Pencil size={14} /></button>
                             <button type="button" className={`icon-action ${account.isActive ? 'icon-action-danger' : ''}`} onClick={() => toggleAccountStatus(account)} aria-label={account.isActive ? `Hapus akses akun ${account.name} (nonaktifkan)` : `Aktifkan kembali akun ${account.name}`} title={account.isActive ? 'Hapus akses (nonaktifkan)' : 'Aktifkan kembali'}>{account.isActive ? <Trash2 size={14} /> : <UserRoundCheck size={14} />}</button>
@@ -283,20 +402,34 @@ export default function AccountManagementPage() {
         )}
 
         <section className="crud-form-panel account-security-panel">
-          <div className="panel-heading"><div><span className="panel-kicker">KEAMANAN AKUN</span><h2>Ganti password</h2><p>Password baru berlaku untuk akun {currentUser?.email || 'Anda'}.</p></div></div>
-          <form onSubmit={changePassword}>
-            <div className="form-two-columns">
-              <label>Password baru<input type="password" autoComplete="new-password" minLength={8} required value={passwordForm.newPassword} onChange={(event) => setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))} placeholder="Minimal 8 karakter" /></label>
-              <label>Ulangi password baru<input type="password" autoComplete="new-password" minLength={8} required value={passwordForm.passwordConfirmation} onChange={(event) => setPasswordForm((current) => ({ ...current, passwordConfirmation: event.target.value }))} placeholder="Ketik ulang password baru" /></label>
-            </div>
-            <button className="btn btn-primary" type="submit" disabled={passwordSaving}>{passwordSaving ? 'Mengganti password...' : 'Simpan password baru'}</button>
-          </form>
-          <hr />
-          <h3>Kelola sesi login</h3>
-          <p>Keluarkan perangkat yang tidak lagi digunakan. Mengeluarkan semua perangkat akan meminta Anda login kembali.</p>
-          <div className="form-two-columns">
-            <button className="btn btn-secondary" type="button" disabled={Boolean(sessionAction)} onClick={logoutOtherDevices}>{sessionAction === 'others' ? 'Mengeluarkan perangkat...' : 'Keluarkan perangkat lain'}</button>
-            <button className="btn btn-secondary" type="button" disabled={Boolean(sessionAction)} onClick={logoutAllDevices}>{sessionAction === 'all' ? 'Mengeluarkan semua...' : 'Keluarkan semua perangkat'}</button>
+          <div className="account-security-heading">
+            <span className="account-security-icon"><ShieldCheck size={19} /></span>
+            <div><span className="panel-kicker">KEAMANAN AKUN</span><h2>Amankan akunmu</h2><p>Atur kata sandi dan perangkat yang sedang masuk.</p></div>
+          </div>
+          <div className="account-security-grid">
+            <section className="account-security-section">
+              <div className="account-security-section-heading"><KeyRound size={17} /><div><h3>Ganti kata sandi</h3><p>Berlaku untuk akun <strong>{currentUser?.email || 'Anda'}</strong>.</p></div></div>
+              <form onSubmit={changePassword} noValidate>
+                <div className="form-two-columns">
+                  <label htmlFor="account-newPassword">Kata sandi baru
+                    <input id="account-newPassword" type="password" autoComplete="new-password" minLength={8} required value={passwordForm.newPassword} onChange={(event) => updatePasswordField('newPassword', event.target.value)} placeholder="Minimal 8 karakter" aria-invalid={Boolean(passwordFieldErrors.newPassword)} aria-describedby={passwordFieldErrors.newPassword ? 'account-newPassword-error' : undefined} />
+                    {passwordFieldErrors.newPassword && <small className="account-field-error" id="account-newPassword-error" role="alert">{passwordFieldErrors.newPassword}</small>}
+                  </label>
+                  <label htmlFor="account-passwordConfirmation">Ulangi kata sandi
+                    <input id="account-passwordConfirmation" type="password" autoComplete="new-password" minLength={8} required value={passwordForm.passwordConfirmation} onChange={(event) => updatePasswordField('passwordConfirmation', event.target.value)} placeholder="Ketik ulang kata sandi" aria-invalid={Boolean(passwordFieldErrors.passwordConfirmation)} aria-describedby={passwordFieldErrors.passwordConfirmation ? 'account-passwordConfirmation-error' : undefined} />
+                    {passwordFieldErrors.passwordConfirmation && <small className="account-field-error" id="account-passwordConfirmation-error" role="alert">{passwordFieldErrors.passwordConfirmation}</small>}
+                  </label>
+                </div>
+                <button className="btn btn-primary" type="submit" disabled={passwordSaving}>{passwordSaving ? 'Mengganti kata sandi...' : 'Simpan kata sandi'}</button>
+              </form>
+            </section>
+            <section className="account-security-section">
+              <div className="account-security-section-heading"><KeyRound size={17} /><div><h3>Kelola sesi login</h3><p>Keluarkan perangkat yang tidak lagi digunakan. Perangkat akan diminta masuk kembali.</p></div></div>
+              <div className="account-session-actions">
+                <button className="btn btn-secondary" type="button" disabled={Boolean(sessionAction)} onClick={logoutOtherDevices}>{sessionAction === 'others' ? 'Mengeluarkan perangkat...' : 'Keluarkan perangkat lain'}</button>
+                <button className="btn btn-secondary" type="button" disabled={Boolean(sessionAction)} onClick={logoutAllDevices}>{sessionAction === 'all' ? 'Mengeluarkan semua...' : 'Keluarkan semua perangkat'}</button>
+              </div>
+            </section>
           </div>
         </section>
       </div>
@@ -305,27 +438,36 @@ export default function AccountManagementPage() {
         isOpen={accountModalOpen}
         onClose={() => setAccountModalOpen(false)}
         title={editingAccount ? 'Edit akun' : 'Undang akun baru'}
-        subtitle={editingAccount ? 'Perbarui identitas, peran, wilayah, atau password akun.' : 'Karyawan akan menerima email untuk membuat password sendiri.'}
+        subtitle={editingAccount ? 'Perbarui identitas, peran, wilayah, atau kata sandi akun.' : 'Karyawan akan menerima email untuk membuat kata sandi sendiri.'}
         kicker="Akun Glosir"
         maxWidth="680px"
       >
-        <form className="account-edit-form" onSubmit={submitAccount}>
+        <form className="account-edit-form" onSubmit={submitAccount} noValidate>
           <div className="form-two-columns">
-            <label>Nama lengkap<input required maxLength={100} autoComplete="name" value={accountForm.name} onChange={(event) => setAccountForm((current) => ({ ...current, name: event.target.value }))} /></label>
-            <label>Email<input required type="email" autoComplete="email" value={accountForm.email} onChange={(event) => setAccountForm((current) => ({ ...current, email: event.target.value }))} /></label>
+            <label htmlFor="account-name">Nama lengkap
+              <input id="account-name" required maxLength={100} autoComplete="name" value={accountForm.name} onChange={(event) => updateAccountField('name', event.target.value)} aria-invalid={Boolean(accountFieldErrors.name)} aria-describedby={accountFieldErrors.name ? 'account-name-error' : undefined} />
+              {accountFieldErrors.name && <small className="account-field-error" id="account-name-error" role="alert">{accountFieldErrors.name}</small>}
+            </label>
+            <label htmlFor="account-email">Alamat email
+              <input id="account-email" required type="email" autoComplete="email" value={accountForm.email} onChange={(event) => updateAccountField('email', event.target.value)} aria-invalid={Boolean(accountFieldErrors.email)} aria-describedby={accountFieldErrors.email ? 'account-email-error' : undefined} />
+              {accountFieldErrors.email && <small className="account-field-error" id="account-email-error" role="alert">{accountFieldErrors.email}</small>}
+            </label>
           </div>
           <div className="form-two-columns">
-            <label>Nomor telepon<input type="tel" autoComplete="tel" value={accountForm.phone} onChange={(event) => setAccountForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Opsional" /></label>
-            <label>Peran<select value={accountForm.role} onChange={(event) => setAccountForm((current) => ({ ...current, role: event.target.value, regionId: event.target.value === 'PARCEL_MANAGER' ? current.regionId : '' }))}><option value="CASHIER">Kasir</option><option value="ADMIN">Admin</option><option value="PARCEL_MANAGER">Manager Parsel</option></select></label>
+            <label htmlFor="account-phone">Nomor telepon <span className="account-optional-label">(opsional)</span><input id="account-phone" type="tel" autoComplete="tel" value={accountForm.phone} onChange={(event) => updateAccountField('phone', event.target.value)} placeholder="08xx xxxx xxxx" /></label>
+            <label htmlFor="account-role">Peran<select id="account-role" value={accountForm.role} onChange={(event) => updateAccountField('role', event.target.value)}><option value="CASHIER">Kasir</option><option value="ADMIN">Admin</option><option value="PARCEL_MANAGER">Manager Parsel</option></select></label>
           </div>
           {accountForm.role === 'PARCEL_MANAGER' && <>
-            <label>Wilayah penugasan<select required value={accountForm.regionId} onChange={(event) => setAccountForm((current) => ({ ...current, regionId: event.target.value }))}><option value="">Pilih wilayah</option>{regions.filter((region) => region.isActive && (!region.managerId || region.managerId === editingAccount?.id)).map((region) => <option key={region.id} value={region.id}>{region.name} ({region.code})</option>)}{editingAccount?.regionId && !regions.some((region) => region.id === editingAccount.regionId) && <option value={editingAccount.regionId}>{editingAccount.regionName || 'Wilayah terhubung'} · tidak aktif</option>}</select></label>
+            <label htmlFor="account-region">Wilayah tugas
+              <select id="account-region" required value={accountForm.regionId} onChange={(event) => updateAccountField('regionId', event.target.value)} aria-invalid={Boolean(accountFieldErrors.regionId)} aria-describedby={accountFieldErrors.regionId ? 'account-region-error' : undefined}><option value="">Pilih wilayah tugas</option>{regions.filter((region) => region.isActive && (!region.managerId || region.managerId === editingAccount?.id)).map((region) => <option key={region.id} value={region.id}>{region.name} ({region.code})</option>)}{editingAccount?.regionId && !regions.some((region) => region.id === editingAccount.regionId) && <option value={editingAccount.regionId}>{editingAccount.regionName || 'Wilayah terhubung'} · tidak aktif</option>}</select>
+              {accountFieldErrors.regionId && <small className="account-field-error" id="account-region-error" role="alert">{accountFieldErrors.regionId}</small>}
+            </label>
             {editingAccount?.regionId && editingAccount.regionIsActive === false && <small className="account-region-warning">Wilayah akun ini sedang nonaktif. Pilih wilayah aktif untuk memindahkan manager.</small>}
           </>}
-          {editingAccount && <label>Password baru <span className="account-optional-label">(opsional)</span><input type="password" autoComplete="new-password" minLength={8} value={accountForm.password} onChange={(event) => setAccountForm((current) => ({ ...current, password: event.target.value }))} placeholder="Kosongkan jika tidak diubah" /><small>Jika password diubah, semua sesi akun ini akan dikeluarkan.</small></label>}
+          {editingAccount && <label htmlFor="account-password">Kata sandi baru <span className="account-optional-label">(opsional)</span><input id="account-password" type="password" autoComplete="new-password" minLength={8} value={accountForm.password} onChange={(event) => updateAccountField('password', event.target.value)} placeholder="Kosongkan jika tidak diubah" aria-invalid={Boolean(accountFieldErrors.password)} aria-describedby={accountFieldErrors.password ? 'account-password-error' : undefined} />{accountFieldErrors.password && <small className="account-field-error" id="account-password-error" role="alert">{accountFieldErrors.password}</small>}<small>Jika kata sandi diubah, semua sesi akun ini akan dikeluarkan.</small></label>}
           <div className="account-modal-actions">
             <button type="button" className="btn btn-secondary" onClick={() => setAccountModalOpen(false)}>Batal</button>
-            <button type="submit" className="btn btn-primary" disabled={saving || (accountForm.role === 'PARCEL_MANAGER' && !accountForm.regionId)}>{saving ? 'Menyimpan...' : editingAccount ? 'Simpan perubahan' : <><UserPlus size={15} /> Kirim undangan</>}</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Menyimpan...' : editingAccount ? 'Simpan perubahan' : <><UserPlus size={15} /> Kirim undangan</>}</button>
           </div>
         </form>
       </ModalForm>

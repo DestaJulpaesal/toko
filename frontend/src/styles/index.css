@@ -6730,6 +6730,34 @@ a:focus-visible {
   box-shadow: 0 0 0 3px rgba(31, 122, 74, 0.12);
 }
 
+.contact-form input[aria-invalid="true"],
+.contact-form textarea[aria-invalid="true"] {
+  border-color: #d66b60;
+  background: #fffafa;
+}
+
+.contact-form input[aria-invalid="true"]:focus,
+.contact-form textarea[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px rgba(191, 70, 57, 0.11);
+}
+
+.contact-form .contact-field-error {
+  display: block;
+  margin-top: -1px;
+  color: #a33f38;
+  font-size: .72rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.contact-form .contact-message-counter {
+  justify-self: end;
+  margin-top: -2px;
+  color: #89958c;
+  font-size: .68rem;
+  font-weight: 600;
+}
+
 .contact-form-feedback {
   padding: 11px 13px;
   border-radius: 10px;

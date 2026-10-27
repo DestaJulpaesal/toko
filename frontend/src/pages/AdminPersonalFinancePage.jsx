@@ -133,7 +133,7 @@ export default function AdminPersonalFinancePage() {
   }, { target: 0, saved: 0 });
   const periodProgress = periodTotals.target ? Math.min(periodTotals.saved / periodTotals.target * 100, 100) : 0;
 
-  return <AdminShell active="Catatan Pribadi" className="admin-crud-shell">
+  return <AdminShell active="Catatan Pribadi" className="admin-crud-shell personal-finance-shell">
     <header className="admin-header personal-page-header">
       <div><p className="eyebrow light">Ruang finansial pribadi</p><h1>Catatan Pribadi & Tabungan</h1><p className="admin-subtitle">Satu tempat untuk melihat tujuan, kebiasaan, dan progres uang kamu.</p></div>
       <div className="personal-header-actions"><span className={`database-status ${loading ? 'loading' : loadFailed ? 'error' : 'ready'}`}><i /> {loading ? 'Memuat data' : loadFailed ? 'Gagal tersinkron' : 'Data tersinkron'}</span><button className="personal-refresh-button" type="button" onClick={load} disabled={loading}><RefreshCw size={15} className={loading ? 'is-spinning' : ''} />{loading ? 'Memuat...' : 'Muat ulang'}</button></div>
@@ -146,19 +146,22 @@ export default function AdminPersonalFinancePage() {
     <section className="personal-monthly-plan" aria-label={`Rencana setoran ${selectedPeriodName}`}>
       <div className="personal-monthly-icon"><CalendarDays size={20} /></div>
       <div className="personal-monthly-content">
-        <div className="personal-monthly-heading"><div><span className="panel-kicker">Rencana setoran</span><h2>{selectedPeriodName}</h2></div><span className="personal-monthly-count">{goals.length} target</span></div>
+        <div className="personal-monthly-heading">
+          <div><span className="panel-kicker">Rencana setoran</span><h2>{selectedPeriodName}</h2></div>
+          <label className="personal-period-select">Rentang
+            <select value={selectedPeriod} onChange={(event) => setSelectedPeriod(event.target.value)} aria-label="Pilih rentang progres">
+              <option value="week">7 hari terakhir</option>
+              <option value="month">Bulan ini</option>
+              <option value="year">Tahun ini</option>
+            </select>
+          </label>
+          <span className="personal-monthly-count">{goals.length} target</span>
+        </div>
         <div className="personal-monthly-values"><span>Terkumpul <strong>{money(periodTotals.saved)}</strong></span><span>Rencana periode <strong>{money(periodTotals.target)}</strong></span><b>{Math.round(periodProgress)}%</b></div>
         <div className="personal-monthly-progress" role="progressbar" aria-valuenow={Math.round(periodProgress)} aria-valuemin="0" aria-valuemax="100" aria-label={`Progres rencana setoran ${selectedPeriodName}`}><span style={{ width: `${periodProgress}%` }} /></div>
         <small>Rencana mengikuti frekuensi tiap target dan dihitung proporsional sampai hari ini; setoran bisa dicatat kapan saja.</small>
       </div>
       <div className="personal-monthly-total"><span>Sisa rencana periode</span><strong>{money(Math.max(periodTotals.target - periodTotals.saved, 0))}</strong></div>
-      <label className="personal-period-select">Rentang
-        <select value={selectedPeriod} onChange={(event) => setSelectedPeriod(event.target.value)} aria-label="Pilih rentang progres">
-          <option value="week">7 hari terakhir</option>
-          <option value="month">Bulan ini</option>
-          <option value="year">Tahun ini</option>
-        </select>
-      </label>
     </section>
     <section className="personal-goals">
       <div className="personal-section-heading">

@@ -1,5 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { isValidIndonesianPhone } from '../utils/phoneUtils.js';
 
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -45,7 +46,7 @@ export const checkoutLimiter = rateLimit({
 
 export const globotLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 30,
+  limit: 300,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { success: false, message: 'Globot menerima terlalu banyak pertanyaan dari perangkat ini. Coba lagi beberapa menit.' },
@@ -304,13 +305,13 @@ export const savingsDepositSchema = z.object({
   date: z.union([z.string(), z.date()]).optional(),
 });
 export const reconciliationSchema = z.object({
-  accountId: z.string().min(1),
-  physicalCount: z.coerce.number().nonnegative(),
+  accountId: z.string({ error: 'Pilih akun kas yang akan dihitung.' }).min(1, 'Pilih akun kas yang akan dihitung.'),
+  physicalCount: z.coerce.number({ error: 'Masukkan jumlah uang yang valid.' }).nonnegative('Jumlah uang tidak boleh kurang dari nol.'),
   note: z.string().trim().optional().nullable(),
 });
 
 export const financeBulkPastePreviewSchema = z.object({
-  text: z.string().trim().min(1, 'Tempelan transaksi wajib diisi').max(50000),
+  text: z.string().trim().min(1, 'Tempelan transaksi wajib diisi').max(50000, 'Teks transaksi maksimal 50.000 karakter.'),
   type: z.enum(['INCOME', 'EXPENSE']).optional().default('EXPENSE'),
 });
 
@@ -318,11 +319,11 @@ export const financeBulkPasteConfirmSchema = z.object({
   transactions: z.array(z.object({
     type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER', 'DEBT']).default('EXPENSE'),
     amount: z.coerce.number().positive('Nominal harus lebih besar dari nol'),
-    description: z.string().trim().min(1, 'Keterangan wajib diisi').max(500),
+    description: z.string().trim().min(1, 'Keterangan wajib diisi').max(500, 'Keterangan maksimal 500 karakter.'),
     categoryId: z.string().trim().optional().nullable(),
     accountId: z.string().trim().optional().nullable(),
     paymentMethod: z.string().trim().optional().nullable(),
-  })).min(1, 'Minimal satu transaksi wajib diisi').max(500),
+  })).min(1, 'Minimal satu transaksi wajib diisi').max(500, 'Maksimal 500 transaksi dapat disimpan sekaligus.'),
 });
 
 // ---- Penagihan Parsel ----
@@ -495,7 +496,7 @@ export const siteContentUpdateSchema = siteContentCreateSchema.partial();
 export const contactMessageSchema = z.object({
   name: z.string().trim().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
   phone: z.string().trim().max(30, 'Nomor WhatsApp maksimal 30 karakter').optional().default('')
-    .refine((value) => !value || value.length >= 8, 'Nomor WhatsApp minimal 8 karakter'),
+    .refine((value) => !value || isValidIndonesianPhone(value), 'Masukkan nomor WhatsApp Indonesia yang valid, misalnya 0812 3456 7890.'),
   message: z.string().trim().min(3, 'Pesan minimal 3 karakter').max(2000, 'Pesan maksimal 2000 karakter'),
 });
 

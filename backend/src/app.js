@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 import multer from 'multer';
 import compression from 'compression';
+import { fileURLToPath } from 'node:url';
 
 import { apiLimiter, whatsappWebhookLimiter } from './middleware/security.js';
 import authRoutes from './routes/authRoutes.js';
@@ -53,6 +54,7 @@ import prisma from './config/db.js';
 import { createHomepageHandler } from './services/homepageHandler.js';
 
 const app = express();
+const uploadsDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'uploads');
 
 // Percayakan header X-Forwarded-* dari reverse proxy (Vercel/Nginx/dll) satu hop,
 // supaya rate limiter & logging membaca IP asli klien, bukan IP proxy.
@@ -94,7 +96,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(hpp());
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(uploadsDirectory));
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Glosir API is running' });
